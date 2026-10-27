@@ -124,9 +124,14 @@ function fromDataTables(raw: Record<string, unknown>, byId: Map<string, ServerCo
     if (!column) throw new TableQueryError(`order.${index}.column`, 'order[].column must be the index of a column');
     return column.id === '' ? [] : [`${column.id}:${entry?.['dir'] === 'desc' ? 'desc' : 'asc'}`];
   });
+  // This package's client sends each filter twice: in `filters[i]` and, for DataTables back ends,
+  // as its column's search. With `filters[i]` the column searches are those copies; without them
+  // (DataTables itself) a column's search is a `contains` filter.
   const extra = list(raw['filters']);
-  for (const column of listed) {
-    if (column.id !== '' && column.search.trim() !== '') extra.push({ field: column.id, op: 'contains', value: column.search });
+  if (extra.length === 0) {
+    for (const column of listed) {
+      if (column.id !== '' && column.search.trim() !== '') extra.push({ field: column.id, op: 'contains', value: column.search });
+    }
   }
   const searchRaw = raw['search'];
   const search = text(typeof searchRaw === 'object' && searchRaw !== null ? (searchRaw as Record<string, unknown>)['value'] ?? '' : searchRaw ?? '', 'search');

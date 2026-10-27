@@ -90,6 +90,18 @@ All notable changes to this repository. Each npm package also has its own
   inflates to 200 MB and claims 1 KB) is refused by both back ends; the error
   report downloads through the client, so bearer-token APIs work; an import
   guide on the docs site and an import scenario in the live demo.
+- **DataTables requests filtered once:** this package's client sends each
+  filter both as `filters[i]` and as its column's search; the Node and
+  Laravel back ends applied both, so a boolean, number or date filter also
+  became a text `contains` (422 or no rows). With `filters[i]` in a request
+  the column searches are now ignored; a DataTables front end without them
+  works as before.
+- **Import fixes (not released yet):** the client sends its headers and
+  cookies only to its own origin (an error report on another host got the
+  bearer token); a chunked upload is counted while it is read (413 past the
+  limit); the xlsx readers stay linear on elements that never close; two
+  starts of one import at once run it once (Node `ImportStore.claim`, Laravel
+  cache lock), and the dialog ignores a second click while it starts.
 
 ## npm 0.4.0 and `acunsoft/datatable-laravel` 0.5.0 (2026-10-25)
 

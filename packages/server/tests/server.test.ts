@@ -263,3 +263,18 @@ describe('counting', () => {
     expect(tableResponse(query, [{ id: 1 }])).toEqual({ rows: [{ id: 1 }] });
   });
 });
+
+describe('DataTables requests from this package\'s client', () => {
+  it('take filters[i] and leave out the column searches, which are their copies', () => {
+    // datatable-http sends an eq filter on a yes/no column both ways (for DataTables back ends too).
+    const params = new URLSearchParams('draw=1&start=0&length=10&columns[0][data]=customer&columns[1][data]=paid&columns[1][search][value]=true'
+      + '&filters[0][field]=paid&filters[0][op]=eq&filters[0][value]=true');
+    const query = readTableQuery(params, columns);
+    expect(query.filters.map(filter => [filter.column.id, filter.operator, filter.value])).toEqual([['paid', 'eq', true]]);
+  });
+
+  it('still read a column search as contains when there are no filters[i] (DataTables itself)', () => {
+    const query = readTableQuery(new URLSearchParams('draw=1&start=0&length=10&columns[0][data]=customer&columns[0][search][value]=ali'), columns);
+    expect(query.filters.map(filter => [filter.column.id, filter.operator, filter.value])).toEqual([['customer', 'contains', 'ali']]);
+  });
+});
