@@ -128,6 +128,8 @@ All notable changes to this repository. Each npm package also has its own
   properties only, so a model property (`public ?Team $team`) was dropped
   and a `query()` scoped by it exported every row (measured: 8 rows instead
   of 3). The properties now travel through Livewire's synthesizers.
+  While a task runs, the table's 2-second check no longer renders the table
+  again (its page, count and totals were read every 2 seconds).
 
 ## npm 0.4.0 and `acunsoft/datatable-laravel` 0.5.0 (2026-10-25)
 
