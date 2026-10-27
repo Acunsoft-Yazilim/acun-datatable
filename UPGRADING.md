@@ -1,5 +1,24 @@
 # Upgrading
 
+## Next release (not released yet)
+
+### `acunsoft/datatable-laravel`
+
+1. **Editing in place needs a policy.** A Livewire table with `editable()`
+   columns let anyone who could see it edit every cell when the model had no
+   policy. Now an edit without a policy is refused (403). Add a policy with
+   `update()` for the model, or allow it on purpose:
+
+   ```php
+   protected function editableWithoutPolicy(): bool
+   {
+       return true; // whoever sees this table may edit it
+   }
+   ```
+
+   Query-builder rows have no policy: override `authorizeEdit()` (or
+   `editableWithoutPolicy()`) for them.
+
 ## npm packages: 0.2.x → 0.4.0
 
 0.3.0 was prepared but not published, so 0.4.0 carries both releases. Most of

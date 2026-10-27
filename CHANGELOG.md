@@ -5,6 +5,10 @@ All notable changes to this repository. Each npm package also has its own
 
 ## Unreleased
 
+- **Breaking (Laravel): editing in place needs a policy.** Without a model
+  policy anyone who saw a Livewire table could edit every `editable()` cell;
+  now such an edit is refused unless the table's `editableWithoutPolicy()`
+  returns `true` (see UPGRADING.md).
 - **React render loop fixed:** `useDataTable` with a new `data` array on every
   render (`orders.filter(…)`) no longer renders without end.
 - **Server-side exports fixed:** `@acunsoft/datatable` fetched 1,000 rows a
