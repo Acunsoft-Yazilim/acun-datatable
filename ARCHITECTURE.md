@@ -197,6 +197,7 @@ Request (GET query, POST form or JSON), validated on the server:
 | `filters[i][field\|op\|value]` | `contains startsWith eq gt gte lt lte between in empty notEmpty` |
 | `search` | smart search text (words, `"quoted phrases"`) |
 | `paging`, `cursor` | `paging=cursor`; `cursor` is the previous answer's `nextCursor` |
+| `tz` | the browser's time zone (`Europe/Istanbul`), sent with a day among the filters: a day on a date-time column is that whole day there; optional, unknown zones are ignored, the server may set its own |
 | DataTables protocol | `draw`, `start`, `length`, `order[i]`, `columns[i]`, `search[value]` — answered in DataTables' format |
 
 Response:

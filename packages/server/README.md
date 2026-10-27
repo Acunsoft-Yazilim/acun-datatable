@@ -65,7 +65,9 @@ or `createHttpDataSource({ url: '/api/orders' })` with the React or Vue package.
   (`$1` for PostgreSQL, `?` for MySQL, MariaDB and SQLite, `@p1` for SQL
   Server): filters (`contains`,
   `startsWith`, `eq`, `gt`, `gte`, `lt`, `lte`, `between`, `in`, `empty`,
-  `notEmpty`; a day on a date-time column means the whole day), the smart
+  `notEmpty`; a day on a date-time column means the whole day, in the time
+  zone the browser sends as `tz`, or `readTableQuery`'s `timeZone` option
+  when you set it, else the server's), the smart
   search (every word must match some searchable column; letters are never
   looked for in numbers or dates), sorting with the key as the last
   tie-breaker, and `LIMIT`/`OFFSET` (`OFFSET … FETCH` on SQL Server). `scope`

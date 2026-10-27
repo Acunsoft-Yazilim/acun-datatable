@@ -1,6 +1,7 @@
 import { foldText } from '@acunsoft/datatable-core';
 import type { ServerColumn } from './columns';
 import { decodeCursor, encodeCursor, sortSignature } from './cursor';
+import { exactInstants, TableDay } from './day';
 import type { ServerFilter, ServerTableQuery } from './query';
 
 type Where = Record<string, unknown>;
@@ -24,7 +25,9 @@ export interface PrismaTableQuery {
 }
 
 const isMidnight = (date: Date): boolean => date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0 && date.getMilliseconds() === 0;
-const nextDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+/** A whole day: a `TableDay` from `readTableQuery` (in the user's zone), or a `Date` at the server's midnight. */
+const isDay = (value: unknown): value is Date => value instanceof TableDay || (value instanceof Date && !exactInstants.has(value) && isMidnight(value));
+const nextDay = (date: Date): Date => (date instanceof TableDay ? date.next : new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1));
 
 /**
  * Prisma arguments for a checked query (`readTableQuery`): `prisma.order.findMany(q.findMany)`
@@ -51,7 +54,7 @@ export function prismaQuery(query: ServerTableQuery, columns: readonly ServerCol
     const field = column.field;
     const value = column.type === 'date' && typeof filter.value === 'string' ? new Date(`${filter.value}T00:00:00.000Z`)
       : column.type === 'date' && Array.isArray(filter.value) ? filter.value.map(item => new Date(`${String(item)}T00:00:00.000Z`)) : filter.value;
-    const day = column.type === 'datetime' && value instanceof Date && isMidnight(value);
+    const day = column.type === 'datetime' && isDay(value);
     switch (operator) {
       case 'contains':
         return column.search ? { [column.search]: { contains: foldText(String(value)) } } : { [field]: { contains: String(value), ...mode } };
@@ -69,7 +72,7 @@ export function prismaQuery(query: ServerTableQuery, columns: readonly ServerCol
         return day ? { [field]: { lt: nextDay(value as Date) } } : { [field]: { lte: value } };
       case 'between': {
         const [low, high] = value as [unknown, unknown];
-        return column.type === 'datetime' && high instanceof Date && isMidnight(high)
+        return column.type === 'datetime' && isDay(high)
           ? { [field]: { gte: low, lt: nextDay(high) } }
           : { [field]: { gte: low, lte: high } };
       }

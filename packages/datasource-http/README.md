@@ -184,10 +184,12 @@ return `$query->paginate(...)` directly with `fromLaravelPaginator`, or pass a
 `parseResponse` that reads `meta.total`.
 
 **Days:** a date-only filter value (`2026-10-23`, which is also how a date
-picker's local midnight is sent) means the whole day. On a `datetime` column
-apply it with `whereDate($field, $text)` for `eq` (and `whereDate(... '>' ...)`
-/ `'<'` for `gt` / `lt`), not with a plain comparison, so `created_at` values
-later that day still match, exactly as the client does.
+picker's local midnight is sent) means the whole day, and the request then
+names the browser's time zone as `tz` (`Europe/Istanbul`). On a `datetime`
+column compare with the day as a half-open range in that zone: `eq` is
+`[day, next day)`, `gt` from the next day, `lt` before the day, so
+`created_at` values later that day still match, exactly as the client does.
+Laravel's `TableResponse` and `@acunsoft/datatable-server` do this.
 
 For the same case- and accent-insensitive matching as the client (`ayse` finds
 `Ayşe`, `istanbul` finds `İSTANBUL`), match against a folded copy of the text:

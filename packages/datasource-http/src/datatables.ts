@@ -1,4 +1,5 @@
 import { formatLocalDate, type TableQuery } from '@acunsoft/datatable-core';
+import { addTimeZone } from './zone';
 
 export interface DataTablesColumn {
   /** The field (DataTables `columns[i].data`). */
@@ -14,7 +15,8 @@ export interface DataTablesColumn {
  * `columns[i][data|name|searchable|orderable|search][value]`. A `contains` or
  * `eq` filter goes into its column's `search[value]`, the closest DataTables
  * has; every filter is also sent in this package's `filters[i]` format for
- * servers that read it. `draw` counts the requests.
+ * servers that read it (with `tz`, the browser's time zone, when one is a
+ * day). `draw` counts the requests.
  */
 export function serializeDataTablesQuery(query: TableQuery, columns: readonly DataTablesColumn[], draw: number): URLSearchParams {
   const params = new URLSearchParams();
@@ -46,7 +48,7 @@ export function serializeDataTablesQuery(query: TableQuery, columns: readonly Da
     if (Array.isArray(rule.value)) rule.value.forEach((item, at) => params.set(`filters[${position}][value][${at}]`, text(item)));
     else if (rule.value !== undefined) params.set(`filters[${position}][value]`, text(rule.value));
   });
-  return params;
+  return addTimeZone(params);
 }
 
 /** DataTables' server answer `{ draw, recordsTotal, recordsFiltered, data }` as `{ rows, totalRows }`. */

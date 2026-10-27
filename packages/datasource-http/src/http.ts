@@ -2,6 +2,7 @@ import {
   createTableQuery, formatLocalDate, MAX_PAGE_SIZE, validatePageResult,
   type DataSource, type PageResult, type TableQuery,
 } from '@acunsoft/datatable-core';
+import { addTimeZone } from './zone';
 
 /** Thrown for a non-2xx HTTP response. */
 export class HttpError extends Error {
@@ -61,7 +62,8 @@ function encodeValue(value: unknown, field: string): string {
  * no value. `search` is the raw text: servers should apply the same smart
  * search (split into words, quoted phrases kept together, every word must
  * match in some searchable column).
- * Dates are sent in local time (`formatLocalDate`). The server must re-validate everything.
+ * Dates are sent in local time (`formatLocalDate`); with a day among the
+ * filters, `tz` names the browser's time zone. The server must re-validate everything.
  */
 export function serializeTableQuery(query: TableQuery): URLSearchParams {
   const params = new URLSearchParams();
@@ -82,7 +84,7 @@ export function serializeTableQuery(query: TableQuery): URLSearchParams {
   });
   if (query.globalSearch !== undefined) params.set('search', query.globalSearch);
   if (query.cursor !== undefined) params.set('cursor', query.cursor);
-  return params;
+  return addTimeZone(params);
 }
 
 /**

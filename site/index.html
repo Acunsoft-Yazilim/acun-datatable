@@ -1165,11 +1165,11 @@ const GUIDES = {
     },
     "code": [
      "bash",
-     "# GET: parameters in the URL; POST: the same parameters as a form body\npage=2&pageSize=25\n&sort=price:desc,name:asc\n&filters[0][field]=price&filters[0][op]=between&filters[0][value][0]=100&filters[0][value][1]=500\n&search=kalem \"mavi mürekkep\"\n\n# Response: either\n{ \"rows\": [ { \"id\": 1, \"name\": \"Kalem\", \"price\": \"12.50\" } ], \"totalRows\": 185920 }\n# or Laravel's paginator { \"data\": [...], \"total\": 185920 }\n# or DataTables' { \"data\": [...], \"recordsFiltered\": 185920 }\n# Too many to count in time: send \"totalRowsAtLeast\": 10000 instead of totalRows."
+     "# GET: parameters in the URL; POST: the same parameters as a form body\npage=2&pageSize=25\n&sort=price:desc,name:asc\n&filters[0][field]=price&filters[0][op]=between&filters[0][value][0]=100&filters[0][value][1]=500\n&search=kalem \"mavi mürekkep\"\n# With a day among the filters, the browser's time zone: that whole day there\n&filters[1][field]=created&filters[1][op]=eq&filters[1][value]=2026-10-23&tz=Europe/Istanbul\n\n# Response: either\n{ \"rows\": [ { \"id\": 1, \"name\": \"Kalem\", \"price\": \"12.50\" } ], \"totalRows\": 185920 }\n# or Laravel's paginator { \"data\": [...], \"total\": 185920 }\n# or DataTables' { \"data\": [...], \"recordsFiltered\": 185920 }\n# Too many to count in time: send \"totalRowsAtLeast\": 10000 instead of totalRows."
     ],
     "note": {
-     "tr": "Arama \"akıllı aramadır\": her kelime bir kolonda geçmeli, tırnak içindeki ifade birlikte aranır, Türkçe harfler ve büyük/küçük harf fark etmez (ayse → Ayşe). Laravel paketi bunu sizin yerinize yapar.",
-     "en": "Search is \"smart search\": every word must match some column, quoted phrases stay together, Turkish letters and case do not matter (ayse → Ayşe). The Laravel package does this for you."
+     "tr": "Arama \"akıllı aramadır\": her kelime bir kolonda geçmeli, tırnak içindeki ifade birlikte aranır, Türkçe harfler ve büyük/küçük harf fark etmez (ayse → Ayşe). Tarih-saat kolonunda bir gün, o günün tamamıdır; tz verilmişse kullanıcının saat dilimindeki gün. Laravel ve Node paketleri bunları sizin yerinize yapar.",
+     "en": "Search is \"smart search\": every word must match some column, quoted phrases stay together, Turkish letters and case do not matter (ayse → Ayşe). A day on a date-time column is that whole day; with tz, the day in the user's time zone. The Laravel and Node packages do this for you."
     }
    },
    {

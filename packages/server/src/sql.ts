@@ -1,6 +1,7 @@
 import { foldText } from '@acunsoft/datatable-core';
 import { checkIdentifier, type ServerColumn } from './columns';
 import { decodeCursor, encodeCursor, sortSignature } from './cursor';
+import { exactInstants, TableDay } from './day';
 import { TableQueryError, type ServerFilter, type ServerTableQuery } from './query';
 
 export type SqlDialect = 'postgres' | 'mysql' | 'sqlite' | 'sqlserver';
@@ -54,7 +55,9 @@ export interface SqlTableQuery {
 
 const pad = (value: number): string => String(value).padStart(2, '0');
 const isMidnight = (date: Date): boolean => date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0 && date.getMilliseconds() === 0;
-const nextDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+/** A whole day: a `TableDay` from `readTableQuery` (in the user's zone), or a `Date` at the server's midnight. */
+const isDay = (value: unknown): value is Date => value instanceof TableDay || (value instanceof Date && !exactInstants.has(value) && isMidnight(value));
+const nextDay = (date: Date): Date => (date instanceof TableDay ? date.next : new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1));
 
 /**
  * Parameterized SQL for a checked query (`readTableQuery`): filters, the
@@ -119,7 +122,7 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
   function condition(filter: ServerFilter): string {
     const { column, operator, value } = filter;
     const sql = quote(column.sql);
-    const day = column.type === 'datetime' && value instanceof Date && isMidnight(value);
+    const day = column.type === 'datetime' && isDay(value);
     switch (operator) {
       case 'contains':
         return column.search
@@ -139,7 +142,7 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
         return day ? `${sql} < ${bind(nextDay(value as Date))}` : `${sql} <= ${bind(value)}`;
       case 'between': {
         const [low, high] = value as [unknown, unknown];
-        const wholeDay = column.type === 'datetime' && high instanceof Date && isMidnight(high);
+        const wholeDay = column.type === 'datetime' && isDay(high);
         return wholeDay ? `(${sql} >= ${bind(low)} AND ${sql} < ${bind(nextDay(high as Date))})` : `${sql} BETWEEN ${bind(low)} AND ${bind(high)}`;
       }
       case 'in':
