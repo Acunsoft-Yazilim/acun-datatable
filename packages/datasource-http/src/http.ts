@@ -38,9 +38,9 @@ export interface HttpDataSourceOptions {
    */
   readonly method?: 'GET' | 'POST';
   /**
-   * `'cursor'` asks the server for keyset pages (`paging=cursor`, and
-   * `cursor=` from the page before), for tables created with
-   * `paging: 'cursor'`. Default `'pages'`.
+   * Not needed with a table: a table created with `paging: 'cursor'` sends
+   * it in every query, and the source follows it. `'cursor'` here asks for
+   * keyset pages (`paging=cursor`) when you call `getPage` yourself.
    */
   readonly paging?: 'pages' | 'cursor';
 }
@@ -57,7 +57,7 @@ function encodeValue(value: unknown, field: string): string {
  * Default wire format, readable by PHP/Laravel and Node `qs` as nested arrays:
  * `page=2&pageSize=25&sort=total:desc,customer:asc`
  * `&filters[0][field]=total&filters[0][op]=gt&filters[0][value]=100&search=ayşe`
- * (`&cursor=…` with cursor paging).
+ * (`&paging=cursor&cursor=…` with cursor paging).
  * `between` and `in` send `filters[i][value][0..n]`; `empty` / `notEmpty` send
  * no value. `search` is the raw text: servers should apply the same smart
  * search (split into words, quoted phrases kept together, every word must
@@ -83,6 +83,7 @@ export function serializeTableQuery(query: TableQuery): URLSearchParams {
     } // empty / notEmpty carry no value
   });
   if (query.globalSearch !== undefined) params.set('search', query.globalSearch);
+  if (query.paging === 'cursor') params.set('paging', 'cursor');
   if (query.cursor !== undefined) params.set('cursor', query.cursor);
   return addTimeZone(params);
 }
@@ -126,8 +127,11 @@ export function createHttpDataSource<TData = Record<string, unknown>>(options: H
       if (query.pageSize > maxPageSize) {
         throw new RangeError(`pageSize ${query.pageSize} exceeds maxPageSize ${maxPageSize}`);
       }
+      if (options.paging === 'cursor' && query.page > 1 && query.cursor === undefined) {
+        throw new TypeError(`page ${query.page} has no cursor: create the table with paging: 'cursor' (the source follows it)`);
+      }
       const serialized = serialize(query);
-      if (options.paging === 'cursor') serialized.set('paging', 'cursor');
+      if (options.paging === 'cursor' || query.paging === 'cursor') serialized.set('paging', 'cursor');
       const params = serialized.toString();
       // Query parameters go before any #fragment: '/a?x=1#top' -> '/a?x=1&page=..#top'.
       const hash = url.indexOf('#');

@@ -106,6 +106,11 @@ All notable changes to this repository. Each npm package also has its own
   an ascending sort served the same rows again without end and a descending
   one skipped rows (10 rows in one millisecond: 7 skipped, measured). The page
   now also reads each date-time sort column as text for the cursor.
+- **Cursor paging is set once, on the table:** `paging: 'cursor'` had to be
+  given to the table and to `createHttpDataSource`; with only the table set,
+  the server answered page numbers and the table stayed on page 1. A cursor
+  table's queries now say `paging: 'cursor'` and the source follows them; its
+  own option stays for calling `getPage` yourself.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the

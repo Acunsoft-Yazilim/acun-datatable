@@ -337,8 +337,7 @@ export class AcunDataTable {
         headers: requestHeaders(ajax),
         // DataTables answers a refused query with 200 and `error`: shown as the error it is.
         parseResponse: body => serverRows(datatables && typeof ajax.dataSrc !== 'function' && body && typeof body === 'object' && 'error' in body ? fromDataTablesResponse(body) : body, ajax.dataSrc),
-        maxPageSize: 1000,
-        ...(cursorPaging(options) ? { paging: 'cursor' as const } : {}),
+        maxPageSize: 1000, // cursor paging: the table's queries say so
         ...(ajax.credentials ? { credentials: ajax.credentials } : {}),
       });
       let primed: PageResult<Data> | undefined;

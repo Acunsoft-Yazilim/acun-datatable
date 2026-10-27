@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTableQuery } from '@acunsoft/datatable-core';
+import { createDataTable, createTableQuery } from '@acunsoft/datatable-core';
 import {
   createHttpDataSource, createQueryRunner, formatLocalDate, fromDataTablesResponse, fromLaravelPaginator, HttpError, serializeDataTablesQuery, serializeTableQuery,
 } from '../src/index';
@@ -248,6 +248,25 @@ describe('cursor paging', () => {
     expect(url.searchParams.get('cursor')).toBe('eyJpZCI6Mn0');
     expect(result.nextCursor).toBe('eyJpZCI6M30');
     expect(serializeTableQuery(createTableQuery({ page: 1, pageSize: 1 })).has('cursor')).toBe(false);
+  });
+
+  it('follows a cursor table without being told, from the first page on', async () => {
+    const table = createDataTable<{ id: number }>({ mode: 'server', paging: 'cursor', columns: [], initialState: { pageSize: 1 } });
+    const fetch = okFetch({ rows: [{ id: 1 }], nextCursor: 'c2' });
+    const source = createHttpDataSource<{ id: number }>({ url: '/api/orders', fetch });
+    table.setPageResult(await source.getPage(table.getQuery()));
+    table.setPage(2);
+    await source.getPage(table.getQuery());
+    const sent = fetch.mock.calls.map(call => new URL(String(call[0]), 'http://x').searchParams);
+    expect(sent.map(params => [params.get('paging'), params.get('cursor')])).toEqual([['cursor', null], ['cursor', 'c2']]);
+    const pages = createHttpDataSource({ url: '/api/orders', fetch });
+    await pages.getPage(createDataTable<{ id: number }>({ mode: 'server', columns: [] }).getQuery());
+    expect(new URL(String(fetch.mock.calls[2]![0]), 'http://x').searchParams.has('paging')).toBe(false);
+  });
+
+  it('refuses page 2 without a cursor when only the source was set to cursor paging', async () => {
+    const source = createHttpDataSource({ url: '/api/orders', fetch: okFetch({ rows: [] }), paging: 'cursor' });
+    await expect(source.getPage(createTableQuery({ page: 2, pageSize: 1 }))).rejects.toThrow("create the table with paging: 'cursor'");
   });
 });
 
