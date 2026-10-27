@@ -79,9 +79,9 @@ From npm 0.2.x or `acunsoft/datatable-laravel` 0.4: see [UPGRADING.md](UPGRADING
 ## Setup
 
 The development standard is **Node.js 24 LTS**, pinned in [`.nvmrc`](.nvmrc).
-The packages support **Node.js 22+** (`engines`), and CI runs the full suite on
-Node **22 and 24**, every supported LTS line, so consumers are not limited to a
-single version. Node 20 reached end of life in April 2026 and is not supported.
+The packages support **Node.js 22+** (`engines`): CI runs the checks and unit
+tests on Node **22 and 24**, every supported LTS line, and the browser and
+database jobs on the `.nvmrc` version. Node 20 reached end of life in April 2026 and is not supported.
 Dependencies are pinned by the committed lockfile; updates land only through a PR
 that passes the CI matrix, never unattended. With [nvm](https://github.com/nvm-sh/nvm):
 

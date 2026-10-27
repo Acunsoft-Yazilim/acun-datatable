@@ -315,7 +315,7 @@ const API = [
   ['@acunsoft/datatable-server', [
     ["defineColumns({ id: { sql?, field?, type?, sortable?, filterable?, searchable?, search? } })", {tr:"Uç noktanın kolon izin listesi; yalnızca bu kimlikler sıralanır, filtrelenir, aranır.", en:"The endpoint's column allowlist; only these IDs are sorted, filtered or searched."}],
     ["readTableQuery(params | formData | body, columns, { maxPageSize? })", {tr:"İsteği okur ve denetler (bizim biçim veya DataTables protokolü, cursor dahil); hata TableQueryError.", en:"Reads and checks a request (this format or DataTables' protocol, cursors included); errors are TableQueryError."}],
-    ["sqlQuery(query, columns, { dialect, table, key?, select?, scope? })", {tr:"PostgreSQL/MySQL/SQLite için bağlı parametreli sayfa ve sayım SQL'i; cursor için cursorOf(row).", en:"Bound-parameter page and count SQL for PostgreSQL/MySQL/SQLite; cursorOf(row) for cursors."}],
+    ["sqlQuery(query, columns, { dialect, table, key?, select?, scope? })", {tr:"PostgreSQL/MySQL/SQLite/SQL Server için bağlı parametreli sayfa ve sayım SQL'i; cursor için cursorOf(row).", en:"Bound-parameter page and count SQL for PostgreSQL/MySQL/SQLite/SQL Server; cursorOf(row) for cursors."}],
     ["prismaQuery(query, columns, { key?, where?, insensitive? })", {tr:"Prisma findMany ve count argümanları.", en:"Prisma findMany and count arguments."}],
     ["tableResponse(query, rows, total?, { cursorOf?, map?, recordsTotal? }) · tableError(error, params)", {tr:"İsteğin biçiminde yanıt (rows/totalRows/nextCursor ya da DataTables) ve 422 / DataTables hatası.", en:"The answer in the request's format (rows/totalRows/nextCursor or DataTables) and 422 / DataTables errors."}],
   ]],
@@ -676,8 +676,8 @@ Object.assign(FW.html, { name: "HTML / JavaScript", topics: [
             en: "A standard custom element; no framework needed. Common options are attributes and properties alike (<code>src</code>, <code>server-side</code>, <code>language</code>, <code>page-size</code>, <code>responsive</code> …), everything else the <code>options</code>, <code>columns</code> and <code>data</code> properties. Light DOM, so <code>styles.css</code> and the page's theme apply. Safe to import on a server; it only runs in the browser." },
     parts: [
       { title: { tr: "Tek <script> etiketiyle", en: "With a single <script> tag" }, lang: "xml", code:
-`<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable/dist/styles.css">
-<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable/dist/acun-datatable.min.js"><\/script>
+`<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/acun-datatable.min.js"><\/script>
 
 <acun-datatable id="orders" src="/api/orders" server-side language="tr" page-size="25" responsive="auto"></acun-datatable>
 <script>
@@ -2950,8 +2950,10 @@ function renderHeader(r) {
   $('#cta').textContent = t.cta;
   const tr = lang === 'tr';
   $('#burger').setAttribute('aria-label', tr ? 'Menü' : 'Menu');
-  $('#lang').setAttribute('aria-label', tr ? 'Switch to English' : 'Türkçeye geç'); // says where it leads, in that language
-  $('#theme').setAttribute('aria-label', dark ? (tr ? 'Açık tema' : 'Light theme') : (tr ? 'Koyu tema' : 'Dark theme'));
+  // The visible text (TR / EN) is part of the name; then where the button leads, in that language.
+  $('#lang').setAttribute('aria-label', `${lang.toUpperCase()}: ${tr ? 'switch to English' : 'Türkçeye geç'}`);
+  $('#theme').setAttribute('aria-label', tr ? 'Koyu tema' : 'Dark theme');
+  $('#theme').setAttribute('aria-pressed', String(dark)); // a toggle that says whether it is on
   $('#skip').textContent = tr ? 'İçeriğe geç' : 'Skip to content';
   document.documentElement.lang = lang;
 }

@@ -59,7 +59,8 @@ test.describe('keyboard and screen reader use of the docs', () => {
     await page.evaluate(() => { location.hash = '#/api'; });
     await expect(page.locator('#content h1')).toBeFocused();
     await page.locator('#lang').click();
-    await expect(page.locator('#lang')).toHaveAttribute('aria-label', 'Türkçeye geç');
+    await expect(page.locator('#lang')).toHaveAttribute('aria-label', 'EN: Türkçeye geç'); // the visible EN is in the name
+    await expect(page.locator('#theme')).toHaveAttribute('aria-pressed', /^(true|false)$/);
     await expect(page.locator('#skip')).toHaveText('Skip to content');
   });
 });

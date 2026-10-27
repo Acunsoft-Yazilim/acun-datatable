@@ -1,8 +1,8 @@
 # @acunsoft/datatable-import
 
-> **Not released yet.** The protocol, its test kit and the import dialog are
-> done; the Laravel and the Node helpers follow (see `IMPORT-PLAN.md` in the
-> repository). This package is private until then.
+> **Not released yet.** The protocol, its test kit, the import dialog and the
+> Laravel and Node back ends are done; they come with the next release. This
+> package is private until then.
 
 Excel and CSV import for ACUN DataTable, as an optional module. The DataTable
 manages the interface; **your back end** reads the file and owns the limits,
