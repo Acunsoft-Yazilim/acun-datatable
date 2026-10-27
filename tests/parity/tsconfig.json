@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": true,
+    "paths": {
+      "@acunsoft/datatable-core": ["../../packages/core/src/index.ts"],
+      "@acunsoft/datatable-dom": ["../../packages/renderer-dom/src/index.ts"],
+      "@acunsoft/datatable-react": ["../../packages/react/src/index.ts"],
+      "@acunsoft/datatable-vue": ["../../packages/vue/src/index.ts"]
+    }
+  },
+  "include": ["*.ts"]
+}
