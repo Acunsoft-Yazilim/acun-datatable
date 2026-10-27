@@ -35,7 +35,9 @@ export function cellText(cell: SheetCell, type?: string): string {
 /**
  * Write a sheet as CSV (RFC 4180): fields with the delimiter, quotes or line
  * breaks are quoted, quotes are doubled. Numbers use `.`, dates are local
- * `YYYY-MM-DD` (and `HH:mm:ss` for instants), so the file reads back exactly.
+ * `YYYY-MM-DD` (and `HH:mm:ss` for instants), so the file reads back exactly,
+ * except text the formula guard prefixed with `'` (`=1+2`, `+90 555`, `-abc`):
+ * it reads back with the `'`. Turn the guard off for files only programs read.
  */
 export function toCsv(sheet: Sheet, options: ToCsvOptions = {}): string {
   checkSheet(sheet);

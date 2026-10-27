@@ -38,7 +38,8 @@ function serial(date: Date, dayOnly: boolean): number | undefined {
 }
 
 function sheetName(name: string | undefined): string {
-  const clean = (name ?? 'Sheet1').replace(/[[\]:*?/\\]/g, ' ').trim().slice(0, 31);
+  // Excel refuses these characters, and an apostrophe at either end.
+  const clean = (name ?? 'Sheet1').replace(/[[\]:*?/\\]/g, ' ').trim().slice(0, 31).replace(/^[\s']+|[\s']+$/g, '');
   return clean === '' || clean.toLowerCase() === 'history' ? 'Sheet1' : clean;
 }
 

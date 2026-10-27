@@ -170,6 +170,16 @@ describe('dates in the user\'s time zone', () => {
   });
 });
 
+describe('sheet names', () => {
+  it('lose an apostrophe at either end, which Excel refuses', async () => {
+    const { openZip } = await import('../src/zip');
+    const workbook = async (name: string) => new TextDecoder().decode(await openZip(toXlsx({ headers: ['A'], rows: [] }, { sheetName: name })).read('xl/workbook.xml'));
+    expect(await workbook("'Orders'")).toContain('<sheet name="Orders"');
+    expect(await workbook("Ali's orders")).toContain(`<sheet name="Ali's orders"`); // inside it is fine
+    expect(await workbook("''")).toContain('<sheet name="Sheet1"');
+  });
+});
+
 describe('text that looks like an escape', () => {
   it('reads back exactly, _x0041_ included', async () => {
     const sheet: Sheet = { headers: ['Note'], rows: [['_x0041_ literal'], ['a_x0041_b_x00'], ['_x005F_']] };
