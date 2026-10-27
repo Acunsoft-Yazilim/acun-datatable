@@ -104,7 +104,8 @@ describe('AcunDataTable', () => {
     const retry = vi.fn();
     const status = { getState: () => ({ status: current as 'loading' }), subscribe: (fn: typeof listener) => { listener = fn; return () => undefined; }, retry };
     await mount(() => h(AcunDataTable, { table: make(), status }));
-    expect(host.querySelector('.adt-table-wrap')!.getAttribute('aria-busy')).toBe('true');
+    expect(host.querySelector('.adt-scroll')!.getAttribute('aria-busy')).toBe('true');
+    expect(host.querySelector('.adt-notice')!.closest('[aria-busy="true"]')).toBeNull(); // "Loading…" is not held back
     expect(host.querySelector('[role="status"]')!.textContent).toBe('Loading…');
     current = 'error';
     listener({ status: 'error' });

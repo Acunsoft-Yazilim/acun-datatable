@@ -536,9 +536,10 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
       const height = scrollHeight(props.scrollY) ?? (virtual ? '480px' : undefined);
       const wrapClassName = wrapClass({ responsive, size, stickyHeader: props.stickyHeader, scrollY: height !== undefined, loading: busy, skeleton, virtual: virtual !== undefined });
       const tableClassName = tableClass({ collapsible, levels, detail: detailSlot !== undefined, userWidths: Object.keys(state.columnWidths).length > 0, locked: lock !== undefined });
-      return h('div', { ref: wrapEl, class: wrapClassName, style: height ? { '--adt-scroll-y': height } : undefined, 'aria-busy': props.status ? String(busy) : undefined }, [
+      return h('div', { ref: wrapEl, class: wrapClassName, style: height ? { '--adt-scroll-y': height } : undefined }, [
         notice,
-        h('div', { class: 'adt-scroll', onScroll: virtual ? onScroll : undefined }, [h('table', { class: tableClassName, 'aria-rowcount': all ? all.length + 1 : undefined }, [
+        // aria-busy on the rows' box, not around the notice (a busy region's changes may be held back).
+        h('div', { class: 'adt-scroll', onScroll: virtual ? onScroll : undefined, 'aria-busy': props.status ? String(busy) : undefined }, [h('table', { class: tableClassName, 'aria-rowcount': all ? all.length + 1 : undefined }, [
           props.caption !== undefined ? h('caption', props.caption) : null,
           h('thead', [h('tr', head)]),
           h('tbody', skeleton ? { 'aria-hidden': 'true' } : null, body),

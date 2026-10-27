@@ -100,7 +100,8 @@ describe('DataTable', () => {
       retry,
     };
     render(h(DataTable<Order>, { table: make(), status }));
-    expect(host.querySelector('.adt-table-wrap')!.getAttribute('aria-busy')).toBe('true');
+    expect(host.querySelector('.adt-scroll')!.getAttribute('aria-busy')).toBe('true');
+    expect(host.querySelector('.adt-notice')!.closest('[aria-busy="true"]')).toBeNull(); // "Loading…" is not held back
     act(() => { phase = 'error'; listeners.forEach(fn => fn({ status: phase })); });
     expect(host.querySelector('[role="alert"]')!.textContent).toContain('The data could not be loaded.');
     click(host.querySelector('.adt-retry'));

@@ -637,7 +637,8 @@ export function renderTable<TData>(
       else notice.setAttribute('aria-live', 'polite');
     };
     const { status: phase } = status.getState();
-    root.setAttribute('aria-busy', phase === 'loading' ? 'true' : 'false');
+    // On the rows' box, not around the notice: a busy region's changes may be held back, "Loading…" too.
+    scroller.setAttribute('aria-busy', phase === 'loading' ? 'true' : 'false');
     root.classList.toggle('adt-loading', phase === 'loading');
     if (phase === 'loading') {
       announce('status');

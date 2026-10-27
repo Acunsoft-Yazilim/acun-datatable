@@ -463,8 +463,8 @@ export class AcunDataTable {
     const notice = el('div', { class: 'adt-notice', role: failed ? 'alert' : 'status' }, el('span', { class: 'adt-notice-text' }, failed ? labels.error : labels.loading));
     const rows = failed || options.skeleton === false ? [] : Array.from({ length: Math.min(pageSizeOf(options), 10) }, () =>
       el('tr', { class: 'adt-row adt-skeleton-row' }, ...Array.from({ length: 4 }, () => el('td', {}, el('span', { class: 'adt-skeleton' })))));
-    const wrap = el('div', { class: `adt-table-wrap${rows.length > 0 ? ' adt-skeleton-on' : ''}`, 'aria-busy': failed ? 'false' : 'true' },
-      notice, ...(rows.length > 0 ? [el('div', { class: 'adt-scroll' }, el('table', { class: 'adt-table' }, el('tbody', { 'aria-hidden': 'true' }, ...rows)))] : []));
+    const wrap = el('div', { class: `adt-table-wrap${rows.length > 0 ? ' adt-skeleton-on' : ''}` },
+      notice, ...(rows.length > 0 ? [el('div', { class: 'adt-scroll', 'aria-busy': 'true' }, el('table', { class: 'adt-table' }, el('tbody', { 'aria-hidden': 'true' }, ...rows)))] : []));
     this.element.replaceChildren(el('div', { class: 'adt' }, wrap));
   }
 

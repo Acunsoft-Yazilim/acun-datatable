@@ -451,11 +451,12 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   const wrapClassName = wrapClass({ responsive, size, stickyHeader: props.stickyHeader === true, scrollY: height !== undefined, loading: busy, skeleton, virtual: virtual !== undefined });
   const tableClassName = tableClass({ collapsible, levels, detail: detail !== undefined, userWidths: Object.keys(state.columnWidths).length > 0, locked: lock !== undefined });
   return h('div', {
-    className: wrapClassName, ref: wrap, 'aria-busy': props.status ? busy : undefined,
+    className: wrapClassName, ref: wrap,
     style: height ? ({ '--adt-scroll-y': height } as CSSProperties) : undefined,
   },
     notice,
-    h('div', { className: 'adt-scroll', onScroll: virtual ? onScroll : undefined }, h('table', { className: tableClassName, 'aria-rowcount': all ? all.length + 1 : undefined },
+    // aria-busy on the rows' box, not around the notice (a busy region's changes may be held back).
+    h('div', { className: 'adt-scroll', onScroll: virtual ? onScroll : undefined, 'aria-busy': props.status ? busy : undefined }, h('table', { className: tableClassName, 'aria-rowcount': all ? all.length + 1 : undefined },
       props.caption !== undefined ? h('caption', null, props.caption) : null,
       h('thead', null, h('tr', null, head)),
       h('tbody', skeleton ? { 'aria-hidden': true } : null, body),

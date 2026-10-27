@@ -243,9 +243,10 @@ describe('renderTable second-review additions', () => {
     const status = { getState: () => state, subscribe: (l: (s: typeof state) => void) => { listeners.add(l); return () => listeners.delete(l); }, retry };
     const set = (next: typeof state) => { state = next; listeners.forEach(l => l(state)); };
     const rendered = renderTable(host, make(), { status, labels: labelsTr });
-    const wrap = host.querySelector('.adt-table-wrap')!;
+    const wrap = host.querySelector('.adt-scroll')!; // the rows' box is busy …
     const notice = host.querySelector('.adt-notice')!;
     expect(wrap.getAttribute('aria-busy')).toBe('true');
+    expect(notice.closest('[aria-busy="true"]')).toBeNull(); // … not the notice that says "Loading…"
     expect(notice.textContent).toBe('Yükleniyor…');
     set({ status: 'error', error: new Error('500') });
     expect(wrap.getAttribute('aria-busy')).toBe('false');
