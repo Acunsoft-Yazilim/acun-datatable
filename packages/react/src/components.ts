@@ -9,7 +9,9 @@ import {
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
-import { checkActions, closeLikeAMenu, frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
+import {
+  actionsCellClass, cellClass, checkActions, closeLikeAMenu, columnSpan, frameThrottle, layoutKey, priorityLevels, responsiveFlags, skeletonRows, tableClass, withoutIds, wrapClass,
+} from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
 /** Controls that do not touch rows accept a table of any row type. */
@@ -86,7 +88,6 @@ export interface DataTableProps<TData> {
 }
 
 /** Placeholder rows while the first rows load: as many as a page, at most this many. */
-const SKELETON_ROWS = 10;
 
 const noStatus = (): (() => void) => () => undefined;
 
@@ -146,9 +147,8 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   // Virtual tables scroll sideways on narrow screens unless told otherwise.
   const responsive = checkResponsive(props.responsive ?? (props.virtual ? 'scroll' : undefined));
   const size = checkSize(props.size);
-  const collapsible = responsive === 'collapse' || responsive === 'modal' || responsive === 'auto';
   const detail = props.detail;
-  const expandable = collapsible || detail !== undefined;
+  const { collapsible, inlineDetails, expandable } = responsiveFlags(responsive, detail !== undefined);
   const uid = useId();
   // Responsive collapse: open rows. Modal: the row shown in the dialog.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -283,9 +283,8 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
     // Back to the row's button (Safari does not focus a clicked button).
     [...(wrap.current?.querySelectorAll<HTMLElement>('.adt-expand') ?? [])].find(button => button.dataset['row'] === id)?.focus();
   };
-  const levels = new Set(columns.map((column, index) => priorityOf(column, index)));
-  if (rowActions.length > 0) levels.add(2);
-  const span = columns.length + (selectable ? 1 : 0) + (rowActions.length > 0 ? 1 : 0) + (expandable ? 1 : 0);
+  const levels = priorityLevels(columns, rowActions.length > 0);
+  const span = columnSpan(columns.length, { selectable, actions: rowActions.length > 0, expandable });
   // Buttons in the row, the rest in a "⋮" menu; icons, danger colour and a confirm question.
   const actionButtons = (row: Row<TData>, name: string, maxInline = props.maxInlineActions ?? Infinity): ReactNode[] => {
     const { inline, menu } = splitActions(rowActions, row, maxInline);
@@ -341,7 +340,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
       : null);
 
   const head: ReactNode[] = [];
-  const lockKey = virtual ? `${columns.map(column => column.id).join('|')}#${selectable}#${rowActions.length > 0}#${expandable}` : '';
+  const lockKey = virtual ? layoutKey(columns, selectable, rowActions.length > 0, expandable) : '';
   const lock = virtual && locked?.key === lockKey ? locked.widths : undefined;
   const lockedWidth = (key: string): CSSProperties | undefined => (lock?.[key] ? { width: `${lock[key]}px` } : undefined);
   if (expandable) head.push(h('td', { className: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }));
@@ -393,15 +392,15 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   // Placeholder rows while the first rows of a remote table load.
   const skeleton = props.skeleton !== false && props.status !== undefined && phase === 'loading' && page.rows.length === 0;
   if (skeleton) {
-    for (let index = 0; index < Math.min(state.pageSize, SKELETON_ROWS); index++) {
+    for (let index = 0; index < skeletonRows(state.pageSize); index++) {
       body.push(h('tr', { className: 'adt-row adt-skeleton-row', key: `__skeleton${index}` },
         expandable ? h('td', { className: 'adt-expand-cell' }) : null,
         selectable ? h('td', { className: 'adt-select' }) : null,
         ...columns.map((column, columnIndex) => h('td', {
           'data-label': column.header, key: column.id,
-          className: [collapsible ? `adt-col--p${priorityOf(column, columnIndex)}` : '', numeric(column) ? 'adt-num' : ''].filter(Boolean).join(' ') || undefined,
+          className: cellClass(column, columnIndex, collapsible) || undefined,
         }, h('span', { className: 'adt-skeleton' }))),
-        rowActions.length > 0 ? h('td', { className: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions' }) : null));
+        rowActions.length > 0 ? h('td', { className: actionsCellClass(collapsible) }) : null));
     }
   } else if (rows.length === 0) {
     body.push(h('tr', { className: 'adt-empty', key: '__empty' }, h('td', { colSpan: span }, props.empty ?? labels.empty)));
@@ -462,8 +461,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
       const start = (): void => setEditing({ rowId: row.id, columnId: column.id });
       cells.push(h('td', {
         'data-label': column.header, key: column.id,
-        className: [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', numeric(column) ? 'adt-num' : '',
-          editable ? 'adt-editable' : '', isEditing ? 'adt-editing' : ''].filter(Boolean).join(' ') || undefined,
+        className: cellClass(column, index, collapsible, editable, isEditing) || undefined,
         'data-adt-edit-host': isEditing ? '' : undefined,
         onDoubleClick: editable && !isEditing
           ? (event: MouseEvent) => { if (!(event.target as Element).closest('a, button, input, select')) start(); }
@@ -475,7 +473,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
     });
     if (rowActions.length > 0) {
       cells.push(h('td', {
-        className: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions', 'data-label': labels.actions, key: '__actions',
+        className: actionsCellClass(collapsible), 'data-label': labels.actions, key: '__actions',
       }, actionButtons(row, name)));
     }
     const rowClass = ['adt-row', selected ? 'adt-row--selected' : '', open ? 'adt-row--expanded' : ''].filter(Boolean).join(' ');
@@ -483,7 +481,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
     if (open) {
       body.push(h('tr', { className: 'adt-detail', id: detailId, key: `${row.id}__detail` },
         h('td', { colSpan: span },
-          responsive === 'collapse' || responsive === 'auto' ? detailList(row, texts, name, false) : null,
+          inlineDetails ? detailList(row, texts, name, false) : null,
           detail ? h('div', { className: 'adt-detail-content' }, detail(row)) : null)));
     }
   });
@@ -500,17 +498,14 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
           : null)
       : h('div', { className: 'adt-notice', role: 'status', 'aria-live': 'polite' });
   const height = scrollHeight(props.scrollY) ?? (virtual ? '480px' : undefined);
-  const wrapClass = ['adt-table-wrap', `adt-responsive--${responsive}`, size === 'md' ? '' : `adt-size--${size}`,
-    props.stickyHeader === true ? 'adt-sticky-header' : '', height ? 'adt-scroll-y' : '', busy ? 'adt-loading' : '', skeleton ? 'adt-skeleton-on' : '', virtual ? 'adt-virtual' : ''].filter(Boolean).join(' ');
-  const tableClass = ['adt-table', collapsible && levels.has(2) ? 'adt-has-p2' : '', collapsible && levels.has(3) ? 'adt-has-p3' : '', detail ? 'adt-has-detail' : '',
-    Object.keys(state.columnWidths).length > 0 || lock ? 'adt-fixed-layout' : '', Object.keys(state.columnWidths).length > 0 ? 'adt-user-widths' : '']
-    .filter(Boolean).join(' ');
+  const wrapClassName = wrapClass({ responsive, size, stickyHeader: props.stickyHeader === true, scrollY: height !== undefined, loading: busy, skeleton, virtual: virtual !== undefined });
+  const tableClassName = tableClass({ collapsible, levels, detail: detail !== undefined, userWidths: Object.keys(state.columnWidths).length > 0, locked: lock !== undefined });
   return h('div', {
-    className: wrapClass, ref: wrap, 'aria-busy': props.status ? busy : undefined,
+    className: wrapClassName, ref: wrap, 'aria-busy': props.status ? busy : undefined,
     style: height ? ({ '--adt-scroll-y': height } as CSSProperties) : undefined,
   },
     notice,
-    h('div', { className: 'adt-scroll', onScroll: virtual ? onScroll : undefined }, h('table', { className: tableClass, 'aria-rowcount': all ? all.length + 1 : undefined },
+    h('div', { className: 'adt-scroll', onScroll: virtual ? onScroll : undefined }, h('table', { className: tableClassName, 'aria-rowcount': all ? all.length + 1 : undefined },
       props.caption !== undefined ? h('caption', null, props.caption) : null,
       h('thead', null, h('tr', null, head)),
       h('tbody', skeleton ? { 'aria-hidden': true } : null, body),
@@ -527,7 +522,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
             ? h('th', { scope: 'row', className: cellClass, 'data-label': column.header, key: column.id }, labels.totals)
             : h('td', { className: cellClass, key: column.id, 'data-label': result ? `${column.header} · ${labels.aggregate(result.aggregate)}` : column.header, title: result ? labels.aggregate(result.aggregate) : undefined }, text.total(column, result)));
         });
-        if (rowActions.length > 0) cells.push(h('td', { className: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions', key: '__actions' }));
+        if (rowActions.length > 0) cells.push(h('td', { className: actionsCellClass(collapsible), key: '__actions' }));
         return cells;
       })())) : null)),
     responsive === 'modal'

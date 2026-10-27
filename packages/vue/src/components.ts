@@ -10,7 +10,9 @@ import {
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
-import { checkActions, closeLikeAMenu, frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
+import {
+  actionsCellClass, cellClass, checkActions, closeLikeAMenu, columnSpan, frameThrottle, layoutKey, priorityLevels, responsiveFlags, skeletonRows, tableClass, withoutIds, wrapClass,
+} from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
 
 type AnyTable = DataTable<any>;
@@ -333,9 +335,8 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
     return (): VNode => {
       const { table } = props;
       const responsive = responsiveMode.value;
-      const collapsible = responsive === 'collapse' || responsive === 'modal' || responsive === 'auto';
       const detailSlot = slots.detail as ((props: DetailSlotProps) => VNode[]) | undefined; // absent unless given
-      const expandable = collapsible || detailSlot !== undefined;
+      const { collapsible, inlineDetails, expandable } = responsiveFlags(responsive, detailSlot !== undefined);
       const state = binding.state.value;
       const page = binding.page.value;
       const columns = binding.visibleColumns.value;
@@ -354,10 +355,9 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
       const label = labels.value;
 
       const head: VNode[] = [];
-      const levels = new Set(columns.map((column, index) => priorityOf(column, index)));
-      if (actions.length > 0) levels.add(2);
+      const levels = priorityLevels(columns, actions.length > 0);
       const level = (column: AnyColumn): string => (collapsible ? ` adt-col--p${priorityOf(column, columns.indexOf(column))}` : '');
-      lockKey = virtual ? `${columns.map(column => column.id).join('|')}#${props.selectable}#${actions.length > 0}#${expandable}` : '';
+      lockKey = virtual ? layoutKey(columns, props.selectable, actions.length > 0, expandable) : '';
       const lock = virtual && locked.value?.key === lockKey ? locked.value.widths : undefined;
       const lockedWidth = (key: string): Record<string, string> | undefined => (lock?.[key] ? { width: `${lock[key]}px` } : undefined);
       if (expandable) head.push(h('td', { class: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }));
@@ -406,7 +406,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
       if (actions.length > 0) {
         head.push(h('th', { scope: 'col', class: `adt-th adt-actions${collapsible ? ' adt-col--p2' : ''}`, key: '__actions', 'data-lock': '__actions', style: lockedWidth('__actions') }, label.actions));
       }
-      const span = columns.length + (props.selectable ? 1 : 0) + (actions.length > 0 ? 1 : 0) + (expandable ? 1 : 0);
+      const span = columnSpan(columns.length, { selectable: props.selectable, actions: actions.length > 0, expandable });
       // Buttons in the row, the rest in a "⋮" menu; icons, danger colour and a confirm question.
       const actionButtons = (row: AnyRow, name: string, maxInline = props.maxInlineActions): VNode[] => {
         const { inline, menu } = splitActions(actions, row, maxInline);
@@ -470,15 +470,15 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
       // Placeholder rows while the first rows of a remote table load.
       const skeleton = props.skeleton && props.status !== undefined && phase.value === 'loading' && page.rows.length === 0;
       if (skeleton) {
-        for (let index = 0; index < Math.min(state.pageSize, SKELETON_ROWS); index++) {
+        for (let index = 0; index < skeletonRows(state.pageSize); index++) {
           body.push(h('tr', { class: 'adt-row adt-skeleton-row', key: `__skeleton${index}` }, [
             expandable ? h('td', { class: 'adt-expand-cell' }) : null,
             props.selectable ? h('td', { class: 'adt-select' }) : null,
             ...columns.map((column, columnIndex) => h('td', {
               'data-label': column.header, key: column.id,
-              class: [collapsible ? `adt-col--p${priorityOf(column, columnIndex)}` : '', numeric(column) ? 'adt-num' : ''].filter(Boolean).join(' ') || undefined,
+              class: cellClass(column, columnIndex, collapsible) || undefined,
             }, [h('span', { class: 'adt-skeleton' })])),
-            actions.length > 0 ? h('td', { class: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions' }) : null,
+            actions.length > 0 ? h('td', { class: actionsCellClass(collapsible) }) : null,
           ]));
         }
       } else if (rows.length === 0) {
@@ -539,8 +539,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
           const start = (): void => { editing.value = { rowId: row.id, columnId: column.id }; };
           cells.push(h('td', {
             'data-label': column.header, key: column.id,
-            class: [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', numeric(column) ? 'adt-num' : '',
-              editable ? 'adt-editable' : '', isEditing ? 'adt-editing' : ''].filter(Boolean).join(' ') || undefined,
+            class: cellClass(column, index, collapsible, editable, isEditing) || undefined,
             'data-adt-edit-host': isEditing ? '' : undefined,
             onDblclick: editable && !isEditing
               ? (event: MouseEvent) => { if (!(event.target as Element).closest('a, button, input, select')) start(); }
@@ -557,7 +556,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
         });
         if (actions.length > 0) {
           cells.push(h('td', {
-            class: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions', 'data-label': label.actions, key: '__actions',
+            class: actionsCellClass(collapsible), 'data-label': label.actions, key: '__actions',
           }, actionButtons(row, name)));
         }
         const rowClass = ['adt-row', selected ? 'adt-row--selected' : '', open ? 'adt-row--expanded' : ''].filter(Boolean).join(' ');
@@ -565,7 +564,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
         if (open) {
           body.push(h('tr', { class: 'adt-detail', id: detailId, key: `${row.id}__detail` }, [
             h('td', { colspan: span }, [
-              responsive === 'collapse' || responsive === 'auto' ? detailList(row, texts, name, false) : null,
+              inlineDetails ? detailList(row, texts, name, false) : null,
               detailSlot ? h('div', { class: 'adt-detail-content' }, detailSlot({ row })) : null,
             ]),
           ]));
@@ -585,14 +584,11 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
           ])
           : h('div', { class: 'adt-notice', role: 'status', 'aria-live': 'polite' });
       const height = scrollHeight(props.scrollY) ?? (virtual ? '480px' : undefined);
-      const wrapClass = ['adt-table-wrap', `adt-responsive--${responsive}`, size === 'md' ? '' : `adt-size--${size}`,
-        props.stickyHeader ? 'adt-sticky-header' : '', height ? 'adt-scroll-y' : '', busy ? 'adt-loading' : '', skeleton ? 'adt-skeleton-on' : '', virtual ? 'adt-virtual' : ''].filter(Boolean).join(' ');
-      const tableClass = ['adt-table', collapsible && levels.has(2) ? 'adt-has-p2' : '', collapsible && levels.has(3) ? 'adt-has-p3' : '', detailSlot ? 'adt-has-detail' : '',
-        Object.keys(state.columnWidths).length > 0 || lock ? 'adt-fixed-layout' : '', Object.keys(state.columnWidths).length > 0 ? 'adt-user-widths' : '']
-        .filter(Boolean).join(' ');
-      return h('div', { ref: wrapEl, class: wrapClass, style: height ? { '--adt-scroll-y': height } : undefined, 'aria-busy': props.status ? String(busy) : undefined }, [
+      const wrapClassName = wrapClass({ responsive, size, stickyHeader: props.stickyHeader, scrollY: height !== undefined, loading: busy, skeleton, virtual: virtual !== undefined });
+      const tableClassName = tableClass({ collapsible, levels, detail: detailSlot !== undefined, userWidths: Object.keys(state.columnWidths).length > 0, locked: lock !== undefined });
+      return h('div', { ref: wrapEl, class: wrapClassName, style: height ? { '--adt-scroll-y': height } : undefined, 'aria-busy': props.status ? String(busy) : undefined }, [
         notice,
-        h('div', { class: 'adt-scroll', onScroll: virtual ? onScroll : undefined }, [h('table', { class: tableClass, 'aria-rowcount': all ? all.length + 1 : undefined }, [
+        h('div', { class: 'adt-scroll', onScroll: virtual ? onScroll : undefined }, [h('table', { class: tableClassName, 'aria-rowcount': all ? all.length + 1 : undefined }, [
           props.caption !== undefined ? h('caption', props.caption) : null,
           h('thead', [h('tr', head)]),
           h('tbody', skeleton ? { 'aria-hidden': 'true' } : null, body),
@@ -609,7 +605,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
                 ? h('th', { scope: 'row', class: cellClass, 'data-label': column.header, key: column.id }, label.totals)
                 : h('td', { class: cellClass, key: column.id, 'data-label': result ? `${column.header} · ${label.aggregate(result.aggregate)}` : column.header, title: result ? label.aggregate(result.aggregate) : undefined }, text.value.total(column, result)));
             });
-            if (actions.length > 0) cells.push(h('td', { class: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions' }));
+            if (actions.length > 0) cells.push(h('td', { class: actionsCellClass(collapsible) }));
             return cells;
           })())]) : null,
         ])]),
@@ -625,7 +621,6 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
 });
 
 /** Placeholder rows while the first rows load: as many as a page, at most this many. */
-const SKELETON_ROWS = 10;
 
 /** A toolbar button's summary, as `fillButton` builds it in the DOM. */
 function toolbarSummary(custom: ToolbarButton | undefined, label: string, fallback: keyof typeof ICONS): VNode {

@@ -4,4 +4,7 @@
  * release; use the package's main entry instead.
  */
 export { checkActions } from './actions';
-export { closeLikeAMenu, frameThrottle, withoutIds, type FrameSource } from './table-model';
+export {
+  actionsCellClass, cellClass, closeLikeAMenu, columnSpan, frameThrottle, layoutKey, priorityLevels, responsiveFlags, skeletonRows, tableClass, withoutIds, wrapClass,
+  type FrameSource,
+} from './table-model';

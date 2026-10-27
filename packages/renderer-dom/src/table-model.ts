@@ -2,6 +2,82 @@
 // functions of the table: the renderers only turn the answers into their own
 // elements. Shared through '@acunsoft/datatable-dom/internal' (see internal.ts).
 import type { RowId } from '@acunsoft/datatable-core';
+import type { ResponsiveMode, TableSize } from './table';
+
+/** What the class helpers read of a column. */
+interface ColumnLike {
+  readonly id: string;
+  readonly priority?: 1 | 2 | 3;
+  readonly type?: string;
+}
+
+/** The responsive priority of a visible column: its own, else 1 for the first column and 2 for the rest. */
+export function priorityOf(column: { readonly priority?: 1 | 2 | 3 }, index: number): 1 | 2 | 3 {
+  return column.priority ?? (index === 0 ? 1 : 2);
+}
+
+/** Numbers and decimals are right-aligned (`adt-num`). */
+export function numeric(column: { readonly type?: string }): boolean {
+  return column.type === 'number' || column.type === 'decimal';
+}
+
+/**
+ * What a responsive mode turns on: an expand column for hidden columns
+ * (collapse, modal, auto) or a child row (`hasDetail`); hidden columns open
+ * below the row (collapse, auto) or in a dialog (modal).
+ */
+export function responsiveFlags(mode: ResponsiveMode, hasDetail: boolean): { readonly collapsible: boolean; readonly inlineDetails: boolean; readonly expandable: boolean } {
+  const collapsible = mode === 'collapse' || mode === 'modal' || mode === 'auto';
+  return { collapsible, inlineDetails: mode === 'collapse' || mode === 'auto', expandable: collapsible || hasDetail };
+}
+
+/** The priorities present: the columns', and 2 for the actions column. */
+export function priorityLevels(columns: readonly ColumnLike[], hasActions: boolean): ReadonlySet<1 | 2 | 3> {
+  const levels = new Set(columns.map((column, index) => priorityOf(column, index)));
+  if (hasActions) levels.add(2);
+  return levels;
+}
+
+/** Cells in a row: the columns, and the expand, checkbox and actions cells. */
+export function columnSpan(columns: number, parts: { readonly selectable: boolean; readonly actions: boolean; readonly expandable: boolean }): number {
+  return columns + (parts.selectable ? 1 : 0) + (parts.actions ? 1 : 0) + (parts.expandable ? 1 : 0);
+}
+
+/** A body cell's class: its priority (responsive modes that hide columns), numbers, editing. `''` for none. */
+export function cellClass(column: ColumnLike, index: number, collapsible: boolean, editable = false, editing = false): string {
+  return [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', numeric(column) ? 'adt-num' : '', editable ? 'adt-editable' : '', editing ? 'adt-editing' : '']
+    .filter(Boolean).join(' ');
+}
+
+/** The actions cell's class; it hides with priority 2. */
+export function actionsCellClass(collapsible: boolean): string {
+  return collapsible ? 'adt-actions adt-col--p2' : 'adt-actions';
+}
+
+/** Placeholder rows while the first rows load: as many as a page, at most 10. */
+export function skeletonRows(pageSize: number): number {
+  return Math.min(pageSize, 10);
+}
+
+/** What the locked column widths of virtual scrolling belong to: measured again when it changes. */
+export function layoutKey(columns: readonly ColumnLike[], selectable: boolean, hasActions: boolean, expandable: boolean): string {
+  return `${columns.map(column => column.id).join('|')}#${selectable}#${hasActions}#${expandable}`;
+}
+
+/** The class of the table's wrapper. */
+export function wrapClass(parts: {
+  readonly responsive: ResponsiveMode; readonly size: TableSize; readonly stickyHeader?: boolean; readonly scrollY?: boolean;
+  readonly loading?: boolean; readonly skeleton?: boolean; readonly virtual?: boolean;
+}): string {
+  return ['adt-table-wrap', `adt-responsive--${parts.responsive}`, parts.size === 'md' ? '' : `adt-size--${parts.size}`, parts.stickyHeader ? 'adt-sticky-header' : '',
+    parts.scrollY ? 'adt-scroll-y' : '', parts.loading ? 'adt-loading' : '', parts.skeleton ? 'adt-skeleton-on' : '', parts.virtual ? 'adt-virtual' : ''].filter(Boolean).join(' ');
+}
+
+/** The class of the `<table>`: priorities to hide, child rows, and a fixed layout once widths are set or locked. */
+export function tableClass(parts: { readonly collapsible: boolean; readonly levels: ReadonlySet<number>; readonly detail: boolean; readonly userWidths: boolean; readonly locked: boolean }): string {
+  return ['adt-table', parts.collapsible && parts.levels.has(2) ? 'adt-has-p2' : '', parts.collapsible && parts.levels.has(3) ? 'adt-has-p3' : '',
+    parts.detail ? 'adt-has-detail' : '', parts.userWidths || parts.locked ? 'adt-fixed-layout' : '', parts.userWidths ? 'adt-user-widths' : ''].filter(Boolean).join(' ');
+}
 
 /** The selection without `remove`, in its order: a Set, so a page of 100,000 rows stays linear. */
 export function withoutIds(selected: readonly RowId[], remove: readonly RowId[]): RowId[] {

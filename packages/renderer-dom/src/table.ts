@@ -8,7 +8,11 @@ import { columnTools } from './column-tools';
 import { autoResponsive } from './auto-responsive';
 import { checkVirtual, virtualWindow } from './virtual';
 import { afterPointerRelease, cellEditor, isEditable, type CellEditor, type EditHandler } from './edit';
-import { frameThrottle, withoutIds } from './table-model';
+import {
+  actionsCellClass, cellClass, columnSpan, frameThrottle, layoutKey, numeric, priorityLevels, priorityOf, responsiveFlags, skeletonRows, tableClass, withoutIds, wrapClass,
+} from './table-model';
+
+export { numeric, priorityOf }; // defined with the other shared table logic in table-model.ts
 
 export type { CellFormatter } from './cells';
 
@@ -133,7 +137,6 @@ export interface RenderTableOptions<TData> {
 }
 
 /** Placeholder rows while the first rows load: as many as a page, at most this many. */
-const SKELETON_ROWS = 10;
 
 /** The content of a row's child row (`detail`). */
 export type DetailRenderer<TData> = (row: Row<TData>) => Node | string | null | undefined | Promise<Node | string | null | undefined>;
@@ -206,11 +209,8 @@ export function renderTable<TData>(
   const responsive = checkResponsive(options.responsive ?? (options.virtual ? 'scroll' : undefined));
   if (options.detail !== undefined && typeof options.detail !== 'function') throw new TypeError('detail must be a function');
   const detailOf = options.detail;
-  // The expand column: hidden columns (collapse, modal) or a child row (detail).
-  const collapsible = responsive === 'collapse' || responsive === 'modal' || responsive === 'auto';
-  // Hidden columns open below the row (collapse, auto) or in a dialog (modal).
-  const inlineDetails = responsive === 'collapse' || responsive === 'auto';
-  const expandable = collapsible || detailOf !== undefined;
+  // The expand column: hidden columns (collapse, modal, auto: below the row or in a dialog) or a child row (detail).
+  const { collapsible, inlineDetails, expandable } = responsiveFlags(responsive, detailOf !== undefined);
   const uid = `adt-${++tables}`;
 
   const nameOf = (row: Row<TData>, cells: readonly string[]): string => rowName(row, cells[0] ?? '', options.rowLabel);
@@ -237,10 +237,7 @@ export function renderTable<TData>(
   const virtual = checkVirtual(options.virtual);
   if (virtual && table.getMode() === 'server') throw new TypeError('virtual scrolling needs a local table; use cursor paging for server tables');
   const height = scrollHeight(options.scrollY) ?? (virtual ? '480px' : undefined);
-  const root = element(doc, 'div', {
-    class: ['adt-table-wrap', `adt-responsive--${responsive}`, size === 'md' ? '' : `adt-size--${size}`,
-      options.stickyHeader === true ? 'adt-sticky-header' : '', height ? 'adt-scroll-y' : '', virtual ? 'adt-virtual' : ''].filter(Boolean).join(' '),
-  });
+  const root = element(doc, 'div', { class: wrapClass({ responsive, size, stickyHeader: options.stickyHeader === true, scrollY: height !== undefined, virtual: virtual !== undefined }) });
   if (height) root.style.setProperty('--adt-scroll-y', height);
   const scroller = element(doc, 'div', { class: 'adt-scroll' });
   const notice = element(doc, 'div', { class: 'adt-notice', role: 'status', 'aria-live': 'polite' });
@@ -436,21 +433,15 @@ export function renderTable<TData>(
     rowParts = [];
 
     const widths = state.columnWidths;
-    const layoutKey = virtual ? `${columns.map(column => column.id).join('|')}#${selectable}#${rowActions.length > 0}#${expandable}` : '';
-    const lock = virtual && locked?.key === layoutKey && locked.width === scroller.clientWidth ? locked : undefined;
+    const lockKey = virtual ? layoutKey(columns, selectable, rowActions.length > 0, expandable) : '';
+    const lock = virtual && locked?.key === lockKey && locked.width === scroller.clientWidth ? locked : undefined;
     const userWidths = Object.keys(widths).length > 0;
-    const tableEl = element(doc, 'table', { class: `adt-table${userWidths || lock ? ' adt-fixed-layout' : ''}${userWidths ? ' adt-user-widths' : ''}` });
+    const levels = priorityLevels(columns, rowActions.length > 0);
+    const tableEl = element(doc, 'table', { class: tableClass({ collapsible, levels, detail: detailOf !== undefined, userWidths, locked: lock !== undefined }) });
     if (page.all) tableEl.setAttribute('aria-rowcount', String(page.all.length + 1));
     if (options.caption !== undefined) tableEl.append(element(doc, 'caption', {}, options.caption));
 
     const headRow = element(doc, 'tr');
-    const levels = new Set(columns.map((column, index) => priorityOf(column, index)));
-    if (rowActions.length > 0) levels.add(2);
-    if (collapsible) {
-      if (levels.has(2)) tableEl.classList.add('adt-has-p2');
-      if (levels.has(3)) tableEl.classList.add('adt-has-p3');
-    }
-    if (detailOf) tableEl.classList.add('adt-has-detail');
     if (expandable) headRow.append(element(doc, 'td', { class: 'adt-expand-cell' }));
     if (selectable) {
       const th = element(doc, 'th', { scope: 'col', class: 'adt-select' });
@@ -516,21 +507,21 @@ export function renderTable<TData>(
 
     const body = element(doc, 'tbody');
     let placed = false;
-    const span = columns.length + (selectable ? 1 : 0) + (rowActions.length > 0 ? 1 : 0) + (expandable ? 1 : 0);
+    const span = columnSpan(columns.length, { selectable, actions: rowActions.length > 0, expandable });
     if (skeletonShown) {
       // Same cells as a row, so the layout does not jump when the rows arrive.
       body.setAttribute('aria-hidden', 'true');
-      for (let index = 0; index < Math.min(state.pageSize, SKELETON_ROWS); index++) {
+      for (let index = 0; index < skeletonRows(state.pageSize); index++) {
         const tr = element(doc, 'tr', { class: 'adt-row adt-skeleton-row' });
         if (expandable) tr.append(element(doc, 'td', { class: 'adt-expand-cell' }));
         if (selectable) tr.append(element(doc, 'td', { class: 'adt-select' }));
         columns.forEach((column, columnIndex) => {
-          const cellClass = [collapsible ? `adt-col--p${priorityOf(column, columnIndex)}` : '', numeric(column) ? 'adt-num' : ''].filter(Boolean).join(' ');
-          const td = element(doc, 'td', { 'data-label': column.header, ...(cellClass ? { class: cellClass } : {}) });
+          const className = cellClass(column, columnIndex, collapsible);
+          const td = element(doc, 'td', { 'data-label': column.header, ...(className ? { class: className } : {}) });
           td.append(element(doc, 'span', { class: 'adt-skeleton' }));
           tr.append(td);
         });
-        if (rowActions.length > 0) tr.append(element(doc, 'td', { class: `adt-actions${collapsible ? ' adt-col--p2' : ''}` }));
+        if (rowActions.length > 0) tr.append(element(doc, 'td', { class: actionsCellClass(collapsible) }));
         body.append(tr);
       }
     } else if (page.rows.length === 0) {
@@ -598,9 +589,8 @@ export function renderTable<TData>(
       columns.forEach((column, index) => {
         const editable = onEdit !== undefined && isEditable(column);
         const isEditing = editable && editing?.rowId === row.id && editing.columnId === column.id;
-        const cellClass = [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', numeric(column) ? 'adt-num' : '',
-          editable ? 'adt-editable' : '', isEditing ? 'adt-editing' : ''].filter(Boolean).join(' ');
-        const td = element(doc, 'td', { 'data-label': column.header, ...(cellClass ? { class: cellClass } : {}) });
+        const className = cellClass(column, index, collapsible, editable, isEditing);
+        const td = element(doc, 'td', { 'data-label': column.header, ...(className ? { class: className } : {}) });
         if (isEditing) {
           td.append(editing!.editor.element);
           placed = true;
@@ -675,7 +665,7 @@ export function renderTable<TData>(
         // Hidden cells (the responsive layout's) measure 0 and get no width of their own.
         const measured = cells.map(cell => cell.getBoundingClientRect().width);
         if (measured.some(width => width > 0)) {
-          locked = { key: layoutKey, width: scroller.clientWidth, widths: measured };
+          locked = { key: lockKey, width: scroller.clientWidth, widths: measured };
           tableEl.classList.add('adt-fixed-layout');
           cells.forEach((cell, index) => { if (!cell.style.width && measured[index]) cell.style.width = `${measured[index]}px`; });
         }
@@ -767,16 +757,6 @@ export function renderTable<TData>(
       root.remove();
     },
   };
-}
-
-/** The responsive priority of a visible column: its own, else 1 for the first column and 2 for the rest. */
-export function priorityOf(column: { readonly priority?: 1 | 2 | 3 }, index: number): 1 | 2 | 3 {
-  return column.priority ?? (index === 0 ? 1 : 2);
-}
-
-/** Numbers and decimals are right-aligned (`adt-num`). */
-export function numeric(column: { readonly type?: string }): boolean {
-  return column.type === 'number' || column.type === 'decimal';
 }
 
 /** The IDs from `a` to `b` (both included) in page order; just `[b]` when `a` is not on the page. */
