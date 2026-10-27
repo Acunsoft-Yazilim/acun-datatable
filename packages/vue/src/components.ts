@@ -1,6 +1,6 @@
 import * as Vue from 'vue';
 import {
-  computed, defineComponent, h, nextTick, onMounted, onScopeDispose, onUpdated, shallowRef, watch,
+  computed, defineComponent, h, nextTick, onBeforeMount, onMounted, onScopeDispose, onUpdated, shallowRef, watch,
   type PropType, type SlotsType, type VNode,
 } from 'vue';
 import { COLUMN_WIDTH_LIMITS, getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
@@ -22,9 +22,21 @@ type AnyColumn = ColumnDef<any>;
  */
 type LooseAction = RowAction<unknown>;
 
-let tables = 0;
-// Vue 3.5+: ids that match between the server render and hydration; 3.4: a counter.
-const useId: () => string = (Vue as { useId?: () => string }).useId ?? (() => `vue-${++tables}`);
+const counters = new WeakMap<object, number>();
+let outside = 0;
+/*
+ * Vue 3.5+: `useId`. Vue 3.4 has none: a counter per app instead. A server
+ * render makes a new app for each request and hydration creates the
+ * components in the same order, so both count the same; a counter for the
+ * whole process (as before) kept counting across requests and never matched.
+ */
+const useId: () => string = (Vue as { useId?: () => string }).useId ?? (() => {
+  const app = Vue.getCurrentInstance()?.appContext;
+  if (!app) return `vue-${++outside}`;
+  const next = (counters.get(app) ?? 0) + 1;
+  counters.set(app, next);
+  return `vue-${next}`;
+});
 const tableProp = {
   type: Object as PropType<AnyTable>,
   required: true as const,
@@ -146,11 +158,15 @@ export const AcunDataTable = defineComponent({
     }));
     const phase = shallowRef<string>(props.status?.getState().status ?? 'idle');
     let stopStatus: (() => void) | undefined;
-    watch(() => props.status, source => {
+    let mounted = false; // onBeforeMount never runs in server rendering: no listener is left behind there
+    const followStatus = (source: StatusSource | undefined): void => {
       stopStatus?.();
+      stopStatus = undefined;
       phase.value = source?.getState().status ?? 'idle';
-      stopStatus = source?.subscribe(state => { phase.value = state.status; });
-    }, { immediate: true });
+      if (mounted) stopStatus = source?.subscribe(state => { phase.value = state.status; });
+    };
+    watch(() => props.status, followStatus);
+    onBeforeMount(() => { mounted = true; followStatus(props.status); });
     onScopeDispose(() => stopStatus?.());
     const uid = `adt-${useId()}`;
     let anchor: string | undefined;
