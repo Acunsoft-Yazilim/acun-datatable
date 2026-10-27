@@ -442,10 +442,13 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
       const known = keyId ? await store.getKey(keyId) : undefined;
       const again = known ? await load(known) : undefined;
       if (again) return json(200, view(again));
-      // The declared size first, so a huge body is not read at all.
+      // The declared size first, so a huge body is not read at all; a body without one
+      // (chunked) is counted while it is read and dropped past the limit.
+      const bodyLimit = maxBytes + 64 * 1024; // the file and the form around it
       const declared = Number(request.headers.get('content-length') ?? 0);
-      if (declared > maxBytes + 64 * 1024) return problem(413, text.tooLarge(maxBytes), 'file');
-      const form = await request.formData().catch(() => undefined);
+      if (declared > bodyLimit) return problem(413, text.tooLarge(maxBytes), 'file');
+      const form = await limitedFormData(request, bodyLimit);
+      if (form === 'too-large') return problem(413, text.tooLarge(maxBytes), 'file');
       const file = form?.get('file');
       if (!(file instanceof Blob)) return problem(422, text.noFile, 'file');
       if (file.size > maxBytes) return problem(413, text.tooLarge(maxBytes), 'file');
@@ -553,4 +556,23 @@ export function toNodeListener(handle: (request: Request) => Promise<Response>) 
     answer.headers.forEach((value, name) => response.setHeader(name, value));
     response.end(new Uint8Array(await answer.arrayBuffer()));
   };
+}
+
+/** The form of a request whose body may not pass `limit` bytes, counted as it is read (whatever Content-Length said). */
+async function limitedFormData(request: Request, limit: number): Promise<FormData | 'too-large' | undefined> {
+  if (!request.body) return request.formData().catch(() => undefined);
+  let read = 0;
+  const counted = request.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      read += chunk.byteLength;
+      if (read > limit) controller.error(new RangeError('body too large'));
+      else controller.enqueue(chunk);
+    },
+  }));
+  const copy = new Request(request.url, { method: request.method, headers: request.headers, body: counted, duplex: 'half' } as RequestInit);
+  try {
+    return await copy.formData();
+  } catch {
+    return read > limit ? 'too-large' : undefined;
+  }
 }

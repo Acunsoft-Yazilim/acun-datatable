@@ -135,6 +135,26 @@ describe('createImportHandler', () => {
     expect((await fetch(URL_BASE, { method: 'POST', headers: { ...as('u1'), 'Content-Length': String(10 * 1024 * 1024) }, body: 'x' })).status).toBe(413);
   });
 
+  it('refuses a body with no Content-Length (chunked) past the limit without reading it all', async () => {
+    const { fetch } = setup();
+    const form = new FormData();
+    form.set('file', new File(['Customer\n', 'x'.repeat(5 * 1024 * 1024)], 'orders.csv'));
+    const encoded = new Response(form);
+    const type = encoded.headers.get('content-type')!;
+    const bytes = new Uint8Array(await encoded.arrayBuffer());
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({ // 16 KB at a time, as a network would deliver it
+      pull(controller) {
+        if (pulled >= bytes.length) { controller.close(); return; }
+        controller.enqueue(bytes.subarray(pulled, pulled + 16 * 1024));
+        pulled += 16 * 1024;
+      },
+    });
+    const response = await fetch(URL_BASE, { method: 'POST', headers: { ...as('u1'), 'Content-Type': type }, body, duplex: 'half' } as RequestInit);
+    expect(response.status).toBe(413);
+    expect(pulled).toBeLessThan(1024 * 1024); // stopped soon after the limit, not 5 MB later
+  });
+
   it('refuses a zip bomb: 207 KB that inflates to 200 MB, claiming 1 KB', async () => {
     const { fetch } = setup({ limits: { maxBytes: 1024 * 1024 } });
     const bomb = new File([readFileSync(new URL('fixtures/zip-bomb.xlsx', import.meta.url))], 'orders.xlsx');
