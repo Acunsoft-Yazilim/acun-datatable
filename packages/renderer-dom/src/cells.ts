@@ -1,5 +1,5 @@
 import { isDecimal, normalizeValue, type AggregateResult, type ColumnDef, type Row, type SortRule } from '@acunsoft/datatable-core';
-import { labelsEn, type DataTableLabels } from './labels';
+import { resolveLabels, type DataTableLabels } from './labels';
 
 /** Turns a cell value into plain text. It must return a string; HTML is never interpreted. */
 export type CellFormatter<TData> = (value: unknown, row: Row<TData>) => string;
@@ -32,7 +32,7 @@ export function createCellText<TData>(
 ): ((column: ColumnDef<TData>, row: Row<TData>) => string) & {
   readonly total: (column: ColumnDef<TData>, result: AggregateResult | undefined) => string;
 } {
-  const labels: DataTableLabels = { ...labelsEn, ...options.labels };
+  const labels: DataTableLabels = resolveLabels(options.locale, options.labels); // locale also picks the texts, as in renderDataTable
   const locale = options.locale ?? 'en';
   const ids = new Set(columns.map(column => column.id));
   for (const [id, formatter] of Object.entries(options.format ?? {})) {

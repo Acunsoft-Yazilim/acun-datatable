@@ -236,6 +236,17 @@ describe('renderTable second-review additions', () => {
     expect(() => renderTable(host, make(), { rowLabel: 'x' as never })).toThrow('rowLabel must be a function');
   });
 
+  it('takes its texts from locale when no labels are given, as renderDataTable does', async () => {
+    const { renderPagination } = await import('../src/index');
+    renderTable(host, make({ data: [] }), { locale: 'tr' });
+    expect(host.querySelector('tbody')!.textContent).toBe(labelsTr.empty);
+    const pager = document.createElement('div');
+    renderPagination(pager, make(), { locale: 'tr' });
+    expect(pager.querySelector('nav')!.getAttribute('aria-label')).toBe(labelsTr.pagination);
+    renderPagination(pager, make(), { locale: 'tr', labels: { pagination: 'Sayfalar' } });
+    expect(pager.querySelector('nav')!.getAttribute('aria-label')).toBe('Sayfalar'); // labels still win
+  });
+
   it('shows loading with aria-busy and an error with a retry button', async () => {
     let state: { status: 'idle' | 'loading' | 'success' | 'error'; error?: unknown } = { status: 'loading' };
     const listeners = new Set<(s: typeof state) => void>();

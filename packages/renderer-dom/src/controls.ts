@@ -1,6 +1,6 @@
 import { getPageItems, type DataTable } from '@acunsoft/datatable-core';
 import { ariaDisabled, checkTarget, element, icon, keepFocus, setText, type RenderedComponent } from './dom';
-import { labelsEn, type DataTableLabels } from './labels';
+import { labelsEn, resolveLabels, type DataTableLabels } from './labels';
 import { pagingView } from './table-model';
 
 export interface RenderPaginationOptions {
@@ -30,7 +30,7 @@ export function renderPagination<TData>(
   const itemOptions = { siblings: options.siblings ?? 1, boundaries: options.boundaries ?? 1 };
   getPageItems(1, 1, itemOptions); // validates the options before anything is rendered
   const doc = container.ownerDocument;
-  const labels: DataTableLabels = { ...labelsEn, ...options.labels };
+  const labels: DataTableLabels = resolveLabels(options.locale, options.labels); // locale also picks the texts, as in renderDataTable
   const numberFormat = new Intl.NumberFormat(options.locale ?? 'en');
 
   const root = element(doc, 'nav', { class: 'adt-paging', 'aria-label': labels.pagination });

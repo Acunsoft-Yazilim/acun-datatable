@@ -2,7 +2,7 @@ import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import { actionCell, checkActions, type RowAction } from './actions';
 import { cellValue, createCellText, nextSorting, rowName, type CellFormatter } from './cells';
 import { checkTarget, element, icon, keepFocus, type RenderedComponent } from './dom';
-import { labelsEn, type DataTableLabels } from './labels';
+import { resolveLabels, type DataTableLabels } from './labels';
 import { checkFixedColumns, pinColumns, type FixedColumns } from './pin';
 import { columnTools } from './column-tools';
 import { autoResponsive } from './auto-responsive';
@@ -192,7 +192,7 @@ export function renderTable<TData>(
 ): RenderedComponent {
   checkTarget(container, table);
   const doc = container.ownerDocument;
-  const labels: DataTableLabels = { ...labelsEn, ...options.labels };
+  const labels: DataTableLabels = resolveLabels(options.locale, options.labels); // locale also picks the texts, as in renderDataTable
   const locale = options.locale ?? 'en';
   const text = createCellText(table.getColumns(), { locale, labels, ...(options.format ? { format: options.format } : {}) });
   if (options.rowLabel !== undefined && typeof options.rowLabel !== 'function') {
