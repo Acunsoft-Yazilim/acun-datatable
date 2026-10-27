@@ -85,6 +85,8 @@ export function writeZip(entries: readonly ZipEntry[]): Uint8Array {
 export interface ZipLimits {
   /** Largest uncompressed entry. Default 50 MB. */
   readonly maxEntryBytes?: number;
+  /** Most bytes read out of the archive in all (every part a reader opens). Default 100 MB. */
+  readonly maxTotalBytes?: number;
   /** Largest archive entry count. Default 2,000. */
   readonly maxEntries?: number;
 }
@@ -148,6 +150,8 @@ async function inflate(data: Uint8Array, limit: number): Promise<Uint8Array> {
 /** Open a ZIP archive (no ZIP64, no encryption) with size limits. */
 export function openZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipReader {
   const maxEntryBytes = limits.maxEntryBytes ?? 50 * 1024 * 1024;
+  const maxTotalBytes = limits.maxTotalBytes ?? 100 * 1024 * 1024;
+  let readBytes = 0; // what read() has given out so far
   const maxEntries = limits.maxEntries ?? 2_000;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let end = -1;
@@ -191,6 +195,8 @@ export function openZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipReader {
     const start = header + 30 + view.getUint16(header + 26, true) + view.getUint16(header + 28, true);
     if (start + entry.compressedSize > bytes.length) throw new ImportError('the file is damaged (entry outside the file)');
     if (entry.method !== 0 && entry.method !== 8) throw new ImportError(`unsupported ZIP compression method ${entry.method}`);
+    // A stored entry is its bytes as they are: its declared size may lie, its real one may not pass the limit.
+    if (entry.method === 0 && entry.compressedSize > maxEntryBytes) throw new ImportError(`an archive entry is larger than ${maxEntryBytes} bytes`);
     return { method: entry.method, data: bytes.subarray(start, start + entry.compressedSize), maxBytes: maxEntryBytes };
   };
   return {
@@ -198,7 +204,13 @@ export function openZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipReader {
     read: async name => {
       const found = stored(name);
       if (!found) return undefined;
-      return found.method === 0 ? found.data : inflate(found.data, maxEntryBytes);
+      const room = maxTotalBytes - readBytes;
+      if (found.method === 0 && found.data.length > room) throw new ImportError(`the archive holds more than ${maxTotalBytes} bytes`);
+      const data = found.method === 0 ? found.data : await inflate(found.data, Math.min(maxEntryBytes, room)).catch(error => {
+        throw room < maxEntryBytes && error instanceof ImportError && /larger than/.test(error.message) ? new ImportError(`the archive holds more than ${maxTotalBytes} bytes`) : error;
+      });
+      readBytes += data.length;
+      return data;
     },
     stored,
   };

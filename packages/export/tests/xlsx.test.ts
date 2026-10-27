@@ -156,6 +156,21 @@ describe('readXlsx safety', () => {
   });
 });
 
+describe('zip limits', () => {
+  it('count every part read, and the real size of a stored entry', async () => {
+    const zip = writeZip([{ name: 'a', data: new Uint8Array(1_000) }, { name: 'b', data: new Uint8Array(1_000) }]);
+    const reader = openZip(zip, { maxEntryBytes: 1_000, maxTotalBytes: 1_500 });
+    expect(await reader.read('a')).toHaveLength(1_000);
+    await expect(reader.read('b')).rejects.toThrow('the archive holds more than 1500 bytes'); // each fits, both do not
+    // A stored entry whose central directory claims 10 bytes.
+    const lying = writeZip([{ name: 'big', data: new Uint8Array(5_000) }]);
+    const view = new DataView(lying.buffer, lying.byteOffset);
+    const central = lying.length - 22 - (46 + 3);
+    view.setUint32(central + 24, 10, true); // the uncompressed size it declares
+    await expect(openZip(lying, { maxEntryBytes: 1_000 }).read('big')).rejects.toThrow('larger than 1000 bytes');
+  });
+});
+
 describe('reading damaged sheets', () => {
   // Elements that never close: regular expressions with a lazy body searched to the end
   // once for each of them (seconds for a small file); the scanner stays linear.
