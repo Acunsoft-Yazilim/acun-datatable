@@ -293,6 +293,15 @@ describe('counting', () => {
   });
 });
 
+describe('DataTables paging', () => {
+  it('skips start rows, also when start is no whole number of pages (the page length changed)', () => {
+    const query = readTableQuery({ draw: '3', start: '15', length: '10', columns: [{ data: 'customer' }] }, columns);
+    expect(sqlQuery(query, columns, { dialect: 'sqlite', table: 'orders' }).page.text).toMatch(/LIMIT 10 OFFSET 15$/);
+    expect(prismaQuery(query, columns).findMany).toMatchObject({ skip: 15, take: 10 });
+    expect(sqlQuery(readTableQuery({ page: '3', pageSize: '10' }, columns), columns, { dialect: 'sqlite', table: 'orders' }).page.text).toMatch(/LIMIT 10 OFFSET 20$/);
+  });
+});
+
 describe('DataTables requests from this package\'s client', () => {
   it('take filters[i] and leave out the column searches, which are their copies', () => {
     // datatable-http sends an eq filter on a yes/no column both ways (for DataTables back ends too).

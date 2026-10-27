@@ -117,6 +117,10 @@ All notable changes to this repository. Each npm package also has its own
   their local wall time and restored as dates.
 - **`in` on a date-time column reads days as whole days on the Node back
   end too** (it matched only rows at midnight), as the browser and Laravel do.
+- **DataTables `start` is used as it is:** after the page length changed
+  (10 → 25 on row 11) DataTables sends a `start` that is no whole number of
+  pages; both back ends rounded it down, so the rows did not match the
+  "Showing 11 to 35" DataTables printed.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the

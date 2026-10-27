@@ -182,7 +182,7 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
     ? `OFFSET ${skip} ROWS FETCH NEXT ${take} ROWS ONLY`
     : `LIMIT ${take}${skip > 0 || !query.cursorPaging ? ` OFFSET ${skip}` : ''}`);
   let pageWhere = filterSql;
-  let limit = window(query.pageSize, (query.page - 1) * query.pageSize);
+  let limit = window(query.pageSize, query.offset ?? (query.page - 1) * query.pageSize);
   if (query.cursorPaging) {
     limit = window(query.pageSize + 1, 0);
     if (query.cursor !== undefined) {

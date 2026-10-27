@@ -121,7 +121,7 @@ export function prismaQuery(query: ServerTableQuery, columns: readonly ServerCol
       where: pageWhere,
       orderBy: orders.map(order => ({ [order.column]: order.nullable ? { sort: order.direction, nulls: order.direction === 'asc' ? 'last' as const : 'first' as const } : order.direction })),
       take: query.cursorPaging ? query.pageSize + 1 : query.pageSize,
-      ...(query.cursorPaging ? {} : { skip: (query.page - 1) * query.pageSize }),
+      ...(query.cursorPaging ? {} : { skip: query.offset ?? (query.page - 1) * query.pageSize }),
     },
     count: { where: base },
     cursorOf: (row: Readonly<Record<string, unknown>>) => encodeCursor(signature, orders.map(order => {

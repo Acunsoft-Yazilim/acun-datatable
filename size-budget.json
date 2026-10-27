@@ -2,7 +2,7 @@
   "//": "Largest gzip size (bytes) of each built file; `npm run size` fails past it. Raise a budget on purpose, in the same change that needs it.",
   "packages/core/dist/index.js": 16500,
   "packages/datasource-http/dist/index.js": 3600,
-  "packages/server/dist/index.js": 9000,
+  "packages/server/dist/index.js": 9200,
   "packages/server/dist/import.js": 7200,
   "packages/renderer-dom/dist/index.js": 30400,
   "packages/renderer-dom/dist/styles.css": 9700,

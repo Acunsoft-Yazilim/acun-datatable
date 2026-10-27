@@ -35,6 +35,8 @@ export interface ServerTableQuery {
   readonly draw: number | undefined;
   /** The time zone of the days in date-time filters; undefined: the server's. */
   readonly timeZone?: string;
+  /** Rows to skip: DataTables' `start`, which need not be a whole number of pages. Undefined: `(page - 1) × pageSize`. */
+  readonly offset?: number;
 }
 
 export interface ReadTableQueryOptions {
@@ -144,6 +146,7 @@ function fromDataTables(raw: Record<string, unknown>, byId: Map<string, ServerCo
     cursorPaging: false,
     cursor: undefined,
     draw: integer(raw['draw'], 'draw', 0, 999_999_999),
+    offset: start,
   });
 }
 
