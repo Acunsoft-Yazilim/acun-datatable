@@ -26,11 +26,17 @@ describe('renderMenu', () => {
     ] });
     expect(host.querySelector('summary')!.textContent).toBe('Araçlar');
     expect(host.querySelector('.adt-menu-label')!.textContent).toBe('Dışa aktar');
+    const group = host.querySelector('[role="group"]')!; // read out with its items
+    expect(group.getAttribute('aria-labelledby')).toBe(host.querySelector('.adt-menu-label')!.id);
+    expect([...group.querySelectorAll('.adt-menu-item')].map(item => item.textContent)).toEqual(['Excel']);
+    expect(host.querySelector('.adt-menu-label')!.hasAttribute('aria-hidden')).toBe(false);
     expect(host.querySelectorAll('.adt-menu-separator')).toHaveLength(1);
     host.querySelector('details')!.open = true;
+    host.querySelector<HTMLButtonElement>('[data-action="copy"]')!.focus();
     host.querySelector<HTMLButtonElement>('[data-action="copy"]')!.click();
     await vi.waitFor(() => expect(host.querySelector('.adt-menu-status')!.textContent).toBe('2 satır kopyalandı'));
     expect(host.querySelector('details')!.open).toBe(false);
+    expect(document.activeElement).toBe(host.querySelector('summary')); // not lost with the hidden item
     host.querySelector<HTMLButtonElement>('[data-action="boom"]')!.click();
     await vi.waitFor(() => expect(host.querySelector('.adt-menu-status--error')!.textContent).toBe('olmadı'));
     expect(() => renderMenu(host, { items: [{ id: 'x' } as never] })).toThrow('menu items need');

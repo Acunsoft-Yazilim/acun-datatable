@@ -86,10 +86,14 @@ export function rowActionsView<TData>(
 /** Escape in an open `<details>` menu closes it and puts the focus back on its `<summary>`. */
 export function closeMenuOnEscape(event: KeyboardEvent): void {
   const details = event.currentTarget as HTMLDetailsElement | null;
-  if (event.key === 'Escape' && details?.open) {
-    details.open = false;
-    details.querySelector<HTMLElement>(':scope > summary')?.focus();
-  }
+  if (event.key === 'Escape' && details?.open) closeMenu(details);
+}
+
+/** Close a `<details>` menu with the focus back on its `<summary>` (the item that had it is hidden now). */
+export function closeMenu(details: HTMLDetailsElement | null): void {
+  if (!details) return;
+  details.open = false;
+  details.querySelector<HTMLElement>(':scope > summary')?.focus();
 }
 
 /** What a bulk action receives. */
@@ -257,7 +261,7 @@ export function actionCell<TData>(
       });
       if (view.icon) item.append(icon(doc, view.icon));
       item.append(element(doc, 'span', {}, view.text!));
-      item.addEventListener('click', () => { details.open = false; view.run(); });
+      item.addEventListener('click', () => { closeMenu(details); view.run(); });
       list.append(item);
     }
     details.addEventListener('keydown', closeMenuOnEscape);

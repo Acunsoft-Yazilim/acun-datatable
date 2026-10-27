@@ -10,7 +10,7 @@ import {
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, clickRowCheckbox, measureRowHeight, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  actionsCellClass, cellClass, checkActions, clickRowCheckbox, measureRowHeight, closeMenu, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
   pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
@@ -283,8 +283,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
         type: 'button', key: view.action.id, 'data-action': view.action.id, className: view.className,
         'aria-label': view.ariaLabel, 'aria-disabled': view.disabled ? 'true' : undefined,
         onClick: (event: MouseEvent) => {
-          const details = (event.currentTarget as HTMLElement).closest('details');
-          if (details) details.open = false;
+          closeMenu((event.currentTarget as HTMLElement).closest('details'));
           view.run();
         },
       }, view.icon ? icon(view.icon) : null, h('span', null, view.text))))));

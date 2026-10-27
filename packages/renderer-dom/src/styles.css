@@ -269,6 +269,7 @@
   display: flex; flex-direction: column; border: 1px solid var(--adt-line); border-radius: var(--adt-radius);
   background: var(--adt-bg); box-shadow: 0 12px 24px -6px rgb(16 24 40 / 0.16), 0 4px 8px -4px rgb(16 24 40 / 0.08);
 }
+.adt-menu-group { display: flex; flex-direction: column; }
 .adt-menu-label { padding: 0.375rem 0.625rem 0.25rem; color: var(--adt-muted); font-size: 0.75em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 .adt-menu-item {
   display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.625rem; text-align: left;

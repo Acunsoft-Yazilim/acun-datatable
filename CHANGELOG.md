@@ -133,6 +133,12 @@ All notable changes to this repository. Each npm package also has its own
   buttons) wrote them in data order, with selected rows the search hid; print
   showed them sorted and filtered. Both now take the selected rows among the
   matching ones, in the table's order, as DataTables does.
+- **Accessibility of menus and live regions:** choosing an item of a row's
+  "⋮" menu or the tools menu puts the focus back on the menu's button (it
+  fell to the page), in every renderer and Livewire; the tools menu's
+  groups are named for screen readers; `aria-busy` marks the rows, not the
+  "Loading…" notice; the page info and the selection count are written only
+  when their words change.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the
