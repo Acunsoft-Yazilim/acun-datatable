@@ -235,6 +235,16 @@ describe('createImportHandler', () => {
     expect((await fetch(`${URL_BASE}/${id}`, { headers: as('42', 'other') })).status).toBe(404); // still kept per tenant
   });
 
+  it('needs the import key matched to update or upsert, not to insert', async () => {
+    const { fetch } = setup({ columns: [{ id: 'customer', title: 'Customer' }, { id: 'total', title: 'Total', type: 'decimal' }] }); // the key is not required
+    const { id } = await (await upload(fetch, csv('Customer,Total\nA,1\n'))).json() as { id: string };
+    for (const mode of ['update', 'upsert']) {
+      const refused = await start(fetch, id, { mapping: [null, 'total'], mode });
+      expect([refused.status, ((await refused.json()) as { errors: Record<string, string> }).errors]).toEqual([422, { mapping: 'Match the required columns: Customer.' }]);
+    }
+    expect(await (await start(fetch, id, { mapping: [null, 'total'], mode: 'insert' })).json()).toMatchObject({ status: 'done' });
+  });
+
   it('a save() that throws fails the import as a whole, with a general message', async () => {
     const onError = vi.fn();
     const { fetch } = setup({ save: () => { throw new Error('database is down: secret details'); }, onError });

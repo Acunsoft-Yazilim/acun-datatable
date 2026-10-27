@@ -247,7 +247,8 @@ same shape as the query protocol's errors and as Laravel's validation errors.
 2. Read xlsx as data: never evaluate formulas, macros or external links.
 3. Authorize every request, and bind an import to the user (and tenant) that
    uploaded it; anyone else gets `404`.
-4. Validate the mapping and the mode again on start (see step 2).
+4. Validate the mapping and the mode again on start (see step 2); to update
+   or upsert, the column that finds existing records must be matched too.
 5. Honour `Idempotency-Key` on upload, and refuse a second start (`409`).
 6. Keep uploads private and delete them when the import ends or expires.
 7. Guard the cells of a CSV error report against formulas (a leading `=`, `+`,

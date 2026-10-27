@@ -364,6 +364,9 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
   const checkStart = (body: unknown, headers: readonly string[]): Record<string, string> => {
     const problems: Record<string, string> = {};
     const mapping = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)['mapping'] : undefined;
+    const mode = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)['mode'] : undefined;
+    // Updating finds the existing records by the import key: it must be matched too.
+    const needed = options.importKey && (mode ?? modes[0]) !== 'insert' && !required.includes(options.importKey) ? [...required, options.importKey] : required;
     if (!Array.isArray(mapping) || mapping.length !== headers.length) {
       problems['mapping'] = text.mappingLength(headers.length);
     } else {
@@ -374,10 +377,9 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
         if (seen.has(entry)) { problems['mapping'] = text.mappedTwice(titles.get(entry) ?? entry); break; }
         seen.add(entry);
       }
-      const missing = required.filter(id => !seen.has(id));
+      const missing = needed.filter(id => !seen.has(id));
       if (!problems['mapping'] && missing.length > 0) problems['mapping'] = text.requiredColumns(missing.map(id => titles.get(id) ?? id).join(', '));
     }
-    const mode = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)['mode'] : undefined;
     if (mode === undefined && modes.length > 1) problems['mode'] = text.chooseMode(modes.join(', '));
     else if (mode !== undefined && !modes.includes(mode as ImportMode)) problems['mode'] = text.mode(String(mode));
     return problems;

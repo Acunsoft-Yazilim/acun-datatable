@@ -117,6 +117,10 @@ All notable changes to this repository. Each npm package also has its own
   limit); the xlsx readers stay linear on elements that never close; two
   starts of one import at once run it once (Node `ImportStore.claim`, Laravel
   cache lock), and the dialog ignores a second click while it starts.
+  Both back ends: update and upsert need the import key column matched.
+  Node: a run again goes on after the rows saved before, a failing store in
+  the background is reported instead of ending the process, and `save()`
+  gets the owner as `owner()` gave it.
 
 ## npm 0.4.0 and `acunsoft/datatable-laravel` 0.5.0 (2026-10-25)
 
