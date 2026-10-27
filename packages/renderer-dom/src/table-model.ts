@@ -277,3 +277,8 @@ export function clickRowCheckbox(table: Selectable, pageIds: readonly string[], 
   }
   return rowId;
 }
+
+/** The height of the first real row drawn (not a placeholder), for virtual scrolling; 0 while there is none. */
+export function measureRowHeight(root: ParentNode | null | undefined): number {
+  return root?.querySelector<HTMLElement>('tbody .adt-row:not(.adt-skeleton-row)')?.getBoundingClientRect().height ?? 0;
+}

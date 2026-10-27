@@ -11,7 +11,7 @@ import {
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, clickRowCheckbox, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  actionsCellClass, cellClass, checkActions, clickRowCheckbox, measureRowHeight, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
   pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
@@ -254,8 +254,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
     // Without rowHeight: the first drawn row is measured once, on mount or the first render with rows.
     const measureRow = (): void => {
       if (!props.virtual || measuredRow.value) return;
-      const row = wrapEl.value?.querySelector<HTMLElement>('tbody .adt-row');
-      const height = row?.getBoundingClientRect().height ?? 0;
+      const height = measureRowHeight(wrapEl.value);
       if (height > 0) measuredRow.value = height;
     };
     onMounted(measureRow);

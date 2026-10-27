@@ -15,3 +15,4 @@ React and Vue draw what the DOM renderer draws:
 - React and Vue check `rowActions` as the DOM renderer does (an id, a label and `onSelect`, no id twice), and Vue refuses a wrong `size` or `fixedColumns` with an error instead of a warning (a wrong size drew `adt-size--<value>`).
 - **Visible change:** `DataTableLayout` and `AcunDataTableLayout` show the texts of their `locale` (`tr`, `de`, `fr`, `es`), with `labels` over them, as `renderDataTable` does; before, `locale` changed only numbers and dates and the texts stayed English unless `labels` were given.
 - React's and Vue's toolbar buttons (`button`, `toolbarButtons`) refuse an icon that is not an icon name or `{ path }`, as the DOM renderer does.
+- Virtual scrolling without `rowHeight`: the DOM renderer measures the first real row once rows are there (a table that loads its rows started with none and kept 40px, so the scroll bar and the jumps were off); none of the three measures a loading placeholder row.

@@ -9,7 +9,7 @@ import { autoResponsive } from './auto-responsive';
 import { checkVirtual, virtualWindow } from './virtual';
 import { afterPointerRelease, cellEditor, isEditable, type CellEditor, type EditHandler } from './edit';
 import {
-  actionsCellClass, cellClass, clickRowCheckbox, closeRowMenusOnOutsideClick, rangeOf, selectAllState, togglePageSelection, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, numeric, priorityLevels, priorityOf, resizeHandle,
+  actionsCellClass, cellClass, clickRowCheckbox, measureRowHeight, closeRowMenusOnOutsideClick, rangeOf, selectAllState, togglePageSelection, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, numeric, priorityLevels, priorityOf, resizeHandle,
   responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, wrapClass,
 } from './table-model';
 
@@ -392,7 +392,8 @@ export function renderTable<TData>(
   const wantsSkeleton = (): boolean => showSkeleton(options.skeleton, status !== undefined, status?.getState().status, table.getPage().rows.length);
 
   // Virtual scrolling: the rows in view, re-drawn when the scroll position moves past them.
-  let rowHeight = virtual?.rowHeight ?? 0;
+  let rowHeight = virtual?.rowHeight ?? 0; // 0: 40 until a row is drawn and measured
+  let rowMeasured = Boolean(virtual?.rowHeight);
   // The column widths of the first rows drawn, kept while scrolling: otherwise every window of
   // rows would size the columns anew and they would jump. Measured again when the columns or
   // the width of the table change.
@@ -400,7 +401,7 @@ export function renderTable<TData>(
   let drawn: { start: number; end: number } | undefined;
   const windowOf = (total: number) => virtualWindow(total, rowHeight, scroller.scrollTop, scroller.clientHeight, virtual!.overscan);
 
-  const render = (): void => keepFocus(root, () => {
+  const draw = (): void => keepFocus(root, () => {
     const state = table.getState();
     const page = virtual
       ? (() => {
@@ -656,23 +657,30 @@ export function renderTable<TData>(
     }
   };
 
+  // Without a rowHeight, the first real row drawn gives it: a table that loads its rows has
+  // none at first (or only placeholders), so it is measured again until one is there.
+  const render = (): void => {
+    draw();
+    if (!virtual || rowMeasured) return;
+    const height = measureRowHeight(root);
+    if (height <= 0) return;
+    rowMeasured = true;
+    if (height !== rowHeight) {
+      rowHeight = height;
+      draw();
+    }
+  };
+
   render();
   showStatus();
-  // Virtual scrolling: measure the row height once, then re-draw when the rows in view change.
+  // Virtual scrolling: re-draw when the rows in view change.
   const frames = frameThrottle(doc.defaultView);
   const onScroll = (): void => frames.schedule(() => {
     const rows = table.getFilteredRows().length;
     const view = windowOf(rows);
     if (!drawn || view.start !== drawn.start || view.end !== drawn.end) render();
   });
-  if (virtual) {
-    if (!rowHeight) {
-      const measured = root.querySelector<HTMLElement>('tbody .adt-row')?.getBoundingClientRect().height ?? 0;
-      rowHeight = measured > 0 ? measured : 40;
-      render();
-    }
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-  }
+  if (virtual) scroller.addEventListener('scroll', onScroll, { passive: true });
   // A new width for the table (window, sidebar): measure the column widths again.
   const View = doc.defaultView as (Window & typeof globalThis) | null;
   const resized = virtual && typeof View?.ResizeObserver === 'function'

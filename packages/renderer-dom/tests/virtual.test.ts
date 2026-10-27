@@ -70,3 +70,18 @@ describe('destroy while a scroll waits for its frame', () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 });
+
+describe('the row height of a table whose rows come later', () => {
+  it('is measured from the first real row, not taken as 40 for good (nor from a placeholder)', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const height = this.classList.contains('adt-skeleton-row') ? 20 : this.classList.contains('adt-row') ? 50 : 0;
+      return { height, width: 100, top: 0, left: 0, right: 100, bottom: height, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    });
+    const table = createDataTable<R>({ data: [], columns });
+    renderTable(host, table, { virtual: true });
+    table.setData(data.slice(0, 1000));
+    const after = [...host.querySelectorAll<HTMLElement>('tbody .adt-spacer td')].at(-1)!;
+    const drawn = host.querySelectorAll('tbody .adt-row').length;
+    expect(after.style.height).toBe(`${(1000 - drawn) * 50}px`); // 50 a row, measured once rows were there
+  });
+});

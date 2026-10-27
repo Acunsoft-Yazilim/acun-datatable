@@ -10,7 +10,7 @@ import {
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, clickRowCheckbox, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  actionsCellClass, cellClass, checkActions, clickRowCheckbox, measureRowHeight, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
   pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
@@ -253,7 +253,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   // Virtual scrolling without rowHeight: measure the first drawn row once.
   useEffect(() => {
     if (!virtual || virtual.rowHeight || measuredRow) return;
-    const height = wrap.current?.querySelector<HTMLElement>('tbody .adt-row')?.getBoundingClientRect().height ?? 0;
+    const height = measureRowHeight(wrap.current);
     if (height > 0) setMeasuredRow(height);
   });
   useEffect(() => closeRowMenusOnOutsideClick(document, () => wrap.current), []);
