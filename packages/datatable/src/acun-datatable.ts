@@ -209,6 +209,12 @@ export interface AcunDataTableOptions {
   /** Server side: the most rows an export fetches. Default 10,000. */
   readonly exportLimit?: number;
   /**
+   * Server side: rows per request while an export fetches its rows. Default
+   * 100, the default most rows per page of `@acunsoft/datatable-server` and
+   * Laravel's `TableResponse`; raise it with their `maxPageSize`.
+   */
+  readonly exportPageSize?: number;
+  /**
    * Remember page, page size, sorting, filters, search and hidden columns
    * across reloads (DataTables `stateSave`). `true` keys it by the page path
    * and the element's ID; `{ key, storage: 'session' }` to choose.
@@ -269,6 +275,10 @@ export class AcunDataTable {
     if (options.serverSide && !options.ajax) throw new TypeError('AcunDataTable: serverSide needs ajax');
     if (options.serverSide && enabled(options.pagination) === false) {
       throw new RangeError('AcunDataTable: pagination cannot be turned off with serverSide');
+    }
+    const { exportPageSize } = options;
+    if (exportPageSize !== undefined && (!Number.isInteger(exportPageSize) || exportPageSize < 1 || exportPageSize > 1000)) {
+      throw new RangeError('AcunDataTable: exportPageSize must be a whole number from 1 to 1000');
     }
     this.#options = options;
 
@@ -604,14 +614,18 @@ export class AcunDataTable {
     const labels = resolveLabels(this.#options.language, this.#options.labels);
     const { cursor: _current, ...query } = table.getQuery();
     const byCursor = cursorPaging(this.#options);
+    let pageSize = this.#options.exportPageSize ?? 100;
     const rows: Data[] = [];
     let cursor: string | undefined; // with cursor paging: from the first row on, each answer's nextCursor
     for (let page = 1; ; page++) {
-      const result = await this.#source.getPage({ ...query, page, pageSize: 1000, ...(cursor === undefined ? {} : { cursor }) });
+      const result = await this.#source.getPage({ ...query, page, pageSize, ...(cursor === undefined ? {} : { cursor }) });
       if (result.totalRows !== undefined && result.totalRows > limit) throw new Error(labels.exportTooLarge(limit));
+      // A server that answers fewer rows than asked while more remain caps the page size: page by its size.
+      if (page === 1 && result.totalRows !== undefined && result.rows.length > 0 && result.rows.length < pageSize && result.rows.length < result.totalRows) pageSize = result.rows.length;
       rows.push(...result.rows);
       if (rows.length > limit) throw new Error(labels.exportTooLarge(limit));
-      if (byCursor ? result.nextCursor === undefined || result.rows.length === 0 : result.rows.length < 1000) break;
+      if (result.rows.length === 0) break;
+      if (byCursor ? result.nextCursor === undefined : result.rows.length < pageSize || (result.totalRows !== undefined && rows.length >= result.totalRows)) break;
       cursor = result.nextCursor;
     }
     // A local copy in the server's order, with the same visible columns.

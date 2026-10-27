@@ -81,7 +81,10 @@ cell as a DOM node (`el` is exported, and `AcunDataTable.el` in the
 `<script>` build); it is never parsed as HTML.
 `buttons: ['excel', 'csv', 'copy', 'print', { id, label, onSelect }]` adds the
 tools menu; exports take the selected rows, else every matching row (server
-side: fetched page by page up to `exportLimit`, default 10,000).
+side: fetched page by page up to `exportLimit`, default 10,000, with
+`exportPageSize` rows a request, default 100: the default most of the Node and
+Laravel back ends; a back end that answers fewer rows than asked is paged by
+what it answers).
 `filter: true` (or a list of `{ value, label }`) puts a column in the
 "Filters" menu; active filters show as removable chips. `filterPanel: 'drawer'`
 or `'modal'` opens the fields in a drawer or a dialog instead of a dropdown

@@ -174,7 +174,8 @@ describe('buttons and custom cells', () => {
     await dt.ready;
     document.querySelector<HTMLButtonElement>('.adt-menu-item[data-action="copy"]')!.click();
     await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
-    expect(String(fetch.mock.calls.at(-1)![0])).toContain('pageSize=1000');
+    expect(String(fetch.mock.calls.at(-1)![0])).toContain('pageSize=100'); // what the back ends allow by default
+    expect(String(fetch.mock.calls.at(-1)![0])).not.toContain('pageSize=1000');
     expect((writeText.mock.calls[0] as unknown as [string])[0].trim().split('\n')).toHaveLength(31); // header + 30 rows, not one page
 
     const small = new AcunDataTable(document.body.appendChild(document.createElement('div')), {
@@ -183,6 +184,61 @@ describe('buttons and custom cells', () => {
     await small.ready;
     small.element.querySelector<HTMLButtonElement>('.adt-menu-item[data-action="copy"]')!.click();
     await vi.waitFor(() => expect(small.element.querySelector('.adt-menu-status--error')!.textContent).toBe('Dışa aktarma 20 satırı aşıyor; filtreleri daraltın.'));
+  });
+
+  // 250 rows behind a server that, like the Node and Laravel back ends by default, allows 100 rows a page.
+  const many = Array.from({ length: 250 }, (_, i) => ({ id: i + 1, customer: `Müşteri ${i + 1}`, total: i }));
+  const copied = async (options: ConstructorParameters<typeof AcunDataTable>[1], writeText: ReturnType<typeof vi.fn>) => {
+    const dt = new AcunDataTable(document.body.appendChild(document.createElement('div')), { buttons: ['copy'], ...options });
+    await dt.ready;
+    dt.element.querySelector<HTMLButtonElement>('.adt-menu-item[data-action="copy"]')!.click();
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
+    return (writeText.mock.calls[0] as unknown as [string])[0].trim().split('\n').slice(1);
+  };
+
+  it('exports from a server that refuses more than 100 rows a page (the defaults of both back ends)', async () => {
+    const fetch = vi.fn(async (url: string) => {
+      const query = new URL(url, 'http://x').searchParams;
+      const page = Number(query.get('page'));
+      const size = Number(query.get('pageSize'));
+      if (size > 100) return new Response(JSON.stringify({ message: 'pageSize' }), { status: 422 });
+      return new Response(JSON.stringify({ rows: many.slice((page - 1) * size, page * size), totalRows: many.length }));
+    });
+    vi.stubGlobal('fetch', fetch);
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const lines = await copied({ serverSide: true, ajax: '/api/orders' }, writeText);
+    expect(lines).toHaveLength(250);
+    expect(lines.at(-1)).toContain('Müşteri 250');
+    expect(fetch).toHaveBeenCalledTimes(1 + 3); // the table's page, then 100 + 100 + 50: no request past the total
+  });
+
+  it('exports every row from a DataTables back end that silently caps the length, and takes exportPageSize', async () => {
+    const seen: number[] = [];
+    const fetch = vi.fn(async (url: string) => {
+      const query = new URL(url, 'http://x').searchParams;
+      const start = Number(query.get('start'));
+      const length = Math.min(Number(query.get('length')), 100); // like Laravel's TableResponse
+      seen.push(Number(query.get('length')));
+      return new Response(JSON.stringify({ draw: Number(query.get('draw')), data: many.slice(start, start + length), recordsTotal: 250, recordsFiltered: 250 }));
+    });
+    vi.stubGlobal('fetch', fetch);
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const lines = await copied({
+      serverSide: true, ajax: { url: '/api/orders', protocol: 'datatables' }, exportPageSize: 500,
+      columns: [{ data: 'customer', title: 'Müşteri' }, { data: 'total', title: 'Tutar' }],
+    }, writeText);
+    expect(seen.slice(1)).toEqual([500, 100, 100]); // asked for 500, got 100: paged by 100 from there
+    expect(lines).toHaveLength(250);
+    expect(new Set(lines).size).toBe(250); // no row twice, none missing
+    expect(lines.at(-1)).toContain('Müşteri 250');
+  });
+
+  it('refuses an exportPageSize the back ends cannot take', () => {
+    expect(() => new AcunDataTable('#orders', { exportPageSize: 0 })).toThrow(RangeError);
+    expect(() => new AcunDataTable('#orders', { exportPageSize: 1001 })).toThrow(RangeError);
+    expect(() => new AcunDataTable('#orders', { exportPageSize: 2.5 })).toThrow(RangeError);
   });
 });
 
