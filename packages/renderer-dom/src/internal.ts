@@ -6,6 +6,6 @@
 export { checkActions } from './actions';
 export {
   actionsCellClass, cellClass, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels, resizeHandle,
-  responsiveFlags, showDialog, skeletonRows, sortView, tableClass, withoutIds, wrapClass,
-  type FrameSource,
+  responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, withoutIds, wrapClass,
+  type FrameSource, type TotalCell,
 } from './table-model';

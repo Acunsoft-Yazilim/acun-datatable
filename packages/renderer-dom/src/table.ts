@@ -10,7 +10,7 @@ import { checkVirtual, virtualWindow } from './virtual';
 import { afterPointerRelease, cellEditor, isEditable, type CellEditor, type EditHandler } from './edit';
 import {
   actionsCellClass, cellClass, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, numeric, priorityLevels, priorityOf, resizeHandle,
-  responsiveFlags, showDialog, skeletonRows, sortView, tableClass, withoutIds, wrapClass,
+  responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, withoutIds, wrapClass,
 } from './table-model';
 
 export { numeric, priorityOf }; // defined with the other shared table logic in table-model.ts
@@ -389,8 +389,7 @@ export function renderTable<TData>(
 
   // Placeholder rows while the first rows of a remote table load.
   let skeletonShown = false;
-  const wantsSkeleton = (): boolean => options.skeleton !== false && status !== undefined
-    && status.getState().status === 'loading' && table.getPage().rows.length === 0;
+  const wantsSkeleton = (): boolean => showSkeleton(options.skeleton, status !== undefined, status?.getState().status, table.getPage().rows.length);
 
   // Virtual scrolling: the rows in view, re-drawn when the scroll position moves past them.
   let rowHeight = virtual?.rowHeight ?? 0;
@@ -611,22 +610,16 @@ export function renderTable<TData>(
     tableEl.append(head, body);
     // Footer totals of the columns with `aggregate` (every matching row, not just the page).
     if (columns.some(column => column.aggregate !== undefined)) {
-      const totals = table.getAggregates();
       const tr = element(doc, 'tr', { class: 'adt-total' });
       if (expandable) tr.append(element(doc, 'td', { class: 'adt-expand-cell' }));
       if (selectable) tr.append(element(doc, 'td', { class: 'adt-select' }));
-      columns.forEach((column, index) => {
-        const result = totals[column.id];
-        const cellClass = [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', result ? 'adt-num' : ''].filter(Boolean).join(' ');
-        const td = element(doc, index === 0 && !result ? 'th' : 'td', {
-          ...(cellClass ? { class: cellClass } : {}),
-          ...(index === 0 && !result ? { scope: 'row' } : {}),
-          'data-label': result ? `${column.header} · ${labels.aggregate(result.aggregate)}` : column.header,
-          ...(result ? { title: labels.aggregate(result.aggregate) } : {}),
-        }, index === 0 && !result ? labels.totals : text.total(column, result));
-        tr.append(td);
-      });
-      if (rowActions.length > 0) tr.append(element(doc, 'td', { class: `adt-actions${collapsible ? ' adt-col--p2' : ''}` }));
+      for (const cell of totalCells(columns, table.getAggregates(), collapsible, labels, (column, result) => text.total(column, result))) {
+        tr.append(element(doc, cell.header ? 'th' : 'td', {
+          ...(cell.className ? { class: cell.className } : {}), ...(cell.header ? { scope: 'row' } : {}),
+          'data-label': cell.label, ...(cell.title ? { title: cell.title } : {}),
+        }, cell.text));
+      }
+      if (rowActions.length > 0) tr.append(element(doc, 'td', { class: actionsCellClass(collapsible) }));
       const foot = element(doc, 'tfoot');
       foot.append(tr);
       tableEl.append(foot);

@@ -11,7 +11,7 @@ import {
 } from '@acunsoft/datatable-dom';
 import {
   actionsCellClass, cellClass, checkActions, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
-  resizeHandle, responsiveFlags, showDialog, skeletonRows, sortView, tableClass, withoutIds, wrapClass,
+  resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, withoutIds, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
@@ -362,7 +362,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
 
   const body: ReactNode[] = [];
   // Placeholder rows while the first rows of a remote table load.
-  const skeleton = props.skeleton !== false && props.status !== undefined && phase === 'loading' && page.rows.length === 0;
+  const skeleton = showSkeleton(props.skeleton, props.status !== undefined, phase, page.rows.length);
   if (skeleton) {
     for (let index = 0; index < skeletonRows(state.pageSize); index++) {
       body.push(h('tr', { className: 'adt-row adt-skeleton-row', key: `__skeleton${index}` },
@@ -483,17 +483,14 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
       h('tbody', skeleton ? { 'aria-hidden': true } : null, body),
       // Footer totals of the columns with `aggregate` (every matching row).
       columns.some(column => column.aggregate !== undefined) ? h('tfoot', null, h('tr', { className: 'adt-total' }, ...(() => {
-        const totals = table.getAggregates();
         const cells: ReactNode[] = [];
         if (expandable) cells.push(h('td', { className: 'adt-expand-cell', key: '__expand' }));
         if (selectable) cells.push(h('td', { className: 'adt-select', key: '__select' }));
-        columns.forEach((column, index) => {
-          const result = totals[column.id];
-          const cellClass = [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', result ? 'adt-num' : ''].filter(Boolean).join(' ') || undefined;
-          cells.push(index === 0 && !result
-            ? h('th', { scope: 'row', className: cellClass, 'data-label': column.header, key: column.id }, labels.totals)
-            : h('td', { className: cellClass, key: column.id, 'data-label': result ? `${column.header} · ${labels.aggregate(result.aggregate)}` : column.header, title: result ? labels.aggregate(result.aggregate) : undefined }, text.total(column, result)));
-        });
+        for (const cell of totalCells(columns, table.getAggregates(), collapsible, labels, (column, result) => text.total(column, result))) {
+          cells.push(h(cell.header ? 'th' : 'td', {
+            scope: cell.header ? 'row' : undefined, className: cell.className || undefined, 'data-label': cell.label, title: cell.title, key: cell.columnId,
+          }, cell.text));
+        }
         if (rowActions.length > 0) cells.push(h('td', { className: actionsCellClass(collapsible), key: '__actions' }));
         return cells;
       })())) : null)),

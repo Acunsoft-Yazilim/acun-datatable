@@ -23,6 +23,8 @@ interface Scenario {
   readonly then?: (host: HTMLElement, table: { selectRow(id: string): void }) => void;
   /** Compare only this part (virtual rows depend on the viewport, which jsdom does not have). */
   readonly part?: string;
+  /** A line the markup must have, so the scenario draws what it is about. */
+  readonly has?: string;
 }
 const scenarios: Record<string, Scenario> = {
   plain: { options: { caption: 'Siparişler' } },
@@ -46,6 +48,11 @@ const scenarios: Record<string, Scenario> = {
     table: { columns: [{ id: 'customer', header: 'Müşteri', accessorKey: 'customer', edit: { type: 'text' } }, { id: 'total', header: 'Tutar', accessorKey: 'total', type: 'decimal' }], initialState: { pageSize: 5 } },
     options: { onEdit: () => undefined },
   },
+  totals: {
+    table: { columns: [columns[0], { ...columns[1], aggregate: 'sum' }, columns[2]], initialState: { pageSize: 5 } },
+    options: { responsive: 'collapse', selectable: true }, has: '<tfoot>',
+  },
+  'totals, the first column with one': { table: { columns: [{ ...columns[1], aggregate: 'avg' }, columns[0]], initialState: { pageSize: 5 } }, has: '<tfoot>' },
   'two sort columns': { table: { initialState: { pageSize: 5, sorting: [{ field: 'total', direction: 'desc' }, { field: 'customer', direction: 'asc' }] } } },
 };
 
@@ -80,6 +87,7 @@ describe('the DOM renderer, React and Vue draw the same table', () => {
     it(name, async () => {
       const dom = await markup('dom', scenario);
       expect(dom.length).toBeGreaterThan(5);
+      if (scenario.has) expect(dom.map(line => line.trim())).toContain(scenario.has);
       for (const renderer of ['react', 'vue'] as const) {
         const other = await markup(renderer, scenario);
         if (DIFFERENT[name]?.includes(renderer)) expect(other, `${renderer}: known difference fixed? remove it from DIFFERENT`).not.toEqual(dom);

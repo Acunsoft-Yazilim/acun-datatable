@@ -1,7 +1,7 @@
 // What the DOM renderer, the React and the Vue adapter decide alike, as plain
 // functions of the table: the renderers only turn the answers into their own
 // elements. Shared through '@acunsoft/datatable-dom/internal' (see internal.ts).
-import { COLUMN_WIDTH_LIMITS, type RowId } from '@acunsoft/datatable-core';
+import { COLUMN_WIDTH_LIMITS, type Aggregate, type RowId } from '@acunsoft/datatable-core';
 import type { ResponsiveMode, TableSize } from './table';
 
 /** What the class helpers read of a column. */
@@ -187,4 +187,38 @@ export function resizeHandle(columnId: string, label: string, width: number | un
     'aria-valuemin': String(COLUMN_WIDTH_LIMITS.min), 'aria-valuemax': String(COLUMN_WIDTH_LIMITS.max),
     ...(width !== undefined ? { 'aria-valuenow': String(width) } : {}),
   };
+}
+
+/** One cell of the totals row: the first column says "Totals" (a row header) unless it has a total itself. */
+export interface TotalCell {
+  readonly columnId: string;
+  readonly header: boolean;
+  readonly className: string;
+  /** `data-label` (the card layout shows it); with the aggregate's name where there is a total. */
+  readonly label: string;
+  readonly title: string | undefined;
+  readonly text: string;
+}
+
+/** The totals row's cells for the columns, from `table.getAggregates()`. */
+export function totalCells<TColumn extends ColumnLike & { readonly header: string }, TResult extends { readonly aggregate: Aggregate }>(
+  columns: readonly TColumn[], totals: Readonly<Record<string, TResult | undefined>>, collapsible: boolean,
+  labels: { readonly totals: string; aggregate(kind: Aggregate): string }, text: (column: TColumn, result: TResult | undefined) => string,
+): TotalCell[] {
+  return columns.map((column, index) => {
+    const result = totals[column.id];
+    const header = index === 0 && !result;
+    return {
+      columnId: column.id, header,
+      className: [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', result ? 'adt-num' : ''].filter(Boolean).join(' '),
+      label: result ? `${column.header} · ${labels.aggregate(result.aggregate)}` : column.header,
+      title: result ? labels.aggregate(result.aggregate) : undefined,
+      text: header ? labels.totals : text(column, result),
+    };
+  });
+}
+
+/** Placeholder rows show while a table with a status source loads its first rows (unless `skeleton: false`). */
+export function showSkeleton(skeleton: boolean | undefined, hasStatus: boolean, phase: string | undefined, rows: number): boolean {
+  return skeleton !== false && hasStatus && phase === 'loading' && rows === 0;
 }
