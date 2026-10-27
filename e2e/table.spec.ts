@@ -437,7 +437,7 @@ test('virtual scrolling keeps 50,000 rows to a handful in the page', async ({ pa
   expect(await first()).toBeGreaterThan(24_000);
 });
 
-test('<acun-datatable> works from the script build, as in Angular, Svelte or Astro', async ({ page }) => {
+test('<acun-datatable> works from the script build, with no bundler and no framework', async ({ page }) => {
   await page.goto('/e2e/fixtures/element.html');
   await expect(page.locator('body[data-ready=true]')).toBeAttached();
   await expect(page.getByRole('columnheader', { name: 'Ürün' })).toBeVisible();

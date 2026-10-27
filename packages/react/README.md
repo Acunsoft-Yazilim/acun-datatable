@@ -90,6 +90,17 @@ defaults to `scroll`: the drawn rows stay a table on narrow screens.
 arrays of the same entries; their callbacks are always the latest ones. In
 server mode pass the HTTP runner as `status` for loading and error states.
 
+## Next.js and server rendering
+
+The same package works in Next.js; there is no separate Next.js package. The
+build is marked `"use client"`. Tested with the Next.js 16.4 App Router
+(`e2e/ssr` in the repository): the table renders on the server and hydrates
+without a mismatch. A table carries functions, so a Server Component cannot
+pass one as a prop: hand the rows over as plain data and make the table in a
+client component (`useDataTable`). For texts in a Server Component, import
+them from `@acunsoft/datatable-dom`; everything from this package is client
+code. The Pages Router and streaming SSR are not tested yet.
+
 ## License
 
 [MIT](LICENSE). Provided “as is”, without warranty of any kind; the authors and Acunsoft accept no liability for any damage or data loss arising from its use (see LICENSE).

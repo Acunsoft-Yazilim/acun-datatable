@@ -267,10 +267,6 @@ const ICON = {
   html:`<svg width="17" height="17" viewBox="0 0 512 512"><path fill="#E34F26" d="M71 460 30 0h452l-41 460-185 52z"/><path fill="#EF652A" d="M256 472l149-41 35-394H256z"/><path fill="#fff" d="M256 208h-75l-5-53h80v-52H119l15 157h122zm0 134-63-17-4-45h-52l7 89 112 31z"/><path fill="#EBEBEB" d="M256 208v52h70l-7 73-63 17v54l112-31 15-165zm0-105v52h132l4-52z"/></svg>`,
   guide:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>`,
   livewire:`<svg width="18" height="18" viewBox="0 0 24 24" fill="#FB70A9"><path d="M13 2 4.5 13H11l-1 9 9-12h-6z"/></svg>`,
-  nuxt:`<svg width="20" height="20" viewBox="0 0 24 24"><path d="M13.4 19.5h6.6c.6 0 .9-.6.6-1.1l-4.4-7.6a.7.7 0 0 0-1.2 0l-1.6 2.7-3-5.3a.7.7 0 0 0-1.2 0L2.6 18.4c-.3.5 0 1.1.6 1.1h4.1c1.6 0 2.8-.7 3.6-2l2-3.4" fill="none" stroke="#00DC82" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
-  inertia:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9553E9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l6 6-6 6M12 6l6 6-6 6"/></svg>`,
-  webcomponent:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4 3 12l5 8M16 4l5 8-5 8M13.5 4l-3 16"/></svg>`,
-  nextjs:`<svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M9.5 7.5v9M9.5 7.5l7 9.5" stroke="var(--bg, #fff)" stroke-width="1.8" stroke-linecap="round"/><path d="M15 7.5v5" stroke="var(--bg, #fff)" stroke-width="1.8" stroke-linecap="round"/></svg>`,
   laravel:`<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#FF2D20" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M3 7l4.5-2.5L12 7 7.5 9.5z"/><path d="M3 7v5l4.5 2.5V9.5"/><path d="M12 7v5l-4.5 2.5"/><path d="M12 7l4.5-2.5L21 7l-4.5 2.5z"/><path d="M16.5 9.5V15L12 17.5"/></svg>`
 };
 
@@ -637,233 +633,6 @@ const { table } = useDataTable({
     <template #top-end><button type="button" class="adt-button">Yeni sipariş</button></template>
   </AcunDataTableLayout>
 </template>` },
-  nuxt:{ name:"Nuxt", pkg:"@acunsoft/datatable-vue", status:"ready",
-    install:"npm install @acunsoft/datatable-core @acunsoft/datatable-vue @acunsoft/datatable-http @acunsoft/datatable-server",
-    unpub:{tr:"MIT lisanslı. Vue paketi ön yüz, sunucu paketi Nitro API rotası için:", en:"MIT licensed. The Vue package for the page, the server package for the Nitro API route:"},
-    api:'@acunsoft/datatable-vue',
-    lead:{tr:"Nuxt 3/4: tablo Vue bileşeni olarak sayfada, veriler <code>server/api</code> rotasından. Rota <code>@acunsoft/datatable-server</code> ile isteği denetler ve SQL'i (ya da Prisma argümanlarını) üretir; Next.js ile aynı üç çağrı.",
-          en:"Nuxt 3/4: the table is a Vue component on the page, the rows come from a <code>server/api</code> route. The route checks the request and builds the SQL (or Prisma arguments) with <code>@acunsoft/datatable-server</code>; the same three calls as in Next.js."},
-    note:{tr:"Tablo tarayıcıda çalışır: <code>&lt;ClientOnly&gt;</code> içine alın ya da bileşeni <code>.client.vue</code> yapın. Sunucu rotasında kullanıcıyı yetkilendirin; kiracı kuralını <code>scope</code>'a koyun.",
-          en:"The table runs in the browser: wrap it in <code>&lt;ClientOnly&gt;</code> or name the component <code>.client.vue</code>. Authorize the user in the server route; put tenant rules in <code>scope</code>."},
-    lang:"typescript", code:
-`// server/api/orders.get.ts
-import { defineColumns, readTableQuery, sqlQuery, tableError, tableResponse } from '@acunsoft/datatable-server';
-
-const columns = defineColumns({
-  customer: { sortable: true, filterable: true, search: 'customer_search' },
-  total: { type: 'decimal', sortable: true, filterable: true },
-});
-
-export default defineEventHandler(async (event) => {
-  const params = new URLSearchParams(getRequestURL(event).search);
-  try {
-    const query = readTableQuery(params, columns);
-    const sql = sqlQuery(query, columns, { dialect: 'postgres', table: 'orders', scope: { text: 'tenant_id = ?', values: [event.context.user.tenantId] } });
-    const [page, count] = await Promise.all([db.query(sql.page.text, [...sql.page.values]), db.query(sql.count.text, [...sql.count.values])]);
-    return tableResponse(query, page.rows, count.rows[0].count, { cursorOf: sql.cursorOf });
-  } catch (error) {
-    const { status, body } = tableError(error, params);
-    setResponseStatus(event, status);
-    return body;
-  }
-});`,
-    examples:[
-      { title:{tr:"Sayfa", en:"The page"}, desc:{tr:"Vue paketinin yerleşim bileşeni; ClientOnly içinde.", en:"The Vue package's layout component, inside ClientOnly."}, lang:"xml", code:
-`<script setup lang="ts">
-import { createDataTable } from '@acunsoft/datatable-core';
-import { connectTable, createHttpDataSource, createQueryRunner } from '@acunsoft/datatable-http';
-import { AcunDataTableLayout, labelsTr } from '@acunsoft/datatable-vue';
-import '@acunsoft/datatable-dom/styles.css';
-
-const table = createDataTable({ mode: 'server', locale: 'tr', columns: [
-  { id: 'customer', header: 'Müşteri', accessorKey: 'customer', enableSorting: true, enableFiltering: true },
-  { id: 'total', header: 'Tutar', accessorKey: 'total', type: 'decimal', enableSorting: true },
-] });
-const runner = createQueryRunner(createHttpDataSource({ url: '/api/orders' }));
-let disconnect = () => {};
-onMounted(() => { disconnect = connectTable(table, runner); });
-onBeforeUnmount(() => disconnect());
-<\/script>
-
-<template>
-  <ClientOnly>
-    <AcunDataTableLayout :table="table" :status="runner" locale="tr" :labels="labelsTr" responsive="auto" />
-  </ClientOnly>
-</template>` },
-    ] },
-  inertia:{ name:"Inertia", pkg:"acunsoft/datatable-laravel", status:"ready",
-    install:"composer require acunsoft/datatable-laravel && npm install @acunsoft/datatable",
-    unpub:{tr:"MIT lisanslı. Laravel paketi uç nokta, tarayıcı paketi sayfa için:", en:"MIT licensed. The Laravel package for the endpoint, a browser package for the page:"},
-    api:'@acunsoft/datatable',
-    lead:{tr:"Inertia (Vue veya React) sayfasında tablo, verileri Laravel'deki <code>TableResponse</code> uç noktasından alır: sayfa Inertia ile gelir, tablo sayfaları JSON ile. Sıralama, filtre, sayfa değişince sayfa yenilenmez, Inertia ziyareti olmaz.",
-          en:"On an Inertia page (Vue or React) the table reads its rows from a Laravel <code>TableResponse</code> endpoint: the page comes through Inertia, the table's pages as JSON. Sorting, filters and paging never reload the page or make an Inertia visit."},
-    note:{tr:"Uç nokta web oturumunu kullanır (aynı origin); POST için CSRF belirtecini <code>AcunDataTable</code> meta etiketinden kendisi gönderir. Uç noktayı policy veya middleware ile yetkilendirin.",
-          en:"The endpoint uses the web session (same origin); for POST, <code>AcunDataTable</code> sends the CSRF token from the meta tag itself. Authorize the endpoint with a policy or middleware."},
-    lang:"php", code:
-`// routes/web.php — the same session as the Inertia pages
-Route::get('/orders', fn () => Inertia::render('Orders'));
-Route::get('/orders/data', fn () => TableResponse::for(Order::query()->whereBelongsTo(auth()->user()->team))
-    ->columns([
-        Column::make('customer')->sortable()->filterable()->searchUsing('customer_search'),
-        Column::make('total')->type('decimal')->sortable()->filter(),
-    ]))->middleware('auth');`,
-    examples:[
-      { title:{tr:"Vue sayfası (resources/js/Pages/Orders.vue)", en:"Vue page (resources/js/Pages/Orders.vue)"}, desc:{tr:"Tek çağrılık AcunDataTable; React'te aynısı useEffect içinde.", en:"The one-call AcunDataTable; in React the same inside useEffect."}, lang:"xml", code:
-`<script setup>
-import { onMounted, onBeforeUnmount, ref } from 'vue';
-import { AcunDataTable } from '@acunsoft/datatable';
-import '@acunsoft/datatable/styles.css';
-
-const el = ref(null);
-let table;
-onMounted(() => {
-  table = new AcunDataTable(el.value, {
-    serverSide: true,
-    ajax: '/orders/data',
-    language: 'tr',
-    columns: [{ data: 'customer', title: 'Müşteri' }, { data: 'total', title: 'Tutar', type: 'decimal', filter: true }],
-  });
-});
-onBeforeUnmount(() => table?.destroy());
-<\/script>
-
-<template><div ref="el" /></template>` },
-    ] },
-  webcomponent:{ name:"Web Component", pkg:"@acunsoft/datatable", status:"ready",
-    install:"npm install @acunsoft/datatable",
-    unpub:{tr:"MIT lisanslı; ya da derleme adımı olmadan tek &lt;script&gt; etiketiyle (aşağıda):", en:"MIT licensed; or with a single &lt;script&gt; tag, no build step (below):"},
-    api:'@acunsoft/datatable',
-    lead:{tr:"<code>&lt;acun-datatable&gt;</code> özel öğesi tabloyu her yerde aynı şekilde kullandırır: Angular, Svelte, Astro, Alpine, Solid ya da düz HTML. Sık kullanılan seçenekler öznitelik (<code>src</code>, <code>server-side</code>, <code>language</code>, <code>page-size</code>, <code>responsive</code> …), geri kalanı <code>options</code> / <code>columns</code> / <code>data</code> özelliği.",
-          en:"The <code>&lt;acun-datatable&gt;</code> custom element brings the table everywhere the same way: Angular, Svelte, Astro, Alpine, Solid or plain HTML. Common options are attributes (<code>src</code>, <code>server-side</code>, <code>language</code>, <code>page-size</code>, <code>responsive</code> …), the rest the <code>options</code> / <code>columns</code> / <code>data</code> properties."},
-    note:{tr:"Light DOM kullanır, <code>styles.css</code> doğrudan uygulanır. İçine yazılmış bir <code>&lt;table&gt;</code> kaynak olur. Olaylar: <code>adt-ready</code> ve her değişiklikte <code>adt-change</code> (<code>{ state, event }</code>). npm ile <code>defineAcunDataTableElement()</code> çağırın; <code>&lt;script&gt;</code> derlemesi öğeyi kendisi tanımlar.",
-          en:"It uses light DOM, so <code>styles.css</code> applies directly. A <code>&lt;table&gt;</code> written inside it is the source. Events: <code>adt-ready</code>, and <code>adt-change</code> (<code>{ state, event }</code>) on every change. With npm call <code>defineAcunDataTableElement()</code>; the <code>&lt;script&gt;</code> build defines the element itself."},
-    lang:"xml", code:
-`<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable/dist/styles.css">
-<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable/dist/acun-datatable.min.js"><\/script>
-
-<acun-datatable id="orders" src="/api/orders" server-side language="tr" page-size="25" responsive="auto"></acun-datatable>
-<script>
-  document.getElementById('orders').columns = [
-    { data: 'customer', title: 'Müşteri' },
-    { data: 'total', title: 'Tutar', type: 'decimal', filter: true },
-  ];
-<\/script>`,
-    examples:[
-      { title:{tr:"Angular", en:"Angular"}, desc:{tr:"CUSTOM_ELEMENTS_SCHEMA ile; özellikler [ ] bağlamasıyla.", en:"With CUSTOM_ELEMENTS_SCHEMA; properties through [ ] bindings."}, lang:"typescript", code:
-`import { Component, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { defineAcunDataTableElement } from '@acunsoft/datatable';
-defineAcunDataTableElement();
-
-@Component({
-  selector: 'app-orders',
-  standalone: true,
-  schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  template: \`<acun-datatable src="/api/orders" server-side language="tr" [columns]="columns"
-                 (adt-change)="onChange($event)"></acun-datatable>\`,
-})
-export class OrdersComponent {
-  columns = [{ data: 'customer', title: 'Müşteri' }, { data: 'total', title: 'Tutar', type: 'decimal' }];
-  onChange(event: Event) { console.log((event as CustomEvent).detail.state); }
-}` },
-      { title:{tr:"Svelte", en:"Svelte"}, desc:{tr:"Svelte özellikleri doğrudan öğeye verir.", en:"Svelte sets properties on the element directly."}, lang:"xml", code:
-`<script>
-  import { defineAcunDataTableElement } from '@acunsoft/datatable';
-  import '@acunsoft/datatable/styles.css';
-  defineAcunDataTableElement();
-  const columns = [{ data: 'customer', title: 'Müşteri' }, { data: 'total', title: 'Tutar', type: 'decimal' }];
-<\/script>
-
-<acun-datatable src="/api/orders" server-side language="tr" {columns} on:adt-ready={() => console.log('ready')}></acun-datatable>` },
-      { title:{tr:"Astro / Alpine", en:"Astro / Alpine"}, desc:{tr:"Astro'da düz HTML gibi; Alpine'de x-init ile özellik atanır.", en:"In Astro like plain HTML; in Alpine set properties with x-init."}, lang:"xml", code:
-`<!-- Astro: the element runs in the browser; no client directive needed -->
-<acun-datatable src="/api/orders" server-side language="tr"></acun-datatable>
-<script>import { defineAcunDataTableElement } from '@acunsoft/datatable'; defineAcunDataTableElement();<\/script>
-
-<!-- Alpine -->
-<acun-datatable x-data x-init="$el.data = await (await fetch('/products.json')).json()" language="tr" virtual></acun-datatable>` },
-    ] },
-  nextjs:{ name:"Next.js", pkg:"@acunsoft/datatable-server", status:"ready",
-    install:"npm install @acunsoft/datatable-server @acunsoft/datatable-react @acunsoft/datatable-http @acunsoft/datatable-core",
-    unpub:{tr:"MIT lisanslı. Node arka ucu (Next.js route handler, Express, Fastify) ve React ön yüzü:", en:"MIT licensed. The Node back end (Next.js route handlers, Express, Fastify) and the React front end:"},
-    api:'@acunsoft/datatable-server',
-    lead:{tr:"Next.js App Router için uçtan uca: bir route handler isteği <code>readTableQuery</code> ile okur ve kolon izin listesine göre denetler, <code>sqlQuery</code> PostgreSQL/MySQL/SQLite için yalnızca bağlı parametreli SQL üretir (ya da <code>prismaQuery</code> Prisma argümanları), <code>tableResponse</code> yanıtlar. Arama, filtreler, sıralama, OFFSET veya cursor sayfalama ve DataTables protokolü dahil; Edge runtime'da da çalışır.",
-          en:"End to end for the Next.js App Router: a route handler reads the request with <code>readTableQuery</code> and checks it against a column allowlist, <code>sqlQuery</code> builds bound-parameter SQL for PostgreSQL/MySQL/SQLite (or <code>prismaQuery</code> Prisma arguments), and <code>tableResponse</code> answers. Search, filters, sorting, OFFSET or cursor paging and DataTables' protocol included; it runs on the Edge runtime too."},
-    note:{tr:"İstekten gelen kolon adları asla SQL metnine girmez: yalnızca <code>defineColumns</code> içindeki tanımlar kullanılır, her değer bağlı parametredir. <code>scope</code> (ör. kiracı) her sorguya eklenir; route handler'da kullanıcıyı ayrıca yetkilendirin. Türkçe ve aksan duyarsız arama için katlanmış kopya kolonu (<code>search</code>) kullanın.",
-          en:"Column names from a request never reach the SQL text: only definitions from <code>defineColumns</code> are used and every value is bound. <code>scope</code> (e.g. the tenant) is added to every query; authorize the user in the route handler as well. For Turkish- and accent-insensitive search, use a folded copy column (<code>search</code>)."},
-    lang:"typescript", code:
-`// app/api/orders/route.ts — PostgreSQL with pg
-import { defineColumns, readTableQuery, sqlQuery, tableError, tableResponse } from '@acunsoft/datatable-server';
-import { pool } from '@/lib/db';
-import { auth } from '@/lib/auth';
-
-const columns = defineColumns({
-  customer: { sortable: true, filterable: true, search: 'customer_search' }, // folded copy: ayse finds Ayşe
-  city: { sortable: true, filterable: true },
-  total: { type: 'decimal', sortable: true, filterable: true },
-  ordered: { sql: 'ordered_at', type: 'datetime', sortable: true, filterable: true },
-});
-
-export async function GET(request: Request) {
-  const user = await auth();
-  if (!user) return new Response(null, { status: 401 });
-  const params = new URL(request.url).searchParams;
-  try {
-    const query = readTableQuery(params, columns, { maxPageSize: 100 });
-    const sql = sqlQuery(query, columns, {
-      dialect: 'postgres', table: 'orders', select: ['id', 'customer', 'city', 'total', 'ordered_at'],
-      scope: { text: 'tenant_id = ?', values: [user.tenantId] },   // every query stays inside it
-    });
-    const [page, count] = await Promise.all([pool.query(sql.page.text, [...sql.page.values]), pool.query(sql.count.text, [...sql.count.values])]);
-    return Response.json(tableResponse(query, page.rows, count.rows[0].count, { cursorOf: sql.cursorOf }));
-  } catch (error) {
-    const { status, body } = tableError(error, params);   // 422, or DataTables' error
-    return Response.json(body, { status });
-  }
-}`,
-    examples:[
-      { title:{tr:"Prisma ile", en:"With Prisma"}, desc:{tr:"Aynı istek, Prisma'nın findMany ve count argümanlarına dönüşür. MySQL/SQLite'ta insensitive: false verin.", en:"The same request becomes Prisma findMany and count arguments. Pass insensitive: false on MySQL/SQLite."}, lang:"typescript", code:
-`import { prismaQuery, readTableQuery, tableResponse } from '@acunsoft/datatable-server';
-
-export async function GET(request: Request) {
-  const query = readTableQuery(new URL(request.url).searchParams, columns);
-  const q = prismaQuery(query, columns, { where: { tenantId: user.tenantId } });
-  const [rows, total] = await Promise.all([prisma.order.findMany(q.findMany), prisma.order.count(q.count)]);
-  return Response.json(tableResponse(query, rows, total, { cursorOf: q.cursorOf }));
-}` },
-      { title:{tr:"Sayfa (istemci bileşeni)", en:"The page (a client component)"}, desc:{tr:"Tablo tarayıcıda, veriler route handler'dan; React paketi \"use client\" ile işaretli.", en:"The table runs in the browser, the rows come from the route handler; the React package is marked \"use client\"."}, lang:"typescript", code:
-`'use client';
-import { useEffect, useMemo } from 'react';
-import { createDataTable } from '@acunsoft/datatable-core';
-import { connectTable, createHttpDataSource, createQueryRunner } from '@acunsoft/datatable-http';
-import { DataTableLayout, labelsTr } from '@acunsoft/datatable-react';
-import '@acunsoft/datatable-dom/styles.css';
-
-export default function OrdersPage() {
-  const { table, runner } = useMemo(() => {
-    const table = createDataTable({ mode: 'server', locale: 'tr', columns: [
-      { id: 'customer', header: 'Müşteri', accessorKey: 'customer', enableSorting: true, enableFiltering: true },
-      { id: 'total', header: 'Tutar', accessorKey: 'total', type: 'decimal', enableSorting: true, enableFiltering: true, filter: true },
-    ] });
-    const runner = createQueryRunner(createHttpDataSource({ url: '/api/orders' }));
-    return { table, runner };
-  }, []);
-  useEffect(() => connectTable(table, runner), [table, runner]); // returns the disconnect
-  return <DataTableLayout table={table} status={runner} locale="tr" labels={labelsTr} responsive="auto" />;
-}` },
-      { title:{tr:"Express veya Fastify", en:"Express or Fastify"}, desc:{tr:"Aynı üç çağrı; Express'te query parser 'extended' olmalı ya da URLSearchParams verin.", en:"The same three calls; in Express use the 'extended' query parser, or pass URLSearchParams."}, lang:"typescript", code:
-`app.get('/api/orders', requireAuth, async (req, res) => {
-  const params = new URLSearchParams(req.url.split('?')[1] ?? '');
-  try {
-    const query = readTableQuery(params, columns);
-    const sql = sqlQuery(query, columns, { dialect: 'mysql', table: 'orders', scope: { text: 'tenant_id = ?', values: [req.user.tenantId] } });
-    const [[rows], [[{ count }]]] = await Promise.all([db.query(sql.page.text, sql.page.values), db.query(sql.count.text, sql.count.values)]);
-    res.json(tableResponse(query, rows, count, { cursorOf: sql.cursorOf }));
-  } catch (error) {
-    const { status, body } = tableError(error, params);
-    res.status(status).json(body);
-  }
-});` },
-    ] },
   react:{ name:"React", pkg:"@acunsoft/datatable-react", status:"ready",
     install:"npm install react @acunsoft/datatable-core @acunsoft/datatable-react",
     lead:{tr:"React hook'ları ve bileşenleri: erişilebilir tablo, sayfalama, arama, kolon menüsü ve toplu işlemler; özel hücreler için <code>cells</code>. <code>useSyncExternalStore</code> ile eşzamanlı render'da tutarlı.",
@@ -891,6 +660,215 @@ export function Orders({ orders }: { orders: Order[] }) {
   );
 }` }
 };
+/*
+ * The four groups. Next.js and Inertia (React) live on the React page, Nuxt and
+ * Inertia (Vue) on the Vue page, Inertia's endpoint on the Laravel page and the
+ * Web Component on the HTML / JavaScript page: one package each, no separate
+ * framework pages. Each topic says what was tested and what was not.
+ */
+Object.assign(FW.html, { name: "HTML / JavaScript", topics: [
+  { id: "webcomponent", title: { tr: "Web Component: <acun-datatable>", en: "Web Component: <acun-datatable>" },
+    desc: { tr: "Standart bir custom element; framework gerektirmez. Sık kullanılan seçenekler hem öznitelik hem property'dir (<code>src</code>, <code>server-side</code>, <code>language</code>, <code>page-size</code>, <code>responsive</code> …), geri kalanı <code>options</code>, <code>columns</code> ve <code>data</code> property'leridir. Light DOM kullanır; <code>styles.css</code> ve sayfanın teması uygulanır. Sunucuda içe aktarılabilir, yalnızca tarayıcıda çalışır.",
+            en: "A standard custom element; no framework needed. Common options are attributes and properties alike (<code>src</code>, <code>server-side</code>, <code>language</code>, <code>page-size</code>, <code>responsive</code> …), everything else the <code>options</code>, <code>columns</code> and <code>data</code> properties. Light DOM, so <code>styles.css</code> and the page's theme apply. Safe to import on a server; it only runs in the browser." },
+    parts: [
+      { title: { tr: "Tek <script> etiketiyle", en: "With a single <script> tag" }, lang: "xml", code:
+`<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable/dist/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable/dist/acun-datatable.min.js"><\/script>
+
+<acun-datatable id="orders" src="/api/orders" server-side language="tr" page-size="25" responsive="auto"></acun-datatable>
+<script>
+  document.getElementById('orders').columns = [
+    { data: 'customer', title: 'Müşteri' },
+    { data: 'total', title: 'Tutar', type: 'decimal', filter: true },
+  ];
+<\/script>` },
+      { title: { tr: "Property'ler, yerinde güncelleme ve olaylar", en: "Properties, updates in place and events" },
+        desc: { tr: "page-size ve data tabloyu yerinde günceller; language, responsive, size gibi görünüm öznitelikleri tabloyu kullanıcının sayfası, sıralaması, filtreleri, araması ve seçimiyle yeniden kurar. Olaylar kabarcıklanır.",
+                en: "page-size and data update the table in place; view attributes such as language, responsive and size rebuild it with the user's page, sorting, filters, search and selection. Events bubble." }, lang: "xml", code:
+`<acun-datatable id="orders" language="tr" page-size="10" state-save></acun-datatable>
+<script>
+  const orders = document.getElementById('orders');
+  orders.columns = [{ data: 'customer', title: 'Müşteri' }, { data: 'total', title: 'Tutar', type: 'decimal' }];
+  orders.data = rows;        // new rows keep the page, sorting and search
+  orders.pageSize = 25;      // in place: the same table
+  orders.language = 'en';    // rebuilt; the user's page, filters and selection stay
+  document.addEventListener('adt-change', event => console.log(event.target.id, event.detail.state));
+  orders.addEventListener('adt-error', event => { showError(event.detail.error); event.preventDefault(); });
+<\/script>` },
+      { title: { tr: "npm ve TypeScript", en: "npm and TypeScript" }, lang: "typescript", code:
+`import { defineAcunDataTableElement } from '@acunsoft/datatable';
+import '@acunsoft/datatable/styles.css';
+
+defineAcunDataTableElement(); // once; the <script> build does it itself
+
+const orders = document.querySelector('acun-datatable'); // AcunDataTableElement | null
+orders?.addEventListener('adt-change', event => console.log(event.detail.state.page)); // typed` },
+    ],
+    note: { tr: "Başka bir framework içinde: HTML öğesi oluşturabilen her framework öğeyi kullanabilir; property'leri öğeye atayın, <code>adt-*</code> olaylarını dinleyin. Öğe tanımlanmadan önce atanan property'ler de alınır. Testler düz HTML ve <code>&lt;script&gt;</code> derlemesiyle yapılır; framework'e özel entegrasyonlar test edilmedi.",
+            en: "Inside another framework: any framework that creates HTML elements can use it; set the properties on the element and listen to the <code>adt-*</code> events. Properties set before the element is defined are taken over. The tests use plain HTML and the <code>&lt;script&gt;</code> build; framework-specific integrations are not tested." } },
+] });
+
+Object.assign(FW.react, { name: "React · Next.js", topics: [
+  { id: "nextjs", title: { tr: "Next.js (App Router)", en: "Next.js (App Router)" },
+    desc: { tr: "Aynı React paketi; Next.js için ayrı paket yoktur. Paket <code>\"use client\"</code> ile işaretlidir. Next.js 16.4 App Router ile test edildi: tablo sunucuda HTML olarak gelir, hydration uyuşmazlıksız tamamlanır ve sunucunun çizdiği öğeler korunur.",
+            en: "The same React package; there is no separate package for Next.js. The package is marked <code>\"use client\"</code>. Tested with the Next.js 16.4 App Router: the table arrives as server HTML, hydration finishes without a mismatch and keeps the server's elements." },
+    parts: [
+      { title: { tr: "Sunucu bileşeni ve istemci bileşeni", en: "A Server Component and a client component" }, lang: "typescript", code:
+`// app/orders/page.tsx — a Server Component: reads the rows, hands them over as plain data
+import { OrdersTable } from './orders-table';
+
+export default async function Page() {
+  const orders = await getOrders();
+  return <OrdersTable rows={orders} />;
+}
+
+// app/orders/orders-table.tsx
+'use client';
+import { DataTableLayout, labelsTr, useDataTable } from '@acunsoft/datatable-react';
+import '@acunsoft/datatable-dom/styles.css';
+
+export function OrdersTable({ rows }: { rows: Order[] }) {
+  const { table } = useDataTable<Order>({ data: rows, columns, locale: 'tr' });
+  return <DataTableLayout table={table} labels={labelsTr} locale="tr" selectable responsive="collapse" />;
+}` },
+      { title: { tr: "Sunucu modu: sayfalar route handler'dan", en: "Server mode: pages from a route handler" }, lang: "typescript", code:
+`'use client';
+import { useEffect, useState } from 'react';
+import { createDataTable } from '@acunsoft/datatable-core';
+import { connectTable, createHttpDataSource, createQueryRunner } from '@acunsoft/datatable-http';
+import { DataTableLayout, labelsTr } from '@acunsoft/datatable-react';
+
+export function RemoteOrders() {
+  const [table] = useState(() => createDataTable({ mode: 'server', locale: 'tr', columns }));
+  const [runner] = useState(() => createQueryRunner(createHttpDataSource({ url: '/api/orders' })));
+  useEffect(() => connectTable(table, runner), [table, runner]); // returns the disconnect
+  return <DataTableLayout table={table} status={runner} labels={labelsTr} locale="tr" />;
+}` },
+    ],
+    note: { tr: "Tablo nesnesi fonksiyon taşıdığı için Server Component'ten prop olarak geçirilemez: satırları düz veri olarak verin, tabloyu istemci bileşeninde kurun. Sunucu bileşeninde metin gerekirse <code>@acunsoft/datatable-dom</code>'dan alın; React paketinden gelen her şey istemci kodudur. Route handler: <a href=\"#/server/node\">Node.js uç noktası</a>. Pages Router ve streaming SSR henüz test edilmedi.",
+            en: "The table object carries functions, so a Server Component cannot pass it as a prop: hand over the rows as plain data and make the table in the client component. For texts in a Server Component, import them from <code>@acunsoft/datatable-dom</code>; everything from the React package is client code. The route handler: <a href=\"#/server/node\">Node.js endpoint</a>. The Pages Router and streaming SSR are not tested yet." } },
+  { id: "inertia", title: { tr: "Inertia (Laravel)", en: "Inertia (Laravel)" },
+    desc: { tr: "Laravel'deki <code>TableResponse</code> uç noktası, Inertia sayfasındaki React tablosuna sayfa sayfa veri verir; ayrı bir paket gerekmez.",
+            en: "Laravel's <code>TableResponse</code> endpoint serves the React table on an Inertia page page by page; no separate package is needed." },
+    parts: [
+      { title: { tr: "resources/js/Pages/Orders.tsx", en: "resources/js/Pages/Orders.tsx" }, lang: "typescript", code:
+`import { useEffect, useState } from 'react';
+import { createDataTable } from '@acunsoft/datatable-core';
+import { connectTable, createHttpDataSource, createQueryRunner } from '@acunsoft/datatable-http';
+import { DataTableLayout, labelsTr } from '@acunsoft/datatable-react';
+import '@acunsoft/datatable-dom/styles.css';
+
+export default function Orders() {
+  const [table] = useState(() => createDataTable({ mode: 'server', locale: 'tr', columns }));
+  const [runner] = useState(() => createQueryRunner(createHttpDataSource({ url: '/orders/data' })));
+  useEffect(() => connectTable(table, runner), [table, runner]);
+  return <DataTableLayout table={table} status={runner} labels={labelsTr} locale="tr" />;
+}` },
+    ],
+    note: { tr: "Uç nokta ve rota: <a href=\"#/laravel/inertia\">Laravel · Inertia</a>. Uç nokta Laravel testleriyle sınanır; Inertia sayfasının kendisi bu depoda test edilmez, React paketinin olağan kullanımıdır.",
+            en: "The endpoint and route: <a href=\"#/laravel/inertia\">Laravel · Inertia</a>. The endpoint is covered by the Laravel tests; the Inertia page itself is not tested here and is the React package's usual use." } },
+] });
+
+Object.assign(FW.vue, { name: "Vue · Nuxt", topics: [
+  { id: "nuxt", title: { tr: "Nuxt", en: "Nuxt" },
+    desc: { tr: "Aynı Vue paketi; Nuxt için ayrı paket yoktur. Nuxt 4.6 ile test edildi: tablo sunucuda HTML olarak gelir, hydration uyuşmazlıksız tamamlanır; <code>&lt;ClientOnly&gt;</code> gerekmez. Sunucu çiziminde tabloya dinleyici bağlanmaz; istekler arasında paylaşılan bir tablo bellek sızdırmaz.",
+            en: "The same Vue package; there is no separate package for Nuxt. Tested with Nuxt 4.6: the table arrives as server HTML and hydration finishes without a mismatch; no <code>&lt;ClientOnly&gt;</code> needed. A server render leaves no listener on the table, so a table shared between requests does not leak." },
+    parts: [
+      { title: { tr: "Sayfa (sunucuda çizilir)", en: "A page (rendered on the server)" }, lang: "xml", code:
+`<script setup lang="ts">
+import { AcunDataTableLayout, labelsTr, useDataTable } from '@acunsoft/datatable-vue';
+import '@acunsoft/datatable-dom/styles.css';
+
+const { data: orders } = await useFetch('/api/orders/all');
+const { table } = useDataTable({ data: () => orders.value ?? [], columns, locale: 'tr' });
+<\/script>
+
+<template>
+  <AcunDataTableLayout :table="table" :labels="labelsTr" locale="tr" selectable responsive="collapse" />
+</template>` },
+      { title: { tr: "Sunucu modu: sayfalar server/api rotasından", en: "Server mode: pages from a server/api route" }, lang: "xml", code:
+`<script setup lang="ts">
+import { onBeforeUnmount, onMounted } from 'vue';
+import { createDataTable } from '@acunsoft/datatable-core';
+import { connectTable, createHttpDataSource, createQueryRunner } from '@acunsoft/datatable-http';
+import { AcunDataTableLayout, labelsTr } from '@acunsoft/datatable-vue';
+
+const table = createDataTable({ mode: 'server', locale: 'tr', columns });
+const runner = createQueryRunner(createHttpDataSource({ url: '/api/orders' }));
+let disconnect = () => {};
+onMounted(() => { disconnect = connectTable(table, runner); }); // asks the server in the browser
+onBeforeUnmount(() => { disconnect(); table.destroy(); });
+<\/script>
+
+<template>
+  <AcunDataTableLayout :table="table" :status="runner" :labels="labelsTr" locale="tr" />
+</template>` },
+    ],
+    note: { tr: "Nitro rotası: <a href=\"#/server/node\">Node.js uç noktası</a>. Vue 3.4 ve 3.5 desteklenir: 3.5'te Vue'nun <code>useId</code>'si, 3.4'te uygulama başına sayaç öğe kimliklerini sunucuyla eşleştirir. Tarayıcıya özgü kodunuzu <code>onMounted</code> içinde çalıştırın.",
+            en: "The Nitro route: <a href=\"#/server/node\">Node.js endpoint</a>. Vue 3.4 and 3.5 are supported: on 3.5 Vue's <code>useId</code>, on 3.4 a counter per app keeps element ids the same as the server's. Run browser-only code of your own in <code>onMounted</code>." } },
+  { id: "inertia", title: { tr: "Inertia (Laravel)", en: "Inertia (Laravel)" },
+    desc: { tr: "Laravel'deki <code>TableResponse</code> uç noktası, Inertia sayfasındaki Vue tablosuna sayfa sayfa veri verir; ayrı bir paket gerekmez.",
+            en: "Laravel's <code>TableResponse</code> endpoint serves the Vue table on an Inertia page page by page; no separate package is needed." },
+    parts: [
+      { title: { tr: "resources/js/Pages/Orders.vue", en: "resources/js/Pages/Orders.vue" }, lang: "xml", code:
+`<script setup lang="ts">
+import { onBeforeUnmount, onMounted } from 'vue';
+import { createDataTable } from '@acunsoft/datatable-core';
+import { connectTable, createHttpDataSource, createQueryRunner } from '@acunsoft/datatable-http';
+import { AcunDataTableLayout, labelsTr } from '@acunsoft/datatable-vue';
+import '@acunsoft/datatable-dom/styles.css';
+
+const table = createDataTable({ mode: 'server', locale: 'tr', columns });
+const runner = createQueryRunner(createHttpDataSource({ url: '/orders/data' }));
+let disconnect = () => {};
+onMounted(() => { disconnect = connectTable(table, runner); });
+onBeforeUnmount(() => { disconnect(); table.destroy(); });
+<\/script>
+
+<template><AcunDataTableLayout :table="table" :status="runner" :labels="labelsTr" locale="tr" /></template>` },
+    ],
+    note: { tr: "Uç nokta ve rota: <a href=\"#/laravel/inertia\">Laravel · Inertia</a>. Uç nokta Laravel testleriyle sınanır; Inertia sayfasının kendisi bu depoda test edilmez, Vue paketinin olağan kullanımıdır.",
+            en: "The endpoint and route: <a href=\"#/laravel/inertia\">Laravel · Inertia</a>. The endpoint is covered by the Laravel tests; the Inertia page itself is not tested here and is the Vue package's usual use." } },
+] });
+
+Object.assign(FW.laravel, { name: "Laravel · Livewire", topics: [
+  { id: "inertia", title: { tr: "Inertia (React veya Vue)", en: "Inertia (React or Vue)" },
+    desc: { tr: "Inertia ayrı bir UI framework'ü değildir: sayfa Inertia ile gelir, tablo sayfaları Laravel'deki <code>TableResponse</code> uç noktasından JSON olarak. Sıralama, filtre ve sayfa değişince sayfa yenilenmez, Inertia ziyareti olmaz. Ön yüz <a href=\"#/react/inertia\">React</a> ya da <a href=\"#/vue/inertia\">Vue</a> paketi, veya tek çağrılık <code>@acunsoft/datatable</code>.",
+            en: "Inertia is not a UI framework of its own: the page comes through Inertia, the table's pages as JSON from Laravel's <code>TableResponse</code> endpoint. Sorting, filters and paging never reload the page or make an Inertia visit. The front end is the <a href=\"#/react/inertia\">React</a> or <a href=\"#/vue/inertia\">Vue</a> package, or the one-call <code>@acunsoft/datatable</code>." },
+    parts: [
+      { title: { tr: "routes/web.php", en: "routes/web.php" }, lang: "php", code:
+`// The same session as the Inertia pages
+Route::get('/orders', fn () => Inertia::render('Orders'));
+Route::get('/orders/data', fn () => TableResponse::for(Order::query()->whereBelongsTo(auth()->user()->team))
+    ->columns([
+        Column::make('customer')->sortable()->filterable()->searchUsing('customer_search'),
+        Column::make('total')->type('decimal')->sortable()->filter(),
+    ]))->middleware('auth');` },
+      { title: { tr: "Tek çağrıyla (Vue sayfası)", en: "In one call (a Vue page)" }, lang: "xml", code:
+`<script setup>
+import { onMounted, onBeforeUnmount, ref } from 'vue';
+import { AcunDataTable } from '@acunsoft/datatable';
+import '@acunsoft/datatable/styles.css';
+
+const el = ref(null);
+let table;
+onMounted(() => {
+  table = new AcunDataTable(el.value, {
+    serverSide: true,
+    ajax: '/orders/data',
+    language: 'tr',
+    columns: [{ data: 'customer', title: 'Müşteri' }, { data: 'total', title: 'Tutar', type: 'decimal', filter: true }],
+  });
+});
+onBeforeUnmount(() => table?.destroy());
+<\/script>
+
+<template><div ref="el" /></template>` },
+    ],
+    note: { tr: "Uç nokta web oturumunu kullanır (aynı origin); POST için CSRF belirtecini <code>AcunDataTable</code> meta etiketinden kendisi gönderir. Uç noktayı policy veya middleware ile yetkilendirin. Uç nokta Laravel testleriyle sınanır; Inertia sayfasının kendisi bu depoda test edilmez.",
+            en: "The endpoint uses the web session (same origin); for POST, <code>AcunDataTable</code> sends the CSRF token from the meta tag itself. Authorize the endpoint with a policy or middleware. The endpoint is covered by the Laravel tests; the Inertia page itself is not tested here." } },
+] });
+
 const GUIDES = {
  "quick": {
   "title": {
@@ -1114,6 +1092,43 @@ const GUIDES = {
      "php",
      "use Acunsoft\\DataTable\\Laravel\\Column;\nuse Acunsoft\\DataTable\\Laravel\\TableResponse;\n\nRoute::match(['get', 'post'], '/api/products', function () {\n    Gate::authorize('viewAny', Product::class);   // authorize every request\n\n    return TableResponse::for(Product::query())\n        ->columns([\n            Column::make('name')->sortable()->filterable()->searchUsing('name_search'),\n            Column::make('price')->type('decimal')->sortable()->filterable(),\n            Column::make('stock')->type('number')->sortable(),\n            Column::make('created')->column('created_at')->type('datetime')->sortable(),\n        ])\n        ->maxPageSize(100);   // the largest page a client may ask for\n});"
     ]
+   },
+   {
+    "id": "node",
+    "title": {
+     "tr": "Node.js uç noktası",
+     "en": "Node.js endpoint"
+    },
+    "desc": {
+     "tr": "@acunsoft/datatable-server isteği kolon izin listesine göre okur, bağlı parametreli SQL (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server) ya da Prisma argümanları üretir ve yanıtlar. Next.js route handler, Nuxt (Nitro), Express ve Fastify'da aynı üç çağrı.",
+     "en": "@acunsoft/datatable-server reads the request against a column allowlist, builds bound-parameter SQL (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server) or Prisma arguments, and answers. The same three calls in a Next.js route handler, Nuxt (Nitro), Express and Fastify."
+    },
+    "tabs": [
+     [
+      "Next.js",
+      "typescript",
+      "// app/api/orders/route.ts — PostgreSQL with pg\nimport { defineColumns, readTableQuery, sqlQuery, tableError, tableResponse } from '@acunsoft/datatable-server';\nimport { pool } from '@/lib/db';\nimport { auth } from '@/lib/auth';\n\nconst columns = defineColumns({\n  customer: { sortable: true, filterable: true, search: 'customer_search' }, // folded copy: ayse finds Ayşe\n  city: { sortable: true, filterable: true },\n  total: { type: 'decimal', sortable: true, filterable: true },\n  ordered: { sql: 'ordered_at', type: 'datetime', sortable: true, filterable: true },\n});\n\nexport async function GET(request: Request) {\n  const user = await auth();\n  if (!user) return new Response(null, { status: 401 });\n  const params = new URL(request.url).searchParams;\n  try {\n    const query = readTableQuery(params, columns, { maxPageSize: 100 });\n    const sql = sqlQuery(query, columns, {\n      dialect: 'postgres', table: 'orders', select: ['id', 'customer', 'city', 'total', 'ordered_at'],\n      scope: { text: 'tenant_id = ?', values: [user.tenantId] },   // every query stays inside it\n    });\n    const [page, count] = await Promise.all([pool.query(sql.page.text, [...sql.page.values]), pool.query(sql.count.text, [...sql.count.values])]);\n    return Response.json(tableResponse(query, page.rows, count.rows[0].count, { cursorOf: sql.cursorOf }));\n  } catch (error) {\n    const { status, body } = tableError(error, params);   // 422, or DataTables' error\n    return Response.json(body, { status });\n  }\n}"
+     ],
+     [
+      "Prisma",
+      "typescript",
+      "import { prismaQuery, readTableQuery, tableResponse } from '@acunsoft/datatable-server';\n\nexport async function GET(request: Request) {\n  const query = readTableQuery(new URL(request.url).searchParams, columns);\n  const q = prismaQuery(query, columns, { where: { tenantId: user.tenantId } });\n  const [rows, total] = await Promise.all([prisma.order.findMany(q.findMany), prisma.order.count(q.count)]);\n  return Response.json(tableResponse(query, rows, total, { cursorOf: q.cursorOf }));\n}"
+     ],
+     [
+      "Nuxt (Nitro)",
+      "typescript",
+      "// server/api/orders.get.ts\nimport { defineColumns, readTableQuery, sqlQuery, tableError, tableResponse } from '@acunsoft/datatable-server';\n\nconst columns = defineColumns({\n  customer: { sortable: true, filterable: true, search: 'customer_search' },\n  total: { type: 'decimal', sortable: true, filterable: true },\n});\n\nexport default defineEventHandler(async (event) => {\n  const params = new URLSearchParams(getRequestURL(event).search);\n  try {\n    const query = readTableQuery(params, columns);\n    const sql = sqlQuery(query, columns, { dialect: 'postgres', table: 'orders', scope: { text: 'tenant_id = ?', values: [event.context.user.tenantId] } });\n    const [page, count] = await Promise.all([db.query(sql.page.text, [...sql.page.values]), db.query(sql.count.text, [...sql.count.values])]);\n    return tableResponse(query, page.rows, count.rows[0].count, { cursorOf: sql.cursorOf });\n  } catch (error) {\n    const { status, body } = tableError(error, params);\n    setResponseStatus(event, status);\n    return body;\n  }\n});"
+     ],
+     [
+      "Express",
+      "typescript",
+      "app.get('/api/orders', requireAuth, async (req, res) => {\n  const params = new URLSearchParams(req.url.split('?')[1] ?? '');\n  try {\n    const query = readTableQuery(params, columns);\n    const sql = sqlQuery(query, columns, { dialect: 'mysql', table: 'orders', scope: { text: 'tenant_id = ?', values: [req.user.tenantId] } });\n    const [[rows], [[{ count }]]] = await Promise.all([db.query(sql.page.text, sql.page.values), db.query(sql.count.text, sql.count.values)]);\n    res.json(tableResponse(query, rows, count, { cursorOf: sql.cursorOf }));\n  } catch (error) {\n    const { status, body } = tableError(error, params);\n    res.status(status).json(body);\n  }\n});"
+     ]
+    ],
+    "note": {
+     "tr": "İstekten gelen kolon adları asla SQL metnine girmez; her değer bağlı parametredir. <code>scope</code> (ör. kiracı) her sorguya eklenir; kullanıcıyı ayrıca yetkilendirin. Tarih-saat kolonundaki gün filtreleri tarayıcının gönderdiği <code>tz</code> saat diliminde hesaplanır; <code>readTableQuery(…, { timeZone })</code> ile sunucu belirleyebilir. Paket yalnızca standart Web API'leri kullanır; Node.js runtime'ında test edildi (Next.js route handler ve Nitro), Edge runtime test edilmedi.",
+     "en": "Column names from a request never reach the SQL text; every value is bound. <code>scope</code> (e.g. the tenant) is added to every query; authorize the user as well. Day filters on date-time columns use the time zone the browser sends as <code>tz</code>; <code>readTableQuery(…, { timeZone })</code> lets the server decide. The package uses standard Web APIs only; tested on the Node.js runtime (a Next.js route handler and Nitro), not on the Edge runtime."
+    }
    },
    {
     "id": "browser",
@@ -2579,14 +2594,17 @@ const GUIDE_ORDER = ["quick", "server", "filters", "tools", "import", "pagesize"
 const CHOOSE = {
   laravel:"composer require acunsoft/datatable-laravel",
   inertia:"composer require acunsoft/datatable-laravel\nnpm install @acunsoft/datatable",
-  nextjs:"npm install @acunsoft/datatable-server @acunsoft/datatable-react",
-  nuxt:"npm install @acunsoft/datatable-vue @acunsoft/datatable-server",
+  nextjs:"npm install @acunsoft/datatable-react @acunsoft/datatable-http",
+  nuxt:"npm install @acunsoft/datatable-vue @acunsoft/datatable-http",
+  node:"npm install @acunsoft/datatable-server",
   vue:"npm install @acunsoft/datatable-vue",
   react:"npm install @acunsoft/datatable-react",
   quick:"npm install @acunsoft/datatable",
   webcomponent:"npm install @acunsoft/datatable",
   api:"npm install @acunsoft/datatable-core",
 };
+/* Where a chooser row leads, when not to a page of the same name. */
+const CHOOSE_TO = { inertia: 'laravel/inertia', nextjs: 'react/nextjs', nuxt: 'vue/nuxt', node: 'server/node', webcomponent: 'html/webcomponent' };
 const QUICK_ADD = [
   ['<script>', 'html', `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/acun-datatable.min.js"><\/script>`],
@@ -2732,7 +2750,7 @@ const PAGES = {
 const PAGE_ORDER = ["performance", "security", "upgrade", "faq"];
 /* "Next steps" on every framework page: the guides most tables need next. */
 const NEXT_STEPS = ['server', 'filters', 'tools', 'mobile', 'bigdata'];
-const FW_ORDER = ["laravel","html","vue","react","nextjs","nuxt","inertia","webcomponent"];
+const FW_ORDER = ["html","react","vue","laravel"];
 
 const T = {
   tr:{ nav_start:"Başlangıç", nav_fw:"Frameworkler", nav_guides:"Kılavuzlar", nav_api:"API", cta:"Kuruluma başla",
@@ -2748,7 +2766,7 @@ const T = {
        copy:"kopyala", copied:"kopyalandı",
        legal_title:"MIT lisansı · Sorumluluk reddi", legal:"Yazılım “olduğu gibi” sunulur; açık ya da örtük hiçbir garanti verilmez. Yazarlar ve Acunsoft, yazılımın kullanımından veya kullanılamamasından doğan hiçbir zarar, veri kaybı ya da talepten sorumlu değildir. Projende kullanmadan önce test etmek, güvenliğini ve yetkilendirmesini sağlamak kullanıcının sorumluluğundadır. Bağlayıcı metin <a href=\"https://github.com/kemaloskan/acun-datatable/blob/main/LICENSE\">LICENSE</a> dosyasıdır.",
        go:"İncele →",
-       fw_desc:{vue:"Hazır: composable\'lar ve bileşenler.",react:"Hazır: hook\'lar ve bileşenler.",html:"Hazır: framework olmadan DOM renderer.",laravel:"Hazır: Livewire tablosu ve JSON uç nokta, tek Composer paketi.",nextjs:"Route handler için Node sunucu paketi ve React ön yüz.",nuxt:"Nitro API rotası ve Vue bileşenleri.",inertia:"Laravel JSON uç noktası, Inertia sayfasında tablo.",webcomponent:"<acun-datatable>: Angular, Svelte, Astro, Alpine, düz HTML."},
+       fw_desc:{html:"Framework olmadan: tek çağrı, DOM renderer ve <acun-datatable> Web Component.",react:"Hook\'lar ve bileşenler; Next.js App Router ile test edildi.",vue:"Composable\'lar ve bileşenler; Nuxt SSR ile test edildi.",laravel:"Livewire tablosu ve JSON uç nokta; Inertia ile React veya Vue."},
        api_title:"API referansı", api_lead:"Paketlerin genel API'si: tek çağrılık AcunDataTable, çekirdek, HTTP, Node sunucusu, DOM, dışa/içe aktarma, Vue, React (npm'de 0.4.0) ve Laravel (Packagist'te 0.5.0).",
        a_s1:"Fonksiyonlar", a_s1d:"İmza ve kısa açıklama.", a_s2:"Örnek", a_s2d:"Fonksiyonların birlikte kullanımı.",
        h2_title:"Veri tablonuz, her projede aynı.",
@@ -2760,10 +2778,10 @@ const T = {
        q1:"Ekleyin", q1d:"Stil dosyası ve tek bir script. npm kullanıyorsanız ikinci sekme.",
        q2:"Tabloyu dönüştürün", q2d:"Elinizdeki <code>&lt;table&gt;</code> yeter: başlıklar kolon, satırlar veri olur. Arama, sıralama ve sayfalama hemen çalışır.",
        q3:"Sunucuya bağlayın", q3d:"Binlerce, milyonlarca satırda sayfa, sıralama, arama ve sayım backend'de yapılır; tablo yalnızca bir sayfa tutar.",
-       q3n:"Backend tarafı: Laravel'de <a href=\"#/laravel\">TableResponse</a>, Node.js'te <a href=\"#/nextjs\">@acunsoft/datatable-server</a>; başka bir dil için <a href=\"#/server\">istek ve yanıt biçimi</a>.",
+       q3n:"Backend tarafı: Laravel'de <a href=\"#/laravel\">TableResponse</a>, Node.js'te <a href=\"#/server/node\">@acunsoft/datatable-server</a>; başka bir dil için <a href=\"#/server\">istek ve yanıt biçimi</a>.",
        c_title:"Hangi paketi kurmalıyım?", c_desc:"Projenize göre tek satırlık cevap.",
        c_head:["Projeniz","Kurun","Rehber"],
-       c_rows:[["Laravel + Livewire","laravel"],["Laravel + Inertia (Vue veya React)","inertia"],["Next.js, Express, Fastify","nextjs"],["Nuxt","nuxt"],["Vue 3","vue"],["React","react"],["Düz HTML, DataTables'tan geçiş","quick"],["Angular, Svelte, Astro, Alpine","webcomponent"],["Kendi tasarım sisteminiz (headless)","api"]],
+       c_rows:[["Düz HTML, DataTables'tan geçiş","quick"],["Web Component (<acun-datatable>)","webcomponent"],["React","react"],["Next.js","nextjs"],["Vue 3","vue"],["Nuxt","nuxt"],["Laravel + Livewire","laravel"],["Laravel + Inertia (React veya Vue)","inertia"],["Node.js arka uç (route handler, Express, Fastify)","node"],["Kendi tasarım sisteminiz (headless)","api"]],
        f_title:"Framework rehberleri", f_desc:"Her sayfada kurulum, ilk tablo ve kopyalanabilir örnekler.",
        w_title:"Nasıl çalışır?", w_desc:"Tablo arayüzü yönetir; veriyi sorgulayan backend'dir.",
        w1:"Tarayıcı", w1d:"Acun DataTable: tablo, arama, filtreler, sayfalar. Kullanıcının istediğini yazar, gelen yanıtı gösterir.",
@@ -2787,7 +2805,7 @@ const T = {
        copy:"copy", copied:"copied",
        legal_title:"MIT License · Disclaimer", legal:"The software is provided “as is”, without warranty of any kind, express or implied. The authors and Acunsoft are not liable for any damage, data loss or claim arising from the use of, or inability to use, the software. Testing it, securing it and authorizing access in your project are your responsibility. The binding text is the <a href=\"https://github.com/kemaloskan/acun-datatable/blob/main/LICENSE\">LICENSE</a> file.",
        go:"Open →",
-       fw_desc:{vue:"Ready: composables and components.",react:"Ready: hooks and components.",html:"Ready: DOM renderer, no framework.",laravel:"Ready: a Livewire table and a JSON endpoint, one Composer package.",nextjs:"A Node server package for route handlers, and the React front end.",nuxt:"A Nitro API route and the Vue components.",inertia:"A Laravel JSON endpoint, the table on an Inertia page.",webcomponent:"<acun-datatable>: Angular, Svelte, Astro, Alpine, plain HTML."},
+       fw_desc:{html:"No framework: one call, the DOM renderer and the <acun-datatable> Web Component.",react:"Hooks and components; tested with the Next.js App Router.",vue:"Composables and components; tested with Nuxt server rendering.",laravel:"A Livewire table and a JSON endpoint; Inertia with React or Vue."},
        api_title:"API reference", api_lead:"Public API of the packages: the one-call AcunDataTable, core, HTTP, Node server, DOM, export/import, Vue, React (on npm, 0.4.0) and Laravel (on Packagist, 0.5.0).",
        a_s1:"Functions", a_s1d:"Signature and short description.", a_s2:"Example", a_s2d:"Using the functions together.",
        h2_title:"Your data table, the same in every project.",
@@ -2799,10 +2817,10 @@ const T = {
        q1:"Add it", q1d:"A stylesheet and one script. Using npm? The second tab.",
        q2:"Turn your table into a data table", q2d:"Your existing <code>&lt;table&gt;</code> is enough: the headers become columns, the rows the data. Search, sorting and paging work at once.",
        q3:"Connect it to your server", q3d:"With thousands or millions of rows, paging, sorting, search and counting run on the back end; the table holds one page.",
-       q3n:"The back end: <a href=\"#/laravel\">TableResponse</a> in Laravel, <a href=\"#/nextjs\">@acunsoft/datatable-server</a> in Node.js; for any other language, the <a href=\"#/server\">request and response format</a>.",
+       q3n:"The back end: <a href=\"#/laravel\">TableResponse</a> in Laravel, <a href=\"#/server/node\">@acunsoft/datatable-server</a> in Node.js; for any other language, the <a href=\"#/server\">request and response format</a>.",
        c_title:"Which package do I install?", c_desc:"A one-line answer for your project.",
        c_head:["Your project","Install","Guide"],
-       c_rows:[["Laravel + Livewire","laravel"],["Laravel + Inertia (Vue or React)","inertia"],["Next.js, Express, Fastify","nextjs"],["Nuxt","nuxt"],["Vue 3","vue"],["React","react"],["Plain HTML, moving from DataTables","quick"],["Angular, Svelte, Astro, Alpine","webcomponent"],["Your own design system (headless)","api"]],
+       c_rows:[["Plain HTML, moving from DataTables","quick"],["Web Component (<acun-datatable>)","webcomponent"],["React","react"],["Next.js","nextjs"],["Vue 3","vue"],["Nuxt","nuxt"],["Laravel + Livewire","laravel"],["Laravel + Inertia (React or Vue)","inertia"],["Node.js back end (route handler, Express, Fastify)","node"],["Your own design system (headless)","api"]],
        f_title:"Framework guides", f_desc:"Installation, a first table and examples to copy on every page.",
        w_title:"How does it work?", w_desc:"The table runs the interface; your back end queries the data.",
        w1:"Browser", w1d:"Acun DataTable: the table, search, filters, pages. It writes what the user asks for and shows the answer.",
@@ -2820,7 +2838,13 @@ let lang = 'tr', theme = null;
 try { lang = localStorage.getItem('adt-lang') || 'tr'; theme = localStorage.getItem('adt-theme'); } catch (e) {}
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const ALIASES = { livewire: 'laravel' }; // Livewire is part of the Laravel package
+/* Pages that moved: their addresses lead to the new place (old links, bookmarks, the demo). */
+const MOVED = { livewire: 'laravel', nextjs: 'react/nextjs', nuxt: 'vue/nuxt', inertia: 'laravel/inertia', webcomponent: 'html/webcomponent' };
+const followMoved = () => {
+  const m = location.hash.match(/^#\/([a-z]+)(\/[a-z0-9-]+)?/);
+  if (m && MOVED[m[1]]) history.replaceState(null, '', '#/' + (MOVED[m[1]].includes('/') ? MOVED[m[1]] : MOVED[m[1]] + (m[2] || '')));
+};
+const ALIASES = {};
 const route = () => { let r = (location.hash.match(/^#\/([a-z]+)/) || [])[1]; r = ALIASES[r] || r; return (r && (r === 'home' || r === 'api' || FW[r] || GUIDES[r] || PAGES[r])) ? r : 'home'; };
 
 /* ======================= builders ======================= */
@@ -2851,8 +2875,9 @@ function page(r) {
     const cards = FW_ORDER.map((id,i) => { const f = FW[id];
       return `<a class="card link" href="#/${id}" data-go="${id}"><div class="ct"><span class="ico">${ICON[id]}</span><h3>${f.name}</h3></div><span class="lb">${esc(f.pkg)}</span><p>${esc(t.fw_desc[id])}</p><span class="go">${t.go}</span></a>`; }).join('');
     const label = (id) => FW[id] ? FW[id].name : GUIDES[id] ? GUIDES[id].title[lang] : t.api;
+    const to = (id) => CHOOSE_TO[id] ?? id;
     const chooser = `<div class="gtable"><table><thead><tr>${t.c_head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${
-      t.c_rows.map(([project, id]) => `<tr><td>${esc(project)}</td><td>${CHOOSE[id].split('\n').map(line => `<code>${esc(line)}</code>`).join('<br>')}</td><td><a href="#/${id}" data-go="${id}">${esc(label(id))}</a></td></tr>`).join('')}</tbody></table></div>`;
+      t.c_rows.map(([project, id]) => `<tr><td>${esc(project)}</td><td>${CHOOSE[id].split('\n').map(line => `<code>${esc(line)}</code>`).join('<br>')}</td><td><a href="#/${to(id)}" data-go="${to(id)}">${esc(label(to(id).split('/')[0]))}</a></td></tr>`).join('')}</tbody></table></div>`;
     const steps = `<ol class="steps">` +
       `<li><h3>${t.q1}</h3><p>${t.q1d}</p>${tabs(QUICK_ADD)}</li>` +
       `<li><h3>${t.q2}</h3><p>${t.q2d}</p>${code(QUICK_TABLE,'html')}</li>` +
@@ -2887,7 +2912,11 @@ function page(r) {
   const f = FW[r];
   const next = `<div class="cards">${NEXT_STEPS.map(id => `<a class="card link" href="#/${id}" data-go="${id}"><div class="ct"><span class="ico">${ICON.guide}</span><h3>${esc(GUIDES[id].title[lang])}</h3></div><p>${esc(t.next_d[id])}</p><span class="go">${t.go}</span></a>`).join('')}` +
     `<a class="card link" href="demo/"><div class="ct"><span class="ico">${ICON.home}</span><h3>${t.h2_demo}</h3></div><p>${esc(t.next_demo)}</p><span class="go">${t.go}</span></a></div>`;
-  return { toc:[['install',t.s_install],['usage',t.s_usage],['examples',t.s_examples],['next',t.s_next],['api',t.s_api]], html:
+  const topics = f.topics ?? [];
+  const topic = (x, n) => sec(x.id, n, esc(x.title[lang]), x.desc[lang],
+    x.parts.map(part => `${part.title ? `<h3 class="sub">${esc(part.title[lang])}</h3>` : ''}${part.desc ? `<p>${esc(part.desc[lang])}</p>` : ''}${code(part.code, part.lang)}`).join('') +
+    (x.note ? `<div class="note">${x.note[lang]}</div>` : ''));
+  return { toc:[['install',t.s_install],['usage',t.s_usage],['examples',t.s_examples],...topics.map(x => [x.id, x.title[lang]]),['next',t.s_next],['api',t.s_api]], html:
     `<h1><span class="hi">${ICON[r]}</span>${f.name}${f.status === 'ready' ? '' : ` <span class="pill">${t.preview}</span>`}</h1><p class="lead">${f.lead[lang]}</p><div class="meta"><span>${esc(f.pkg)}</span><span>${t.updated}</span></div>` +
     (f.status === 'ready' ? '' : `<div class="note warn" style="margin-top:22px">${t.prevNote}</div>`) +
     sec('install',1,t.s_install,t.d_install,
@@ -2896,8 +2925,9 @@ function page(r) {
     sec('examples',3,t.s_examples,t.d_examples, f.examples
       ? f.examples.map(x => `<h3 class="sub">${esc(x.title[lang])}</h3><p>${esc(x.desc[lang])}</p>${code(x.code,x.lang)}`).join('')
       : `<h3 class="sub">${t.ex1}</h3><p>${t.ex1d}</p>${code(EX_SORT,'typescript')}<h3 class="sub">${t.ex2}</h3><p>${t.ex2d}</p>${code(EX_STATE,'typescript')}`) +
-    sec('next',4,t.s_next,t.d_next,next) +
-    sec('api',5,t.s_api,t.d_api,apiList(f.api ?? (f.status === 'ready' ? undefined : '@acunsoft/datatable-core'))) };
+    topics.map((x, i) => topic(x, 4 + i)).join('') +
+    sec('next',4 + topics.length,t.s_next,t.d_next,next) +
+    sec('api',5 + topics.length,t.s_api,t.d_api,apiList(f.api ?? (f.status === 'ready' ? undefined : '@acunsoft/datatable-core'))) };
 }
 
 /* ======================= render ======================= */
@@ -2969,6 +2999,7 @@ function mountHomeTable(r) {
 const sectionFromHash = () => (location.hash.match(/^#\/[a-z]+\/([a-z0-9-]+)/) || [])[1];
 let rendered = null;
 function render(scrollTop) {
+  followMoved();
   const r = route();
   if (r !== rendered) { renderHeader(r); renderSide(r); renderPage(r); rendered = r; }
   const target = sectionFromHash() && document.getElementById(sectionFromHash());

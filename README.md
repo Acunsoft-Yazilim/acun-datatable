@@ -10,8 +10,10 @@
 [Performance measurements](https://kemaloskan.github.io/acun-datatable/#/performance) ·
 [Upgrading](UPGRADING.md)
 
-A framework-independent data table for **Laravel + Livewire, Vue, React,
-Next.js and plain HTML**. Sorting, smart search, filters, paging, export and
+A framework-independent data table for **plain HTML / JavaScript (also as
+the `<acun-datatable>` Web Component), React and Next.js, Vue and Nuxt, and
+Laravel + Livewire**: one TypeScript core, one package per framework, no
+separate Next.js or Nuxt package. Sorting, smart search, filters, paging, export and
 mobile layouts come ready; the table manages the interface and your back end
 decides how the data is queried. Free and MIT licensed, with no third-party
 runtime dependencies.
@@ -29,7 +31,7 @@ runtime dependencies.
 | [`@acunsoft/datatable`](packages/datatable) | Everything in one call, like DataTables: `new AcunDataTable('#table', { serverSide: true, ajax: '/api/orders' })`; also a single `<script>`. |
 | [`@acunsoft/datatable-core`](packages/core) | Headless engine: sorting, filters, Turkish-aware search, pages, selection, column visibility, server mode. No dependencies. |
 | [`@acunsoft/datatable-dom`](packages/renderer-dom) | Accessible renderer without a framework: `renderDataTable` with a DataTables-style layout, optional `styles.css`. |
-| [`@acunsoft/datatable-vue`](packages/vue) · [`@acunsoft/datatable-react`](packages/react) | Components and composables/hooks with the same markup. |
+| [`@acunsoft/datatable-vue`](packages/vue) · [`@acunsoft/datatable-react`](packages/react) | Components and composables/hooks with the same markup; server rendering and hydration tested in a Nuxt and a Next.js (App Router) app. |
 | [`@acunsoft/datatable-http`](packages/datasource-http) | Server mode over `fetch`: latest request wins, abort, retry. |
 | [`@acunsoft/datatable-server`](packages/server) | Node back end (Next.js, Express, Fastify): checks the query against a column allowlist, builds bound-parameter SQL (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server; no driver required) or Prisma arguments, answers in the table or DataTables format. |
 | [`@acunsoft/datatable-export`](packages/export) | Excel (.xlsx) and CSV export and import, written from scratch. |

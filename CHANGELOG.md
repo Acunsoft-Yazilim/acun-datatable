@@ -15,6 +15,13 @@ All notable changes to this repository. Each npm package also has its own
   distinct join counted 1 row (and Laravel's own exact count counted
   duplicates); they are counted as a subquery with their columns. Export size
   checks stop after limit + 1 rows instead of counting every row.
+- **Documentation in four groups:** HTML / JavaScript (with the Web
+  Component), React · Next.js, Vue · Nuxt and Laravel · Livewire (with
+  Inertia); the Node.js back end is a section of the server guide. The old
+  addresses (`#/nextjs`, `#/nuxt`, `#/inertia`, `#/webcomponent`) lead to the
+  new sections. Framework examples that were never tested (Angular, Svelte,
+  Astro, Alpine) are gone; Nuxt needs no `<ClientOnly>`; the Edge runtime is
+  no longer claimed for the Node package (only the Node.js runtime is tested).
 - **`<acun-datatable>`, a fuller custom element:** every attribute is also a
   property; properties set before the element is defined are taken over; a
   new page size changes in place and the view attributes (language,
