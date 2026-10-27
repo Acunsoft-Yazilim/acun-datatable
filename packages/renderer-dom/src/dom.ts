@@ -124,11 +124,13 @@ export function fillButton(
  * Keep an open dropdown (`<details>` with its panel after the `<summary>`) inside the
  * window: the panel opens towards the end of its button and is shifted sideways
  * (`--adt-menu-shift`) when it would stick out, e.g. on a phone where the button
- * sits at the start of the row. Call it from the `toggle` event.
+ * sits at the start of the row. A row's "⋮" menu opens over the page instead
+ * (see `pinMenu`). Call it from the `toggle` event.
  */
 export function placeMenu(menu: HTMLDetailsElement): void {
   menu.style.removeProperty('--adt-menu-shift');
   const panel = menu.querySelector<HTMLElement>(':scope > :not(summary)');
+  if (panel && menu.classList.contains('adt-row-menu')) return pinMenu(menu, panel);
   if (!menu.open || !panel) return;
   const margin = 8;
   const view = menu.ownerDocument.documentElement.clientWidth;
@@ -136,6 +138,51 @@ export function placeMenu(menu: HTMLDetailsElement): void {
   let shift = box.right > view - margin ? view - margin - box.right : 0;
   if (box.left + shift < margin) shift = margin - box.left;
   if (shift !== 0) menu.style.setProperty('--adt-menu-shift', `${Math.round(shift)}px`);
+}
+
+/** The listeners of each open row menu, removed when it closes or opens again. */
+const pinned = new WeakMap<HTMLDetailsElement, () => void>();
+
+/**
+ * A row's menu sits in the table's scroll box (and in a card with rounded
+ * corners), which would cut it off: open, it is fixed over the page (styles.css)
+ * at `--adt-menu-x` / `--adt-menu-y`, below its button (above when there is no
+ * room below), inside the window, and follows the button while anything scrolls.
+ */
+function pinMenu(menu: HTMLDetailsElement, panel: HTMLElement): void {
+  const view = menu.ownerDocument.defaultView;
+  if (!view) return;
+  const at = (x: number, y: number): void => {
+    menu.style.setProperty('--adt-menu-x', `${Math.round(x)}px`);
+    menu.style.setProperty('--adt-menu-y', `${Math.round(y)}px`);
+  };
+  const stop = (): void => {
+    view.removeEventListener('scroll', place, true);
+    view.removeEventListener('resize', place);
+    pinned.delete(menu);
+  };
+  const place = (): void => {
+    if (!menu.open || !menu.isConnected) return stop();
+    const margin = 8;
+    const gap = 6;
+    const page = menu.ownerDocument.documentElement;
+    const button = menu.querySelector('summary')!.getBoundingClientRect();
+    at(0, 0);
+    // Measured at 0,0 (also the offset a transformed ancestor gives a fixed box).
+    const box = panel.getBoundingClientRect();
+    const below = button.bottom + gap;
+    const above = button.top - gap - box.height;
+    at(
+      Math.max(margin, Math.min(button.right - box.width, page.clientWidth - margin - box.width)) - box.left,
+      (below + box.height > page.clientHeight - margin && above >= margin ? above : below) - box.top,
+    );
+  };
+  pinned.get(menu)?.();
+  place();
+  if (!menu.open) return;
+  pinned.set(menu, stop);
+  view.addEventListener('scroll', place, { capture: true, passive: true });
+  view.addEventListener('resize', place, { passive: true });
 }
 
 /** Set or clear `aria-disabled`; unlike `disabled`, a focused control keeps focus. */

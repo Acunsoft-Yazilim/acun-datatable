@@ -1,14 +1,14 @@
 // Vue fixture: the documented pattern — table and runner made in setup, connected once mounted.
 import { createApp, defineComponent, h, onMounted, onUnmounted } from 'vue';
 import { AcunDataTable, AcunDataTableLayout, labelsEn } from '@acunsoft/datatable-vue';
-import { ordersTable, peopleTable } from './columns.js';
+import { ordersTable, peopleTable, rowMenu } from './columns.js';
 
 const Orders = defineComponent(() => {
   const { table, runner, connect } = ordersTable();
   let disconnect;
   onMounted(() => { disconnect = connect(); });
   onUnmounted(() => disconnect?.());
-  return () => h(AcunDataTableLayout, { table, status: runner, locale: 'tr', labels: labelsEn, selectable: true });
+  return () => h(AcunDataTableLayout, { table, status: runner, locale: 'tr', labels: labelsEn, selectable: true, ...rowMenu });
 });
 
 const People = defineComponent(() => {

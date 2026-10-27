@@ -35,7 +35,7 @@ const table = createDataTable({
   initialState: { pageSize: 5 },
 });
 // Turkish number and date formats with the English texts.
-// ?responsive=collapse|modal|scroll and ?size=sm|lg try the other modes; ?detail adds child rows, ?fixed pins columns, ?columns resizes and moves them, ?edit edits customers in place.
+// ?responsive=collapse|modal|scroll and ?size=sm|lg try the other modes; ?detail adds child rows, ?fixed pins columns, ?columns resizes and moves them, ?edit edits customers in place, ?menu adds a "⋮" menu to each row.
 const params = new URLSearchParams(location.search);
 const detail = params.has('detail')
   ? row => new Promise(resolve => setTimeout(() => resolve(`Order lines of ${row.original.customer}`), 50))
@@ -44,7 +44,10 @@ renderDataTable(document.getElementById('orders'), table, {
   caption: 'Orders', selectable: true, locale: 'tr', labels: labelsEn, pageSizes: [5, 10], search: { debounceMs: 0 },
   ...(params.has('responsive') ? { responsive: params.get('responsive') } : {}), size: params.get('size') ?? 'md',
   ...(params.has('filterPanel') ? { filterPanel: params.get('filterPanel') } : {}),
-  rowActions: [{ id: 'edit', label: 'Edit', onSelect: row => { window.__edited = row.id; } }],
+  rowActions: [{ id: 'edit', label: 'Edit', onSelect: row => { window.__edited = row.id; } },
+    // ?menu: three more actions in each row's "⋮" menu.
+    ...(params.has('menu') ? ['Copy', 'Archive', 'Delete'].map(label => ({ id: label.toLowerCase(), label, onSelect: row => { window.__edited = `${label}:${row.id}`; } })) : [])],
+  ...(params.has('menu') ? { maxInlineActions: 1 } : {}),
   ...(detail ? { detail } : {}),
   ...(params.has('fixed') ? { fixedColumns: { start: 1, end: 1 } } : {}),
   ...(params.has('columns') ? { resizableColumns: true, reorderableColumns: true } : {}),

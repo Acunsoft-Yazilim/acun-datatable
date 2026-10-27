@@ -96,6 +96,11 @@ All notable changes to this repository. Each npm package also has its own
   became a text `contains` (422 or no rows). With `filters[i]` in a request
   the column searches are now ignored; a DataTables front end without them
   works as before.
+- **Row "⋮" menus open whole:** the menu of the last rows was cut off by the
+  table's scroll box, and on phones by the cards. Open, it now sits over the
+  page below its button (above when there is no room), inside the window, and
+  follows the button while the page or the table scrolls; in the DOM
+  renderer, React, Vue, the Web Component and Livewire.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the

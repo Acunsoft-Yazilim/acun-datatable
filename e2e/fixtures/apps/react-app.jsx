@@ -2,12 +2,12 @@
 import { StrictMode, useEffect, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DataTable, DataTableLayout, labelsEn } from '@acunsoft/datatable-react';
-import { ordersTable, peopleTable } from './columns.js';
+import { ordersTable, peopleTable, rowMenu } from './columns.js';
 
 function Orders() {
   const orders = useMemo(() => ordersTable(), []);
   useEffect(() => orders.connect(), [orders]);
-  return <DataTableLayout table={orders.table} status={orders.runner} locale="tr" labels={labelsEn} selectable />;
+  return <DataTableLayout table={orders.table} status={orders.runner} locale="tr" labels={labelsEn} selectable {...rowMenu} />;
 }
 
 function People() {

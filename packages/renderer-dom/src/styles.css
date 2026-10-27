@@ -378,6 +378,8 @@
 .adt-row-menu > summary { list-style: none; }
 .adt-row-menu > summary::-webkit-details-marker { display: none; }
 .adt-row-menu .adt-menu-list { top: 100%; text-align: left; white-space: nowrap; }
+/* placed by placeMenu(): over the page, so the table's scroll box and the cards do not cut it off */
+.adt-row-menu[open] > .adt-menu-list { position: fixed; top: var(--adt-menu-y); left: var(--adt-menu-x); right: auto; margin: 0; }
 .adt-menu-item--danger, .adt-menu-item--danger:hover { color: var(--adt-danger); }
 .adt-menu-item .adt-icon { color: var(--adt-muted); }
 .adt-menu-item--danger .adt-icon { color: inherit; }
