@@ -101,7 +101,6 @@ interface CentralEntry {
 
 /** A read-only view of a ZIP archive; entries are inflated on demand. */
 export interface ZipReader {
-  has(name: string): boolean;
   /** The entry's bytes, or `undefined` when it does not exist. */
   read(name: string): Promise<Uint8Array | undefined>;
   /**
@@ -200,7 +199,6 @@ export function openZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipReader {
     return { method: entry.method, data: bytes.subarray(start, start + entry.compressedSize), maxBytes: maxEntryBytes };
   };
   return {
-    has: name => entries.has(name),
     read: async name => {
       const found = stored(name);
       if (!found) return undefined;

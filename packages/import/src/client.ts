@@ -132,6 +132,7 @@ export function createImportClient(options: ImportClientOptions): ImportClient {
       http.addEventListener('load', () => { try { resolve(parse(http.status, http.responseText, http.getResponseHeader('Retry-After'))); } catch (error) { reject(error); } });
       http.addEventListener('error', () => reject(new TypeError('The upload failed (network).')));
       http.addEventListener('abort', () => reject(signal?.reason ?? new DOMException('Aborted', 'AbortError')));
+      if (signal?.aborted) { reject(signal.reason ?? new DOMException('Aborted', 'AbortError')); return; } // aborted before it began
       signal?.addEventListener('abort', () => http.abort(), { once: true });
       http.send(body);
     });
@@ -150,7 +151,8 @@ export function createImportClient(options: ImportClientOptions): ImportClient {
       const form = new FormData();
       form.append('file', file, file.name ?? 'import');
       const key = { 'Idempotency-Key': uploadOptions.idempotencyKey ?? importKey() };
-      const body = uploadOptions.onProgress && !options.fetch && typeof XMLHttpRequest === 'function'
+      // XMLHttpRequest reports progress but cannot leave cookies out of a same-origin request.
+      const body = uploadOptions.onProgress && !options.fetch && options.credentials !== 'omit' && typeof XMLHttpRequest === 'function'
         ? await xhr(base, form, key, uploadOptions.signal, uploadOptions.onProgress)
         : await request(base, { method: 'POST', body: form, headers: key, ...(uploadOptions.signal ? { signal: uploadOptions.signal } : {}) });
       return readImportState(body, { requireProtocol: true });

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { importButton, ImportRequestError, openImport, type ImportClient, type ImportState } from '../src/index';
+import { createImportClient, importButton, ImportRequestError, openImport, type ImportClient, type ImportState } from '../src/index';
 
 HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', ''); };
 HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) { this.removeAttribute('open'); this.dispatchEvent(new Event('close')); };
@@ -166,6 +166,36 @@ describe('openImport', () => {
     const item = importButton({ url: '/api/import', language: 'de', group: 'Daten' });
     expect(item).toMatchObject({ id: 'import', label: 'Importieren…', group: 'Daten' });
     expect(importButton({ url: '/x', label: 'Load' }).label).toBe('Load');
+  });
+});
+
+describe('createImportClient in a browser', () => {
+  it('uploads with fetch when cookies must be left out (XMLHttpRequest cannot), progress or not', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ ...mapping }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      const client = createImportClient({ url: 'http://app.test/api/import', credentials: 'omit' });
+      await client.upload(new File(['x'], 'orders.csv'), { onProgress: () => undefined });
+      expect(fetch).toHaveBeenCalledOnce();
+      expect((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].credentials).toBe('omit');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('openImport, the template', () => {
+  it('downloads through the client, with its headers, as the error report does', async () => {
+    const client = fakeClient();
+    URL.createObjectURL ??= () => 'blob:x';
+    URL.revokeObjectURL ??= () => undefined;
+    const { element: dialog } = openImport({ client, language: 'en' });
+    await flush();
+    const link = dialog.querySelector<HTMLAnchorElement>('.adt-import-hint a')!;
+    expect(link.getAttribute('download')).toBe('template.xlsx');
+    link.click();
+    await flush();
+    expect(client.file).toHaveBeenCalledWith('/template.xlsx');
   });
 });
 

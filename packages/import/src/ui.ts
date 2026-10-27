@@ -59,7 +59,6 @@ const ICONS = {
   alert: 'M12 9v4M12 17h.01M10.3 3.9 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
 } as const;
 
-const CLOSE_STATES = new Set(['done', 'failed', 'cancelled', 'expired']);
 
 /**
  * Open the import dialog. Needs `url` (or a `client`); the back end decides
@@ -182,7 +181,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
       notice,
       zone,
       hints || templateUrl ? h('p', { class: 'adt-import-hint' }, hints, hints && templateUrl ? ' · ' : '',
-        templateUrl ? h('a', { href: templateUrl, download: '' }, labels.template) : '') : null);
+        templateUrl ? downloadLink(templateUrl, template!, templateUrl.split(/[?#]/)[0]!.split('/').pop() || 'template', labels.template) : '') : null);
   };
 
   // ---- Uploading
@@ -318,15 +317,15 @@ export function openImport(options: OpenImportOptions): ImportDialog {
     poll();
   };
 
-  // The error report through the client: it carries the configured headers (a bearer token)
-  // and a custom fetch, which a plain link would not; the href is the fallback.
-  const downloadLink = (href: string, source: string): HTMLElement => {
-    const link = h('a', { href, download: 'import-errors.csv', class: 'adt-import-report' }, labels.report) as HTMLAnchorElement;
+  // The error report and the template through the client: it carries the configured headers (a
+  // bearer token) and a custom fetch, which a plain link would not; the href is the fallback.
+  function downloadLink(href: string, source: string, name: string, text: string, className?: string): HTMLElement {
+    const link = h('a', { href, download: name, ...(className ? { class: className } : {}) }, text) as HTMLAnchorElement;
     link.addEventListener('click', event => {
       event.preventDefault();
       client.file(source).then(blob => {
         const url = URL.createObjectURL(blob);
-        const save = h('a', { href: url, download: 'import-errors.csv', hidden: true }) as HTMLAnchorElement;
+        const save = h('a', { href: url, download: name, hidden: true }) as HTMLAnchorElement;
         doc.body.append(save);
         save.click();
         save.remove();
@@ -334,7 +333,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
       }, error => { link.after(alert(messageOf(error))); });
     });
     return link;
-  };
+  }
 
   // ---- Step 4: the result
   const result = (state: ImportState): void => {
@@ -351,7 +350,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
       shown.length > 0 ? h('div', { class: 'adt-import-problems' }, h('h4', {}, labels.problems),
         h('ul', {}, ...shown.map(error => h('li', {}, `${labels.line(numbers.format(error.line))}${error.column ? ` · ${error.column}` : ''}${error.value ? ` · “${error.value}”` : ''}: ${error.message}`))),
         state.errorsTruncated || state.errors.length > shown.length ? h('p', { class: 'adt-import-hint' }, labels.moreProblems) : null) : null,
-      report ? h('p', {}, downloadLink(report, state.errorReport!)) : null,
+      report ? h('p', {}, downloadLink(report, state.errorReport!, 'import-errors.csv', labels.report, 'adt-import-report')) : null,
       h('div', { class: 'adt-import-actions' }, button(labels.another, () => fileStep()), button(labels.close, () => dialog.close(), 'primary', { 'data-focus': 'true' })));
     live.textContent = title;
     completed(state);
@@ -369,10 +368,10 @@ export function openImport(options: OpenImportOptions): ImportDialog {
   dialog.addEventListener('close', () => {
     closed = true;
     // A running import goes on in the back end: keep following it quietly, to refresh the table when it ends.
-    const following = current && !CLOSE_STATES.has(current.status) && current.status !== 'mapping' && body.dataset['step'] === 'progress';
+    const following = current && !FINAL_STATUSES.includes(current.status) && current.status !== 'mapping' && body.dataset['step'] === 'progress';
     if (!following) running?.abort();
     if (current?.status === 'mapping') void client.cancel(current.id).catch(() => undefined);
-    if (!following && (!current || !CLOSE_STATES.has(current.status))) finish(null);
+    if (!following && (!current || !FINAL_STATUSES.includes(current.status))) finish(null);
     dialog.remove();
   });
 
