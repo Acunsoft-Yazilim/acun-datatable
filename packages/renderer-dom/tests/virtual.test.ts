@@ -57,3 +57,16 @@ describe('virtual scrolling', () => {
     expect(() => renderTable(host, createDataTable<R>({ mode: 'server', columns }), { virtual: true })).toThrow('virtual scrolling needs a local table');
   });
 });
+
+describe('destroy while a scroll waits for its frame', () => {
+  it('cancels the frame: nothing is drawn after destroy', () => {
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame');
+    const table = createDataTable<R>({ data, columns });
+    const rendered = renderTable(host, table, { virtual: { rowHeight: 40 } });
+    const scroller = host.querySelector<HTMLElement>('.adt-scroll')!;
+    scroller.scrollTop = 4000;
+    scroller.dispatchEvent(new Event('scroll'));
+    rendered.destroy();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+});

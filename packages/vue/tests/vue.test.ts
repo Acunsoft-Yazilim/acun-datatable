@@ -707,3 +707,16 @@ describe('selection speed', () => {
     expect(performance.now() - started).toBeLessThan(300);
   });
 });
+
+describe('unmount while a scroll waits for its frame', () => {
+  it('cancels the frame', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame');
+    const many = Array.from({ length: 1000 }, (_, i) => ({ id: i + 1, customer: `Row ${i + 1}`, total: '1.00' }));
+    await mount(() => h(AcunDataTable, { table: createDataTable<Order>({ data: many, columns }), virtual: { rowHeight: 40 } }));
+    host.querySelector('.adt-scroll')!.dispatchEvent(new Event('scroll'));
+    app!.unmount();
+    app = undefined;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+});

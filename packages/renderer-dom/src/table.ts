@@ -8,7 +8,7 @@ import { columnTools } from './column-tools';
 import { autoResponsive } from './auto-responsive';
 import { checkVirtual, virtualWindow } from './virtual';
 import { afterPointerRelease, cellEditor, isEditable, type CellEditor, type EditHandler } from './edit';
-import { withoutIds } from './table-model';
+import { frameThrottle, withoutIds } from './table-model';
 
 export type { CellFormatter } from './cells';
 
@@ -710,16 +710,12 @@ export function renderTable<TData>(
   render();
   showStatus();
   // Virtual scrolling: measure the row height once, then re-draw when the rows in view change.
-  let frame = 0;
-  const onScroll = (): void => {
-    if (frame) return;
-    frame = (doc.defaultView?.requestAnimationFrame ?? ((callback: FrameRequestCallback) => setTimeout(callback, 16) as unknown as number))(() => {
-      frame = 0;
-      const rows = table.getFilteredRows().length;
-      const view = windowOf(rows);
-      if (!drawn || view.start !== drawn.start || view.end !== drawn.end) render();
-    });
-  };
+  const frames = frameThrottle(doc.defaultView);
+  const onScroll = (): void => frames.schedule(() => {
+    const rows = table.getFilteredRows().length;
+    const view = windowOf(rows);
+    if (!drawn || view.start !== drawn.start || view.end !== drawn.end) render();
+  });
   if (virtual) {
     if (!rowHeight) {
       const measured = root.querySelector<HTMLElement>('tbody .adt-row')?.getBoundingClientRect().height ?? 0;
@@ -756,6 +752,7 @@ export function renderTable<TData>(
       closeDialog();
       editing?.editor.destroy();
       scroller.removeEventListener('scroll', onScroll);
+      frames.cancel(); // a scroll just before: no drawing after destroy
       resized?.disconnect();
       unpin();
       stopAuto();

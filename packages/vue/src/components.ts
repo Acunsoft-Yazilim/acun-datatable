@@ -10,7 +10,7 @@ import {
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
-import { withoutIds } from '@acunsoft/datatable-dom/internal';
+import { frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
 
 type AnyTable = DataTable<any>;
@@ -238,11 +238,11 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
     // window of rows sizes the columns anew); measured again when the columns or the width change.
     const locked = shallowRef<{ key: string; width: number; widths: Readonly<Record<string, number>> } | undefined>();
     let lockKey = '';
-    let frame = 0;
+    const frames = frameThrottle(globalThis);
+    onScopeDispose(() => frames.cancel()); // a scroll just before unmounting: no update after
     const onScroll = (event: Event): void => {
       const node = event.currentTarget as HTMLElement;
-      if (frame) return;
-      frame = requestAnimationFrame(() => { frame = 0; scrollTop.value = node.scrollTop; viewport.value = node.clientHeight || viewport.value; });
+      frames.schedule(() => { scrollTop.value = node.scrollTop; viewport.value = node.clientHeight || viewport.value; });
     };
     // The viewport is measured once mounted and follows resizes where ResizeObserver exists.
     let stopViewport: (() => void) | undefined;

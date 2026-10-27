@@ -9,7 +9,7 @@ import {
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
-import { withoutIds } from '@acunsoft/datatable-dom/internal';
+import { frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
 /** Controls that do not touch rows accept a table of any row type. */
@@ -119,11 +119,11 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   // The column widths of the first rows drawn, kept while scrolling virtually (otherwise every
   // window of rows sizes the columns anew); measured again when the columns or the width change.
   const [locked, setLocked] = useState<{ key: string; width: number; widths: Readonly<Record<string, number>> } | undefined>(undefined);
-  const frame = useRef(0);
+  const [frames] = useState(() => frameThrottle(globalThis));
+  useEffect(() => () => frames.cancel(), [frames]); // a scroll just before unmounting: no update after
   const onScroll = (event: { currentTarget: HTMLElement }): void => {
     const node = event.currentTarget;
-    if (frame.current) return;
-    frame.current = requestAnimationFrame(() => { frame.current = 0; setScroll(current => ({ top: node.scrollTop, viewport: node.clientHeight || current.viewport })); });
+    frames.schedule(() => setScroll(current => ({ top: node.scrollTop, viewport: node.clientHeight || current.viewport })));
   };
   const all = virtual ? table.getFilteredRows() : undefined;
   const view = all ? virtualWindow(all.length, virtual!.rowHeight || measuredRow, scroll.top, scroll.viewport, virtual!.overscan) : undefined;
