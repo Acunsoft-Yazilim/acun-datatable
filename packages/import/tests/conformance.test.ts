@@ -51,6 +51,16 @@ describe('runImportConformance', () => {
     ]));
   });
 
+  it('reads the error report cell by cell for formula characters (rule 7)', async () => {
+    const report = (body: string) => run(broken(request => (request.method === 'GET' && request.url.endsWith('/errors.csv')
+      ? Promise.resolve(new Response(body, { headers: { 'Content-Type': 'text/csv' } }))
+      : undefined)), 60);
+    for (const unsafe of ['line,value\n2,-abc', 'line;value\r\n2;@SUM(A1)', 'line,value\n2,"\tx"']) {
+      expect(failed(await report(unsafe)), JSON.stringify(unsafe)).toContain('errorReport: absent or a safe http(s) URL');
+    }
+    expect(failed(await report('line,value\n2,"a,=b"\n3,\'-abc'))).not.toContain('errorReport: absent or a safe http(s) URL'); // inside a field, or guarded
+  });
+
   it('finds an unsafe error report and an answer that breaks the protocol', async () => {
     const unsafe = await run(broken(async (request, good) => {
       const response = await good(request);

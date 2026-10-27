@@ -74,7 +74,28 @@ interface Stored {
 }
 
 const fold = (value: string): string => value.toLocaleLowerCase('tr').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i').replace(/[^a-z0-9]/g, '');
-const guard = (value: string): string => (/^[=+\-@\t\r]/.test(value) ? `'${value}` : value);
+const FORMULA = /^[=+\-@\t\r]/;
+const guard = (value: string): string => (FORMULA.test(value) ? `'${value}` : value);
+/** The cells of a CSV text (RFC 4180, any of , ; or tab), unquoted, as a spreadsheet would read them. */
+function csvCells(text: string): string[] {
+  const cells: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i]!;
+    if (quoted) {
+      if (char !== '"') cell += char;
+      else if (text[i + 1] === '"') { cell += '"'; i += 1; } else quoted = false;
+    } else if (char === '"' && cell === '') quoted = true;
+    else if (char === ',' || char === ';' || char === '\t' || char === '\n' || char === '\r') {
+      cells.push(cell);
+      cell = '';
+      if (char === '\r' && text[i + 1] === '\n') i += 1;
+    } else cell += char;
+  }
+  cells.push(cell);
+  return cells;
+}
 const csvCell = (value: string): string => (/[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
 const json = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
@@ -380,7 +401,9 @@ export async function runImportConformance(options: ConformanceOptions): Promise
     const response = await send(url, { ...(options.headers ? { headers: options.headers } : {}), ...(options.credentials ? { credentials: options.credentials } : {}) });
     if (!response.ok) throw new Error(`answered ${response.status}`);
     const textBody = await response.text();
-    if (/(^|[\r\n,])"?[=+@]/.test(textBody)) throw new Error('a cell starts with a formula character');
+    // PROTOCOL.md rule 7: no cell may start with = + - @, a tab or a carriage return.
+    const risky = csvCells(textBody).find(cell => FORMULA.test(cell));
+    if (risky !== undefined) throw new Error(`a cell starts with a formula character: ${JSON.stringify(risky.slice(0, 40))}`);
     return `${textBody.split(/\r?\n/).length} lines`;
   });
 
