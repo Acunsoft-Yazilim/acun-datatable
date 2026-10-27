@@ -65,7 +65,7 @@ const nodeImport = createImportHandler({
 export async function importApi(request, response) {
   const url = new URL(request.url, 'http://127.0.0.1');
   if (url.pathname === '/e2e/api/node-import-records') {
-    const owner = `${request.headers['x-user'] ?? ''}|`;
+    const owner = request.headers['x-user'] ?? ''; // what save() got as context.owner
     response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
       .end(JSON.stringify(db.prepare('SELECT email, name, total FROM imported WHERE owner = ? ORDER BY rowid').all(owner)));
     return;
