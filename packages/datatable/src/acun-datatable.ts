@@ -1,5 +1,5 @@
 import {
-  createDataTable, persistState, type Aggregate, type ColumnDef, type PageResult, type TableQuery, type ColumnType, type DataTable, type DataTableListener, type FilterOption, type Row, type SortRule,
+  createDataTable, persistState, type Aggregate, type ColumnDef, type DataTableInitialState, type PageResult, type TableQuery, type ColumnType, type DataTable, type DataTableListener, type FilterOption, type Row, type SortRule,
 } from '@acunsoft/datatable-core';
 import {
   DEFAULT_LAYOUT, cellValue, createCellText, downloadFile, el, numeric, printRows, renderDataTable, renderFilterPanel, resolveLabels,
@@ -223,6 +223,13 @@ export interface AcunDataTableOptions {
   /** Place the controls yourself; merged over the layout the options above give. */
   readonly layout?: DataTableLayout;
   /**
+   * The table's state at the start — page, page size, sorting, filters,
+   * search, selection, hidden columns, column order and widths — e.g. from
+   * your own storage. Wins over `pagination.pageSize`, `sorting.initial` and
+   * `searching.initial`; a saved state (`stateSave`) wins over it.
+   */
+  readonly initialState?: DataTableInitialState;
+  /**
    * Where the filter fields open: `'dropdown'` under the button (default),
    * `'drawer'` from the side, `'modal'` centred. For your own drawer or modal,
    * take `'filters'` out of `layout` and call `renderFilterPanel(element)`.
@@ -425,6 +432,7 @@ export class AcunDataTable {
         ...(sorting.initial ? { sorting: sorting.initial } : {}),
         ...(searching.initial ? { globalSearch: searching.initial } : {}),
         ...(hidden.length > 0 ? { hiddenColumns: hidden } : {}),
+        ...options.initialState,
       },
     } as Parameters<typeof createDataTable<Data>>[0]);
     this.table = table;

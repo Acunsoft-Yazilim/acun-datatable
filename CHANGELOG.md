@@ -15,6 +15,14 @@ All notable changes to this repository. Each npm package also has its own
   distinct join counted 1 row (and Laravel's own exact count counted
   duplicates); they are counted as a subquery with their columns. Export size
   checks stop after limit + 1 rows instead of counting every row.
+- **`<acun-datatable>`, a fuller custom element:** every attribute is also a
+  property; properties set before the element is defined are taken over; a
+  new page size changes in place and the view attributes (language,
+  responsive, size, …) keep the user's page, sorting, filters, search,
+  selection and columns (they started over before); `adt-change` and
+  `adt-ready` bubble, `adt-error` is new; `scroll-y="480"` works; two
+  `state-save` tables without an id keep separate states; typed for
+  TypeScript. `AcunDataTable` takes `initialState`.
 - **Vue in Nuxt (server rendering):** no listener is left on a table or status
   shared between requests (13 per request before); on Vue 3.4 an opened row's
   `aria-controls` names its details again after hydration. Vue 3.4 stays

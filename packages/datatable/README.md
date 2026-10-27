@@ -34,24 +34,47 @@ Or with a `<script>` tag, without a build step (`window.AcunDataTable`):
 </script>
 ```
 
-## `<acun-datatable>` (Angular, Svelte, Astro, Alpine, plain HTML)
+## `<acun-datatable>` (a standard custom element)
 
 ```html
 <acun-datatable id="orders" src="/api/orders" server-side language="tr" page-size="25" responsive="auto"></acun-datatable>
 <script>
-  document.getElementById('orders').columns = [{ data: 'customer', title: 'Müşteri' }, { data: 'total', type: 'decimal' }];
+  const orders = document.getElementById('orders');
+  orders.columns = [{ data: 'customer', title: 'Müşteri' }, { data: 'total', type: 'decimal' }];
+  orders.addEventListener('adt-change', event => console.log(event.detail.state));
 </script>
 ```
 
 The `<script>` build defines the element; with npm call
-`defineAcunDataTableElement()` once. Attributes: `src`, `server-side`,
-`method`, `language`, `page-size`, `responsive`, `size`, `fixed-header`,
-`scroll-y`, `virtual`, `cursor`, `state-save`; the `options`, `columns` and
-`data` properties take everything else. A `<table>` inside it is the source
-when there is no `src` or `data`. It uses light DOM (so `styles.css`
-applies), fires `adt-ready` and `adt-change` (`{ state, event }`), and
-`element.table` is the `AcunDataTable`. Importing it on a server (SSR) is
-safe; it only runs in the browser.
+`defineAcunDataTableElement()` once. It needs no framework: plain HTML, or
+any framework that renders HTML elements (tested here with plain HTML and
+the `<script>` build).
+
+- **Attributes and properties:** `src`, `server-side` (`serverSide`),
+  `method`, `language`, `page-size` (`pageSize`), `responsive`, `size`,
+  `fixed-header` (`fixedHeader`), `scroll-y` (`scrollY`: `480` is pixels, or
+  `60vh`), `virtual`, `cursor`, `state-save` (`stateSave`), `filter-panel`
+  (`filterPanel`). Each property sets its attribute; `null` removes it. The
+  `options`, `columns` and `data` properties take everything else.
+  Properties set before the element is defined (a deferred script, a
+  framework that renders first) are taken over when it is.
+- **Changes:** `page-size` and `data` update the table in place. `language`,
+  `responsive`, `size`, `filter-panel`, `fixed-header`, `scroll-y`,
+  `virtual` and `state-save` rebuild it and keep the page, sorting, filters,
+  search, selection and column widths, order and visibility. `src`,
+  `server-side`, `method`, `cursor`, `columns` and `options` start over.
+- **Events** (they bubble): `adt-ready` once the first rows are shown,
+  `adt-change` (`{ state, event }`) on every change, `adt-error`
+  (`{ error }`) when the options are refused or the rows cannot be loaded;
+  an `adt-error` that no listener cancels (`preventDefault()`) is reported
+  like an uncaught error.
+- **Several tables** on a page keep their own state and element ids;
+  `state-save` keys each by its `id`, or by its place among the page's tables.
+- A `<table>` inside it is the source when there is no `src` or `data`.
+  Light DOM, so `styles.css` and the page's theme apply. `element.table` is
+  the `AcunDataTable`. TypeScript: `document.querySelector('acun-datatable')`
+  is an `AcunDataTableElement`, and its events are typed. Importing it on a
+  server (SSR) is safe; it only runs in the browser.
 
 ## Where the rows come from
 

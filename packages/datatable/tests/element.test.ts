@@ -20,10 +20,11 @@ describe('<acun-datatable>', () => {
     element.addEventListener('adt-change', changes);
     element.table!.search('ali');
     expect(changes).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.objectContaining({ event: { type: 'globalSearch', globalSearch: 'ali' } }) }));
-    element.setAttribute('language', 'en'); // re-renders from the original table
+    element.setAttribute('language', 'en'); // re-renders from the original table, keeping the search
     await tick();
     await element.table!.ready;
-    expect(element.querySelector('.adt-info')!.textContent).toBe('Showing 1 to 2 of 2 rows');
+    expect(element.querySelector('.adt-info')!.textContent).toBe('Showing 1 to 1 of 1 row');
+    expect(element.querySelector<HTMLInputElement>('input[type="search"]')!.value).toBe('ali');
     element.remove();
     await tick();
     expect(element.table).toBeUndefined();
