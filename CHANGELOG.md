@@ -115,6 +115,8 @@ All notable changes to this repository. Each npm package also has its own
   date filter as UTC text and gave it back as a string, so a day filter on a
   date-time column matched almost nothing after a reload. Dates are saved as
   their local wall time and restored as dates.
+- **`in` on a date-time column reads days as whole days on the Node back
+  end too** (it matched only rows at midnight), as the browser and Laravel do.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the

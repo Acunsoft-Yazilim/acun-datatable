@@ -123,6 +123,8 @@ for (const [name, url, open] of servers) {
         .toBe(mine.filter(row => row.ordered_at.startsWith('2026-10-06')).length);
       expect((await ask('pageSize=100&filters[0][field]=ordered&filters[0][op]=lte&filters[0][value]=2026-10-03')).total)
         .toBe(mine.filter(row => row.ordered_at.slice(0, 10) <= '2026-10-03').length);
+      expect((await ask('pageSize=100&filters[0][field]=ordered&filters[0][op]=in&filters[0][value][0]=2026-10-06&filters[0][value][1]=2026-10-09')).total)
+        .toBe(mine.filter(row => ['2026-10-06', '2026-10-09'].includes(row.ordered_at.slice(0, 10))).length);
     });
 
     it('sorts with the key as tie-breaker and pages by OFFSET and by cursor to the same rows, NULLs included', async () => {

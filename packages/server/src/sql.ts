@@ -145,8 +145,14 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
         const wholeDay = column.type === 'datetime' && isDay(high);
         return wholeDay ? `(${sql} >= ${bind(low)} AND ${sql} < ${bind(nextDay(high as Date))})` : `${sql} BETWEEN ${bind(low)} AND ${bind(high)}`;
       }
-      case 'in':
-        return `${sql} IN (${(value as unknown[]).map(item => bind(item)).join(', ')})`;
+      case 'in': {
+        // A day among the values means the whole day, as eq (and the browser, and Laravel) read it.
+        const days = column.type === 'datetime' ? (value as unknown[]).filter(isDay) : [];
+        const exact = (value as unknown[]).filter(item => !days.includes(item as Date));
+        const parts = days.map(item => `(${sql} >= ${bind(item)} AND ${sql} < ${bind(nextDay(item))})`);
+        if (exact.length > 0) parts.push(`${sql} IN (${exact.map(item => bind(item)).join(', ')})`);
+        return parts.length === 1 ? parts[0]! : `(${parts.join(' OR ')})`;
+      }
       case 'empty':
         return column.type === 'text' ? `(${sql} IS NULL OR ${textOf(column)} = '')` : `${sql} IS NULL`;
       case 'notEmpty':

@@ -92,6 +92,11 @@ describe('sqlQuery (SQLite)', () => {
     expect(day.total).toBeGreaterThan(0);
     const range = ask('pageSize=50&filters[0][field]=ordered&filters[0][op]=between&filters[0][value][0]=2026-10-06&filters[0][value][1]=2026-10-07');
     expect(range.total).toBe(all(row => /^2026-10-0[67]/.test(String(row['ordered_at']))).length);
+    const days = ask('pageSize=50&filters[0][field]=ordered&filters[0][op]=in&filters[0][value][0]=2026-10-06&filters[0][value][1]=2026-10-09');
+    expect(days.total).toBe(all(row => /^2026-10-0[69]/.test(String(row['ordered_at']))).length); // in: whole days too, as in the browser
+    expect(days.total).toBeGreaterThan(0);
+    const mixed = ask('pageSize=50&filters[0][field]=ordered&filters[0][op]=in&filters[0][value][0]=2026-10-06&filters[0][value][1]=2026-10-09T09:00:00');
+    expect(mixed.total).toBe(all(row => String(row['ordered_at']).startsWith('2026-10-06') || row['ordered_at'] === '2026-10-09 09:00:00').length);
     const empty = ask('pageSize=50&filters[0][field]=city&filters[0][op]=empty');
     expect(empty.total).toBe(all(row => row['city'] === null).length);
     const paid = ask('pageSize=50&filters[0][field]=paid&filters[0][op]=eq&filters[0][value]=true');
@@ -155,6 +160,15 @@ describe('sqlQuery (SQL Server)', () => {
 });
 
 describe('prismaQuery', () => {
+  it('reads days in an in list as whole days, other values exactly', () => {
+    const where = (value: string) => prismaQuery(readTableQuery(new URLSearchParams(`filters[0][field]=ordered&filters[0][op]=in&${value}`), columns), columns).count.where;
+    expect(where('filters[0][value][0]=2026-10-05&filters[0][value][1]=2026-10-07T09:30:00')).toEqual({ OR: [ // one condition: no AND around it
+      { ordered: { gte: new Date(2026, 9, 5), lt: new Date(2026, 9, 6) } },
+      { ordered: { in: [new Date(2026, 9, 7, 9, 30)] } },
+    ] });
+    expect(prismaQuery(readTableQuery(new URLSearchParams('filters[0][field]=qty&filters[0][op]=in&filters[0][value][0]=1'), columns), columns).count.where).toEqual({ qty: { in: [1] } });
+  });
+
   it('builds findMany and count arguments', () => {
     const query = readTableQuery(new URLSearchParams('page=2&pageSize=10&sort=total:asc&filters[0][field]=ordered&filters[0][op]=eq&filters[0][value]=2026-10-05&search=kaya'), columns);
     const prisma = prismaQuery(query, columns, { where: { tenant: 1 } });

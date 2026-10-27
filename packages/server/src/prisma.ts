@@ -76,8 +76,13 @@ export function prismaQuery(query: ServerTableQuery, columns: readonly ServerCol
           ? { [field]: { gte: low, lt: nextDay(high) } }
           : { [field]: { gte: low, lte: high } };
       }
-      case 'in':
-        return { [field]: { in: value } };
+      case 'in': {
+        // A day among the values means the whole day, as eq reads it.
+        const days = column.type === 'datetime' ? (value as unknown[]).filter(isDay) : [];
+        if (days.length === 0) return { [field]: { in: value } };
+        const exact = (value as unknown[]).filter(item => !days.includes(item as Date));
+        return { OR: [...days.map(item => ({ [field]: { gte: item, lt: nextDay(item) } })), ...(exact.length > 0 ? [{ [field]: { in: exact } }] : [])] };
+      }
       case 'empty':
         return column.type === 'text' ? { OR: [{ [field]: null }, { [field]: '' }] } : { [field]: null };
       case 'notEmpty':
