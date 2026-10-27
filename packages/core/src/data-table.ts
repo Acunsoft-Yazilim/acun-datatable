@@ -531,6 +531,8 @@ export function createDataTable<TData>(options: DataTableOptions<TData>): DataTa
       if (destroyed) return;
       const next = checkSearch(text);
       if (next === globalSearch) return;
+      // Spaces around the words change no match (the query trims them): kept as typed, page and rows stay.
+      if (next.trim() === globalSearch.trim()) { globalSearch = next; emit({ type: 'globalSearch', globalSearch }); return; }
       viewChanged(() => { globalSearch = next; }, () => ({ type: 'globalSearch', globalSearch }));
     },
 
