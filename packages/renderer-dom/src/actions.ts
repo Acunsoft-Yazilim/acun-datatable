@@ -1,5 +1,5 @@
 import type { DataTable, Row, RowId, TableQuery } from '@acunsoft/datatable-core';
-import { checkTarget, element, icon, placeMenu, type ICONS, type RenderedComponent } from './dom';
+import { checkTarget, element, icon, placeMenu, setText, type ICONS, type RenderedComponent } from './dom';
 import { labelsEn, type DataTableLabels } from './labels';
 
 /** A button in each row's actions cell, e.g. "Edit" or "Delete". */
@@ -200,8 +200,8 @@ export function renderBulkActions<TData>(
     const total = table.getTotalRows();
     const allMatching = table.isAllMatchingSelected();
     root.hidden = current.ids.length === 0;
-    count.textContent = current.ids.length === 0 ? ''
-      : allMatching && total !== undefined ? labels.allMatchingSelected(total) : labels.selectedCount(current.ids.length);
+    setText(count, current.ids.length === 0 ? ''
+      : allMatching && total !== undefined ? labels.allMatchingSelected(total) : labels.selectedCount(current.ids.length));
     // Offer "every matching row" once the whole page is selected and more rows match.
     const pageIds = table.getPage().rows.map(row => row.id);
     const offer = !allMatching && total !== undefined && total > current.ids.length && table.getSelectionMode() === 'multiple' &&

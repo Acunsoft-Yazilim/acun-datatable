@@ -1,5 +1,5 @@
 import { getPageItems, type DataTable } from '@acunsoft/datatable-core';
-import { ariaDisabled, checkTarget, element, icon, keepFocus, type RenderedComponent } from './dom';
+import { ariaDisabled, checkTarget, element, icon, keepFocus, setText, type RenderedComponent } from './dom';
 import { labelsEn, type DataTableLabels } from './labels';
 import { pagingView } from './table-model';
 
@@ -181,7 +181,7 @@ export function renderPageInfo<TData>(
   const root = element(doc, 'div', { class: 'adt-info', 'aria-live': 'polite', 'aria-atomic': 'true' });
   container.replaceChildren(root);
   const update = (): void => {
-    root.textContent = pageInfoText(table, labels, options.all === true);
+    setText(root, pageInfoText(table, labels, options.all === true)); // not again on every selection change
   };
   update();
   const unsubscribe = table.subscribe(() => update());

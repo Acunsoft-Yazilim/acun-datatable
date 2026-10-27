@@ -14,6 +14,30 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 const make = (pageSize = 10) => createDataTable<Item>({ data, columns, initialState: { pageSize } });
 
+describe('live regions', () => {
+  it('rewrite the page info and the selection count only when their words change', async () => {
+    const { renderBulkActions } = await import('../src/index');
+    const table = make();
+    const info = document.createElement('div');
+    const bar = document.createElement('div');
+    host.append(info, bar);
+    renderPageInfo(info, table);
+    renderBulkActions(bar, table, { actions: [] });
+    table.toggleRow('1');
+    const writes: MutationRecord[] = [];
+    const observer = new MutationObserver(records => writes.push(...records));
+    observer.observe(info.querySelector('.adt-info')!, { childList: true, characterData: true, subtree: true });
+    observer.observe(bar.querySelector('.adt-selection-count')!, { childList: true, characterData: true, subtree: true });
+    table.setColumnVisibility('name', true); // an event that changes neither text
+    table.setColumnOrder(['name']);
+    await Promise.resolve();
+    expect(observer.takeRecords().concat(writes)).toEqual([]);
+    table.toggleRow('2'); // "1 selected" → "2 selected"; the page info stays
+    expect(observer.takeRecords().map(record => (record.target as Element).className ?? record.target.parentElement?.className)).toEqual(['adt-selection-count']);
+    observer.disconnect();
+  });
+});
+
 describe('renderPagination', () => {
   const nav = () => host.querySelector('nav')!;
   const previous = () => host.querySelector<HTMLButtonElement>('.adt-previous')!;

@@ -185,6 +185,11 @@ function pinMenu(menu: HTMLDetailsElement, panel: HTMLElement): void {
   view.addEventListener('resize', place, { passive: true });
 }
 
+/** Write a text only when it changed: a live region rewritten with the same words may be read out again. */
+export function setText(node: Node, text: string): void {
+  if (node.textContent !== text) node.textContent = text;
+}
+
 /** Set or clear `aria-disabled`; unlike `disabled`, a focused control keeps focus. */
 export function ariaDisabled(node: HTMLElement, value: boolean): void {
   if (value) node.setAttribute('aria-disabled', 'true');
