@@ -14,8 +14,8 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./stream": { "types": "./dist/stream.d.ts", "import": "./dist/stream.js" }
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" },
+    "./stream": { "types": "./dist/stream.d.ts", "import": "./dist/stream.js", "default": "./dist/stream.js" }
   },
   "files": ["dist"],
   "scripts": {
