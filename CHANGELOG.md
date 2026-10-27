@@ -15,6 +15,14 @@ All notable changes to this repository. Each npm package also has its own
   distinct join counted 1 row (and Laravel's own exact count counted
   duplicates); they are counted as a subquery with their columns. Export size
   checks stop after limit + 1 rows instead of counting every row.
+- **Vue in Nuxt (server rendering):** no listener is left on a table or status
+  shared between requests (13 per request before); on Vue 3.4 an opened row's
+  `aria-controls` names its details again after hydration. Vue 3.4 stays
+  supported.
+- **SSR tests:** server rendering without a DOM and hydration in eight layouts
+  for React and Vue, and real Next.js (16.4) and Nuxt (4.6) test apps in
+  `e2e/ssr` (`npm run e2e:ssr`, a CI job of its own): server HTML, no
+  hydration mismatch, the server's elements kept, the table working after.
 - **Filter days in the user's time zone:** with a day among the filters,
   `datatable-http` sends `tz` (the browser's zone); the Node server and
   Laravel take the day there, so a server in UTC no longer shifts Istanbul's

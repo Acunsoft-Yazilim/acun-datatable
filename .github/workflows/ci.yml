@@ -66,6 +66,37 @@ jobs:
           path: test-results/
           retention-days: 7
 
+  ssr:
+    # The React package in a Next.js app and the Vue package in a Nuxt app
+    # (e2e/ssr, test fixtures only): server HTML, hydration without a
+    # mismatch, and the table working afterwards, in all three browsers.
+    runs-on: ubuntu-latest
+    name: SSR (Next.js, Nuxt)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            e2e/ssr/*/package-lock.json
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run e2e:ssr
+      - name: Keep traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-ssr
+          path: test-results/
+          retention-days: 7
+
   php:
     # acunsoft/datatable-laravel: oldest and newest supported PHP.
     runs-on: ubuntu-latest

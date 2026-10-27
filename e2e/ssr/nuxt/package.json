@@ -1,0 +1,18 @@
+{
+  "name": "acun-datatable-nuxt-test-app",
+  "private": true,
+  "type": "module",
+  "description": "Nuxt test app for the Vue package: server rendering and hydration (e2e/ssr.spec.ts).",
+  "scripts": {
+    "build": "nuxt build",
+    "start": "node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "@acunsoft/datatable-core": "file:../../../packages/core",
+    "@acunsoft/datatable-dom": "file:../../../packages/renderer-dom",
+    "@acunsoft/datatable-http": "file:../../../packages/datasource-http",
+    "@acunsoft/datatable-server": "file:../../../packages/server",
+    "@acunsoft/datatable-vue": "file:../../../packages/vue",
+    "nuxt": "4.6.3"
+  }
+}
