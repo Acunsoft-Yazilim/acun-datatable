@@ -121,7 +121,13 @@ All notable changes to this repository. Each npm package also has its own
   Node: a run again goes on after the rows saved before, a failing store in
   the background is reported instead of ending the process, and `save()`
   gets the owner as `owner()` gave it. Laravel: columns named with their
-  table (`->column('orders.code')`) find and fill their records.
+  table (`->column('orders.code')`) find and fill their records, and a
+  queued import whose user was deleted fails instead of running as a guest.
+- **Laravel queued table tasks keep the table's own properties:** a large
+  export or a queued bulk action rebuilt the table from its scalar
+  properties only, so a model property (`public ?Team $team`) was dropped
+  and a `query()` scoped by it exported every row (measured: 8 rows instead
+  of 3). The properties now travel through Livewire's synthesizers.
 
 ## npm 0.4.0 and `acunsoft/datatable-laravel` 0.5.0 (2026-10-25)
 
