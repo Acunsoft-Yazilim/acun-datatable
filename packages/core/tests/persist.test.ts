@@ -32,6 +32,27 @@ describe('persistState', () => {
     });
   });
 
+  it('keeps date filters as dates: a day stays the whole local day', () => {
+    type D = { id: number; at: Date };
+    const dated: readonly ColumnDef<D>[] = [{ id: 'at', header: 'At', accessorKey: 'at', type: 'datetime', enableFiltering: true }];
+    const rows = [{ id: 1, at: new Date(2026, 9, 23, 9, 30) }, { id: 2, at: new Date(2026, 9, 23, 23, 59) }, { id: 3, at: new Date(2026, 9, 24, 0, 0) }];
+    const storage = memory();
+    const first = createDataTable<D>({ data: rows, columns: dated });
+    persistState(first, { key: 'dated', storage });
+    first.setFilters([
+      { field: 'at', operator: 'eq', value: new Date(2026, 9, 23) },
+      { field: 'at', operator: 'between', value: [new Date(2026, 9, 1), new Date(2026, 9, 31, 12, 0, 0, 5)] },
+    ]);
+    expect(first.getFilteredRows().map(row => row.id)).toEqual(['1', '2']);
+
+    const second = createDataTable<D>({ data: rows, columns: dated });
+    persistState(second, { key: 'dated', storage });
+    const [day, range] = second.getState().filters;
+    expect(day!.value).toEqual(new Date(2026, 9, 23));
+    expect(range!.value).toEqual([new Date(2026, 9, 1), new Date(2026, 9, 31, 12, 0, 0, 5)]);
+    expect(second.getFilteredRows().map(row => row.id)).toEqual(['1', '2']);
+  });
+
   it('applies the page again when rows arrive later and skips parts that no longer fit', () => {
     const storage = memory();
     storage.setItem('acun-datatable:late', JSON.stringify({ v: 1, state: { page: 4, pageSize: 10, sorting: [{ field: 'gone', direction: 'asc' }] } }));

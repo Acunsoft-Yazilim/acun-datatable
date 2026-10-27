@@ -111,6 +111,10 @@ All notable changes to this repository. Each npm package also has its own
   the server answered page numbers and the table stayed on page 1. A cursor
   table's queries now say `paging: 'cursor'` and the source follows them; its
   own option stays for calling `getPage` yourself.
+- **Saved date filters stay dates:** `persistState` (and `stateSave`) wrote a
+  date filter as UTC text and gave it back as a string, so a day filter on a
+  date-time column matched almost nothing after a reload. Dates are saved as
+  their local wall time and restored as dates.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the
