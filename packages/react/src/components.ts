@@ -355,13 +355,15 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
         : null));
   }
   const primary = state.sorting[0];
+  const fixedLayout = Object.keys(state.columnWidths).length > 0 || lock !== undefined;
   for (const column of columns) {
     const index = state.sorting.findIndex(rule => rule.field === column.id);
     const rule = state.sorting[index];
     const width = state.columnWidths[column.id];
     head.push(h('th', {
       scope: 'col', key: column.id,
-      className: `adt-th${collapsible ? ` adt-col--p${priorityOf(column, columns.indexOf(column))}` : ''}${numeric(column) ? ' adt-num' : ''}`,
+      // adt-th--auto: a column without a width in a fixed layout (e.g. shown again by the responsive layout)
+      className: `adt-th${collapsible ? ` adt-col--p${priorityOf(column, columns.indexOf(column))}` : ''}${numeric(column) ? ' adt-num' : ''}${width === undefined && fixedLayout ? ' adt-th--auto' : ''}`,
       'aria-sort': primary?.field === column.id ? (primary.direction === 'asc' ? 'ascending' : 'descending') : undefined,
       'data-column-id': column.id, draggable: props.reorderableColumns ? true : undefined,
       'data-lock': column.id,

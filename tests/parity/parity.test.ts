@@ -53,7 +53,6 @@ const scenarios: Record<string, Scenario> = {
 const DIFFERENT: Readonly<Record<string, readonly Renderer[]>> = {
   'modal, a row open': ['react'], // an extra <div> around the details in the dialog
   error: ['react', 'vue'], // the DOM notice keeps aria-live="polite" next to role="alert"
-  'resized column': ['react', 'vue'], // adt-th--auto on columns without a width
 };
 
 /** Differences that are fine: React and Vue draw the closed modal <dialog> up front, the DOM renderer when it first opens. */
