@@ -10,6 +10,7 @@ import {
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
+import { withoutIds } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
 
 type AnyTable = DataTable<any>;
@@ -364,7 +365,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
             ? [h('label', { class: 'adt-select-all' }, [h('input', {
               type: 'checkbox', 'aria-label': label.selectAll, checked: status === 'all', indeterminate: status === 'some',
               onChange: () => (table.getSelectionStatus(pageIds) === 'all'
-                ? table.setSelectedRows(table.getState().selectedIds.filter(id => !pageIds.includes(id)))
+                ? table.setSelectedRows(withoutIds(table.getState().selectedIds, pageIds))
                 : table.selectRows(pageIds)),
             }), h('span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, label.selectAll)])]
             : []));
@@ -522,7 +523,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
               if (event.shiftKey && from !== undefined && from !== row.id && table.getSelectionMode() === 'multiple') {
                 const ids = rangeOf(pageIds, from, row.id);
                 if ((event.currentTarget as HTMLInputElement).checked) table.selectRows(ids);
-                else table.setSelectedRows(table.getState().selectedIds.filter(id => !ids.includes(id)));
+                else table.setSelectedRows(withoutIds(table.getState().selectedIds, ids));
               } else {
                 table.toggleRow(row.id);
               }

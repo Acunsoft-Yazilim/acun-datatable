@@ -9,6 +9,7 @@ import {
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
+import { withoutIds } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
 /** Controls that do not touch rows accept a table of any row type. */
@@ -349,7 +350,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
         ? h('label', { className: 'adt-select-all' }, h('input', {
           type: 'checkbox', ref: selectAll, 'aria-label': labels.selectAll, checked: pageStatus === 'all',
           onChange: () => (table.getSelectionStatus(pageIds) === 'all'
-            ? table.setSelectedRows(table.getState().selectedIds.filter(id => !pageIds.includes(id)))
+            ? table.setSelectedRows(withoutIds(table.getState().selectedIds, pageIds))
             : table.selectRows(pageIds)),
         }), h('span', { className: 'adt-select-all-text', 'aria-hidden': 'true' }, labels.selectAll))
         : null));
@@ -447,7 +448,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
           if (event.shiftKey && from !== undefined && from !== row.id && table.getSelectionMode() === 'multiple') {
             const ids = rangeOf(pageIds, from, row.id);
             if (event.currentTarget.checked) table.selectRows(ids);
-            else table.setSelectedRows(table.getState().selectedIds.filter(id => !ids.includes(id)));
+            else table.setSelectedRows(withoutIds(table.getState().selectedIds, ids));
           } else {
             table.toggleRow(row.id);
           }

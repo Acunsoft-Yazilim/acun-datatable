@@ -34,6 +34,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./internal": {
+      "types": "./dist/internal.d.ts",
+      "import": "./dist/internal.js"
+    },
     "./styles.css": "./dist/styles.css"
   },
   "files": [
@@ -42,7 +46,7 @@
   "scripts": {
     "check": "tsc -p tsconfig.check.json",
     "test": "vitest run",
-    "build": "tsup src/index.ts --format esm --dts --clean --external @acunsoft/datatable-core && node -e \"require('node:fs').copyFileSync('src/styles.css','dist/styles.css')\""
+    "build": "tsup src/index.ts src/internal.ts --format esm --dts --clean --external @acunsoft/datatable-core && node -e \"require('node:fs').copyFileSync('src/styles.css','dist/styles.css')\""
   },
   "dependencies": {
     "@acunsoft/datatable-core": "0.4.0"

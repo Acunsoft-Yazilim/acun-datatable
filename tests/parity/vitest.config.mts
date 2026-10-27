@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@acunsoft/datatable-core': src('core/src/index.ts'),
+      '@acunsoft/datatable-dom/internal': src('renderer-dom/src/internal.ts'), // before its package: an alias also matches the paths below it
       '@acunsoft/datatable-dom': src('renderer-dom/src/index.ts'),
       '@acunsoft/datatable-react': src('react/src/index.ts'),
       '@acunsoft/datatable-vue': src('vue/src/index.ts'),

@@ -8,6 +8,7 @@ import { columnTools } from './column-tools';
 import { autoResponsive } from './auto-responsive';
 import { checkVirtual, virtualWindow } from './virtual';
 import { afterPointerRelease, cellEditor, isEditable, type CellEditor, type EditHandler } from './edit';
+import { withoutIds } from './table-model';
 
 export type { CellFormatter } from './cells';
 
@@ -456,10 +457,8 @@ export function renderTable<TData>(
       if (table.getSelectionMode() === 'multiple' && pageIds.length > 0) {
         const box = element(doc, 'input', { type: 'checkbox', 'aria-label': labels.selectAll, 'data-adt-focus': 'select-all' });
         box.addEventListener('change', () => {
-          if (table.getSelectionStatus(pageIds) === 'all') {
-            const page = new Set(pageIds);
-            table.setSelectedRows(table.getState().selectedIds.filter(id => !page.has(id)));
-          } else {
+          if (table.getSelectionStatus(pageIds) === 'all') table.setSelectedRows(withoutIds(table.getState().selectedIds, pageIds));
+          else {
             table.selectRows(pageIds);
           }
         });
@@ -587,9 +586,8 @@ export function renderTable<TData>(
           anchor = row.id;
           if (event.shiftKey && from !== undefined && from !== row.id && table.getSelectionMode() === 'multiple') {
             const ids = rangeOf(pageIds, from, row.id);
-            const range = new Set(ids);
             if (input.checked) table.selectRows(ids);
-            else table.setSelectedRows(table.getState().selectedIds.filter(id => !range.has(id)));
+            else table.setSelectedRows(withoutIds(table.getState().selectedIds, ids));
             return;
           }
           table.toggleRow(row.id);

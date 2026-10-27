@@ -691,3 +691,19 @@ describe('filter panel modes and toolbar buttons', () => {
     expect([...host.querySelectorAll('.adt-filter legend')].map(node => node.textContent)).toEqual(['Müşteri', 'Tutar']);
   });
 });
+
+describe('selection speed', () => {
+  it('clears a large selection quickly (virtual: every row is on the page)', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+    const many = Array.from({ length: 30_000 }, (_, i) => ({ id: i + 1, customer: `Row ${i + 1}`, total: '1.00' }));
+    const table = createDataTable<Order>({ data: many, columns });
+    await mount(() => h(AcunDataTable, { table, virtual: { rowHeight: 40 }, selectable: true }));
+    host.querySelector<HTMLInputElement>('thead .adt-select input')!.click();
+    await nextTick();
+    expect(table.getState().selectedIds).toHaveLength(30_000);
+    const started = performance.now();
+    host.querySelector<HTMLInputElement>('thead .adt-select input')!.click();
+    expect(table.getState().selectedIds).toHaveLength(0);
+    expect(performance.now() - started).toBeLessThan(300);
+  });
+});
