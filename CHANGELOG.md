@@ -120,7 +120,8 @@ All notable changes to this repository. Each npm package also has its own
   Both back ends: update and upsert need the import key column matched.
   Node: a run again goes on after the rows saved before, a failing store in
   the background is reported instead of ending the process, and `save()`
-  gets the owner as `owner()` gave it.
+  gets the owner as `owner()` gave it. Laravel: columns named with their
+  table (`->column('orders.code')`) find and fill their records.
 
 ## npm 0.4.0 and `acunsoft/datatable-laravel` 0.5.0 (2026-10-25)
 
