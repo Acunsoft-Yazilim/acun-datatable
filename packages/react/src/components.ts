@@ -2,7 +2,7 @@ import {
   createElement as h, Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
   type ChangeEvent, type CSSProperties, type KeyboardEvent, type RefObject, type MouseEvent, type ReactElement, type ReactNode, type SyntheticEvent,
 } from 'react';
-import { COLUMN_WIDTH_LIMITS, getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
+import { getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
 import {
   cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, resolveLabels, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
   afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
@@ -10,8 +10,8 @@ import {
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, hideDialog, layoutKey, priorityLevels, responsiveFlags,
-  showDialog, skeletonRows, tableClass, withoutIds, wrapClass,
+  actionsCellClass, cellClass, checkActions, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  resizeHandle, responsiveFlags, showDialog, skeletonRows, sortView, tableClass, withoutIds, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
@@ -336,34 +336,25 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
         }), h('span', { className: 'adt-select-all-text', 'aria-hidden': 'true' }, labels.selectAll))
         : null));
   }
-  const primary = state.sorting[0];
   const fixedLayout = Object.keys(state.columnWidths).length > 0 || lock !== undefined;
   for (const column of columns) {
-    const index = state.sorting.findIndex(rule => rule.field === column.id);
-    const rule = state.sorting[index];
+    const sort = column.enableSorting ? sortView(column.id, state.sorting) : undefined;
     const width = state.columnWidths[column.id];
+    const { class: resizeClass, ...resize } = resizeHandle(column.id, labels.resizeColumn(column.header), width);
     head.push(h('th', {
       scope: 'col', key: column.id,
-      // adt-th--auto: a column without a width in a fixed layout (e.g. shown again by the responsive layout)
-      className: `adt-th${collapsible ? ` adt-col--p${priorityOf(column, columns.indexOf(column))}` : ''}${numeric(column) ? ' adt-num' : ''}${width === undefined && fixedLayout ? ' adt-th--auto' : ''}`,
-      'aria-sort': primary?.field === column.id ? (primary.direction === 'asc' ? 'ascending' : 'descending') : undefined,
+      className: headerClass(column, columns.indexOf(column), collapsible, width === undefined && fixedLayout),
+      'aria-sort': sort?.ariaSort,
       'data-column-id': column.id, draggable: props.reorderableColumns ? true : undefined,
       'data-lock': column.id,
       style: width !== undefined ? { width: `${width}px` } : lockedWidth(column.id),
-    }, column.enableSorting
+    }, sort
       ? h('button', {
-        type: 'button', className: rule ? `adt-sort adt-sort--${rule.direction}` : 'adt-sort',
+        type: 'button', className: sort.className,
         onClick: (event: MouseEvent) => table.setSorting(nextSorting(table.getState().sorting, column.id, event.shiftKey && props.multiSort !== false)),
-      }, column.header, h('span', { className: 'adt-sort-mark', 'aria-hidden': 'true' },
-        rule ? `${rule.direction === 'asc' ? '▲' : '▼'}${state.sorting.length > 1 ? index + 1 : ''}` : ''))
+      }, column.header, h('span', { className: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark))
       : column.header,
-    props.resizableColumns
-      ? h('span', {
-        className: 'adt-resize', role: 'separator', 'aria-orientation': 'vertical', tabIndex: 0,
-        'aria-label': labels.resizeColumn(column.header), 'data-column-id': column.id,
-        'aria-valuemin': COLUMN_WIDTH_LIMITS.min, 'aria-valuemax': COLUMN_WIDTH_LIMITS.max, 'aria-valuenow': width,
-      })
-      : null));
+    props.resizableColumns ? h('span', { ...resize, className: resizeClass, tabIndex: 0 }) : null));
   }
   if (rowActions.length > 0) {
     head.push(h('th', { scope: 'col', className: collapsible ? 'adt-th adt-actions adt-col--p2' : 'adt-th adt-actions', key: '__actions', 'data-lock': '__actions', style: lockedWidth('__actions') }, labels.actions));

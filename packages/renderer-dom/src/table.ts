@@ -1,4 +1,4 @@
-import { COLUMN_WIDTH_LIMITS, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
+import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import { actionCell, checkActions, type RowAction } from './actions';
 import { cellValue, createCellText, nextSorting, rowName, type CellFormatter } from './cells';
 import { checkTarget, element, icon, keepFocus, type RenderedComponent } from './dom';
@@ -9,8 +9,8 @@ import { autoResponsive } from './auto-responsive';
 import { checkVirtual, virtualWindow } from './virtual';
 import { afterPointerRelease, cellEditor, isEditable, type CellEditor, type EditHandler } from './edit';
 import {
-  actionsCellClass, cellClass, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, hideDialog, layoutKey, numeric, priorityLevels, priorityOf, responsiveFlags, showDialog,
-  skeletonRows, tableClass, withoutIds, wrapClass,
+  actionsCellClass, cellClass, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, numeric, priorityLevels, priorityOf, resizeHandle,
+  responsiveFlags, showDialog, skeletonRows, sortView, tableClass, withoutIds, wrapClass,
 } from './table-model';
 
 export { numeric, priorityOf }; // defined with the other shared table logic in table-model.ts
@@ -449,27 +449,19 @@ export function renderTable<TData>(
       }
       headRow.append(th);
     }
-    const primary = state.sorting[0];
     for (const column of columns) {
+      const width = widths[column.id];
       const th = element(doc, 'th', {
-        scope: 'col', class: `adt-th${collapsible ? ` adt-col--p${priorityOf(column, columns.indexOf(column))}` : ''}${numeric(column) ? ' adt-num' : ''}`,
+        scope: 'col', class: headerClass(column, columns.indexOf(column), collapsible, width === undefined && (userWidths || lock !== undefined)),
         'data-column-id': column.id,
         ...(options.reorderableColumns ? { draggable: 'true' } : {}),
       });
-      const width = widths[column.id];
       if (width !== undefined) th.style.width = `${width}px`;
-      else if (tableEl.classList.contains('adt-fixed-layout')) th.classList.add('adt-th--auto'); // e.g. shown again by the responsive layout
       if (column.enableSorting) {
-        const index = state.sorting.findIndex(rule => rule.field === column.id);
-        const rule = state.sorting[index];
-        if (primary?.field === column.id) th.setAttribute('aria-sort', primary.direction === 'asc' ? 'ascending' : 'descending');
-        const button = element(doc, 'button', {
-          type: 'button',
-          class: rule ? `adt-sort adt-sort--${rule.direction}` : 'adt-sort',
-          'data-adt-focus': `sort:${column.id}`,
-        }, column.header);
-        const mark = rule ? `${rule.direction === 'asc' ? '▲' : '▼'}${state.sorting.length > 1 ? index + 1 : ''}` : '';
-        button.append(element(doc, 'span', { class: 'adt-sort-mark', 'aria-hidden': 'true' }, mark));
+        const sort = sortView(column.id, state.sorting);
+        if (sort.ariaSort) th.setAttribute('aria-sort', sort.ariaSort);
+        const button = element(doc, 'button', { type: 'button', class: sort.className, 'data-adt-focus': `sort:${column.id}` }, column.header);
+        button.append(element(doc, 'span', { class: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark));
         button.addEventListener('click', event => {
           table.setSorting(nextSorting(table.getState().sorting, column.id, event.shiftKey && options.multiSort !== false));
         });
@@ -478,12 +470,7 @@ export function renderTable<TData>(
         th.textContent = column.header;
       }
       if (options.resizableColumns) {
-        th.append(element(doc, 'span', {
-          class: 'adt-resize', role: 'separator', 'aria-orientation': 'vertical', tabindex: '0',
-          'aria-label': labels.resizeColumn(column.header), 'data-column-id': column.id, 'data-adt-focus': `resize:${column.id}`,
-          'aria-valuemin': String(COLUMN_WIDTH_LIMITS.min), 'aria-valuemax': String(COLUMN_WIDTH_LIMITS.max),
-          ...(width !== undefined ? { 'aria-valuenow': String(width) } : {}),
-        }));
+        th.append(element(doc, 'span', { ...resizeHandle(column.id, labels.resizeColumn(column.header), width), tabindex: '0', 'data-adt-focus': `resize:${column.id}` }));
       }
       headRow.append(th);
     }

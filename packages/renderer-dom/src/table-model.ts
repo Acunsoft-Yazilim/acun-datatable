@@ -1,7 +1,7 @@
 // What the DOM renderer, the React and the Vue adapter decide alike, as plain
 // functions of the table: the renderers only turn the answers into their own
 // elements. Shared through '@acunsoft/datatable-dom/internal' (see internal.ts).
-import type { RowId } from '@acunsoft/datatable-core';
+import { COLUMN_WIDTH_LIMITS, type RowId } from '@acunsoft/datatable-core';
 import type { ResponsiveMode, TableSize } from './table';
 
 /** What the class helpers read of a column. */
@@ -160,4 +160,31 @@ export function closeRowMenusOnOutsideClick(doc: Document, root: () => ParentNod
   };
   doc.addEventListener('click', close);
   return () => doc.removeEventListener('click', close);
+}
+
+/** A header cell's class; `autoWidth`: no width of its own in a fixed layout (e.g. shown again by the responsive layout). */
+export function headerClass(column: ColumnLike, index: number, collapsible: boolean, autoWidth: boolean): string {
+  return ['adt-th', collapsible ? `adt-col--p${priorityOf(column, index)}` : '', numeric(column) ? 'adt-num' : '', autoWidth ? 'adt-th--auto' : ''].filter(Boolean).join(' ');
+}
+
+/** A sortable column's sort button: its class, the ▲/▼ mark (numbered with several rules), and `aria-sort` for the first rule. */
+export function sortView(columnId: string, sorting: readonly { readonly field: string; readonly direction: 'asc' | 'desc' }[]): {
+  readonly className: string; readonly mark: string; readonly ariaSort: 'ascending' | 'descending' | undefined;
+} {
+  const index = sorting.findIndex(rule => rule.field === columnId);
+  const rule = sorting[index];
+  return {
+    className: rule ? `adt-sort adt-sort--${rule.direction}` : 'adt-sort',
+    mark: rule ? `${rule.direction === 'asc' ? '▲' : '▼'}${sorting.length > 1 ? index + 1 : ''}` : '',
+    ariaSort: index === 0 ? (rule!.direction === 'asc' ? 'ascending' : 'descending') : undefined,
+  };
+}
+
+/** The attributes of a column's resize handle (a separator with its width as the value); the renderer adds the tab stop. */
+export function resizeHandle(columnId: string, label: string, width: number | undefined): Readonly<Record<string, string>> {
+  return {
+    class: 'adt-resize', role: 'separator', 'aria-orientation': 'vertical', 'aria-label': label, 'data-column-id': columnId,
+    'aria-valuemin': String(COLUMN_WIDTH_LIMITS.min), 'aria-valuemax': String(COLUMN_WIDTH_LIMITS.max),
+    ...(width !== undefined ? { 'aria-valuenow': String(width) } : {}),
+  };
 }

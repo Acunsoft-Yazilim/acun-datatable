@@ -3,7 +3,7 @@ import {
   computed, defineComponent, h, nextTick, onBeforeMount, onMounted, onScopeDispose, onUpdated, shallowRef, watch,
   type PropType, type SlotsType, type VNode,
 } from 'vue';
-import { COLUMN_WIDTH_LIMITS, getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
+import { getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
 import {
   cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, resolveLabels, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
   afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
@@ -11,8 +11,8 @@ import {
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, hideDialog, layoutKey, priorityLevels, responsiveFlags,
-  showDialog, skeletonRows, tableClass, withoutIds, wrapClass,
+  actionsCellClass, cellClass, checkActions, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  resizeHandle, responsiveFlags, showDialog, skeletonRows, sortView, tableClass, withoutIds, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
 
@@ -342,7 +342,6 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
 
       const head: VNode[] = [];
       const levels = priorityLevels(columns, actions.length > 0);
-      const level = (column: AnyColumn): string => (collapsible ? ` adt-col--p${priorityOf(column, columns.indexOf(column))}` : '');
       lockKey = virtual ? layoutKey(columns, props.selectable, actions.length > 0, expandable) : '';
       const lock = virtual && locked.value?.key === lockKey ? locked.value.widths : undefined;
       const lockedWidth = (key: string): Record<string, string> | undefined => (lock?.[key] ? { width: `${lock[key]}px` } : undefined);
@@ -359,34 +358,24 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
             }), h('span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, label.selectAll)])]
             : []));
       }
-      const primary = state.sorting[0];
       const fixedLayout = Object.keys(state.columnWidths).length > 0 || lock !== undefined;
       for (const column of columns) {
-        const index = state.sorting.findIndex(rule => rule.field === column.id);
-        const rule = state.sorting[index];
+        const sort = column.enableSorting ? sortView(column.id, state.sorting) : undefined;
         const width = state.columnWidths[column.id];
         head.push(h('th', {
-          // adt-th--auto: a column without a width in a fixed layout (e.g. shown again by the responsive layout)
-          scope: 'col', class: `adt-th${level(column)}${numeric(column) ? ' adt-num' : ''}${width === undefined && fixedLayout ? ' adt-th--auto' : ''}`, key: column.id,
-          'aria-sort': primary?.field === column.id ? (primary.direction === 'asc' ? 'ascending' : 'descending') : undefined,
+          scope: 'col', class: headerClass(column, columns.indexOf(column), collapsible, width === undefined && fixedLayout), key: column.id,
+          'aria-sort': sort?.ariaSort,
           'data-column-id': column.id, draggable: props.reorderableColumns ? 'true' : undefined,
           'data-lock': column.id,
           style: width !== undefined ? { width: `${width}px` } : lockedWidth(column.id),
         }, [
-          column.enableSorting
+          sort
             ? h('button', {
-              type: 'button', class: rule ? `adt-sort adt-sort--${rule.direction}` : 'adt-sort',
+              type: 'button', class: sort.className,
               onClick: (event: MouseEvent) => table.setSorting(nextSorting(table.getState().sorting, column.id, event.shiftKey && props.multiSort)),
-            }, [column.header, h('span', { class: 'adt-sort-mark', 'aria-hidden': 'true' },
-              rule ? `${rule.direction === 'asc' ? '▲' : '▼'}${state.sorting.length > 1 ? index + 1 : ''}` : '')])
+            }, [column.header, h('span', { class: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark)])
             : column.header,
-          props.resizableColumns
-            ? h('span', {
-              class: 'adt-resize', role: 'separator', 'aria-orientation': 'vertical', tabindex: 0,
-              'aria-label': label.resizeColumn(column.header), 'data-column-id': column.id,
-              'aria-valuemin': COLUMN_WIDTH_LIMITS.min, 'aria-valuemax': COLUMN_WIDTH_LIMITS.max, 'aria-valuenow': width,
-            })
-            : null,
+          props.resizableColumns ? h('span', { ...resizeHandle(column.id, label.resizeColumn(column.header), width), tabindex: 0 }) : null,
         ]));
       }
       if (actions.length > 0) {

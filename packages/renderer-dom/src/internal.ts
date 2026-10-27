@@ -5,7 +5,7 @@
  */
 export { checkActions } from './actions';
 export {
-  actionsCellClass, cellClass, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, hideDialog, layoutKey, priorityLevels, responsiveFlags, showDialog, skeletonRows,
-  tableClass, withoutIds, wrapClass,
+  actionsCellClass, cellClass, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels, resizeHandle,
+  responsiveFlags, showDialog, skeletonRows, sortView, tableClass, withoutIds, wrapClass,
   type FrameSource,
 } from './table-model';
