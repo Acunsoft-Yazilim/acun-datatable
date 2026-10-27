@@ -31,6 +31,24 @@ const outcome = async <T>(run: () => T | Promise<T>): Promise<T | string> => {
 const decoded = (text: string) => new TextDecoder().decode(encode(text));
 const plain = (sheet: Sheet) => ({ headers: [...sheet.headers], rows: sheet.rows.map(row => [...row]) });
 
+describe('streamCsv on hostile files', () => {
+  it('stops at a quote that never closes after a megabyte, in linear time', async () => {
+    const bytes = encode(`"${'x'.repeat(24 << 20)}`); // 24 MB, one open field (8 MB took 0.38 s before, 32 MB 4.4 s)
+    const started = performance.now();
+    const error = await outcome(async () => collect(streamCsv(pieces(bytes, 64 * 1024))));
+    expect(error).toBe(`error: a field is longer than ${1 << 20} characters (line 1)`);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
+  it('still reads a long header line and fields up to the limit', async () => {
+    const wide = Array.from({ length: 30_000 }, (_, i) => `c${i}`).join(';'); // a header line of 200 KB
+    const sheet = await collect(streamCsv(pieces(encode(`${wide}\n${'1;'.repeat(29_999)}1`), 4096), { maxColumns: 40_000 }));
+    expect(sheet.headers).toHaveLength(30_000);
+    const long = await collect(streamCsv(pieces(encode(`a\n"${'y'.repeat(100_000)}"`), 4096)));
+    expect(String(long.rows[0]![0])).toHaveLength(100_000);
+  });
+});
+
 describe('streamCsv reads what parseCsv reads', () => {
   const samples = [
     '', 'a', 'a,b\n1,2', 'a;b\r\n1;2\r\n\r\n3;4', 'a\tb\n1\t2\n', 'a,b\r1,2\r', '"x;y",z\n1,2',

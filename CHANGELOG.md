@@ -146,7 +146,10 @@ All notable changes to this repository. Each npm package also has its own
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the
-  limit); the xlsx readers stay linear on elements that never close; two
+  limit); the xlsx readers stay linear on elements that never close, and a
+  date-styled number past any date stays a number; `streamCsv` stops at a
+  field longer than a million characters (an open quote held the whole
+  file: 30 s for 24 MB, now 34 ms); two
   starts of one import at once run it once (Node `ImportStore.claim`, Laravel
   cache lock), and the dialog ignores a second click while it starts.
   Both back ends: update and upsert need the import key column matched.
