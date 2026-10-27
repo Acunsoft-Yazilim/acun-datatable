@@ -160,6 +160,20 @@ describe('buttons and custom cells', () => {
     expect((await created[0]!.text()).split('\r\n')[0]).toBe('Müşteri;Total'); // ; for Turkish Excel
   });
 
+  it('writes CSV with ; for the languages whose Excel expects it, regional tags included', async () => {
+    const created: Blob[] = [];
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: (blob: Blob) => { created.push(blob); return 'blob:x'; }, revokeObjectURL: () => undefined }));
+    for (const language of ['de-DE', 'fr', 'es', 'tr-TR', 'en']) {
+      const host = document.body.appendChild(document.createElement('div'));
+      const dt = new AcunDataTable(host, { data: orders.slice(0, 2), language, buttons: ['csv'], columns: [{ data: 'customer', title: 'C' }, { data: 'total', title: 'T' }] });
+      await dt.ready;
+      host.querySelector<HTMLButtonElement>('.adt-menu-item[data-action="csv"]')!.click();
+      await vi.waitFor(() => expect(created).toHaveLength(['de-DE', 'fr', 'es', 'tr-TR', 'en'].indexOf(language) + 1));
+      expect((await created.at(-1)!.text()).replace(/^\uFEFF/, '').split('\r\n')[0]).toBe(language === 'en' ? 'C,T' : 'C;T');
+      dt.destroy();
+    }
+  });
+
   it('exports every matching row of a server table, page by page, within the limit', async () => {
     const fetch = vi.fn(async (url: string) => {
       const query = new URL(url, 'http://x').searchParams;

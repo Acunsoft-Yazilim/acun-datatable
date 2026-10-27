@@ -558,7 +558,8 @@ export class AcunDataTable {
             id: 'csv', label: labels.exportCsv, group: labels.export,
             onSelect: async () => {
               const sheet = await this.#sheet();
-              downloadFile((await exportKit()).toCsv(sheet, { delimiter: this.#options.language === 'tr' ? ';' : ',' }), `${name}.csv`);
+              // Excel in Turkish, German, French and Spanish (decimal comma) splits CSV at ';'.
+              downloadFile((await exportKit()).toCsv(sheet, { delimiter: /^(tr|de|fr|es)\b/i.test(this.#options.language ?? '') ? ';' : ',' }), `${name}.csv`);
             },
           };
         case 'copy':

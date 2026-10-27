@@ -121,6 +121,10 @@ All notable changes to this repository. Each npm package also has its own
   (10 → 25 on row 11) DataTables sends a `start` that is no whole number of
   pages; both back ends rounded it down, so the rows did not match the
   "Showing 11 to 35" DataTables printed.
+- **CSV opens in columns in German, French and Spanish Excel:** the CSV
+  button (`@acunsoft/datatable`) and Livewire's `exportDelimiter()` wrote `;`
+  only for exactly `tr`; now for `tr`, `de`, `fr` and `es`, regional tags
+  included.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the
