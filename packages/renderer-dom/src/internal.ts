@@ -3,4 +3,4 @@
  * logic the three renderers share. Not a public API: it may change in any
  * release; use the package's main entry instead.
  */
-export { frameThrottle, withoutIds, type FrameSource } from './table-model';
+export { closeLikeAMenu, frameThrottle, withoutIds, type FrameSource } from './table-model';

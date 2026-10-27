@@ -10,7 +10,7 @@ import {
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
-import { frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
+import { closeLikeAMenu, frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
 
 type AnyTable = DataTable<any>;
@@ -780,13 +780,18 @@ export const AcunColumnToggle = /*#__PURE__*/ defineComponent({
   },
   setup(props) {
     const binding = useTable(() => props.table);
+    const menu = shallowRef<HTMLDetailsElement | null>(null);
+    let stopMenu: (() => void) | undefined;
+    onMounted(() => { if (menu.value) stopMenu = closeLikeAMenu(menu.value); }); // Escape and a click outside close it
+    onScopeDispose(() => stopMenu?.());
+    const focusSummary = (): void => menu.value?.querySelector<HTMLElement>(':scope > summary')?.focus();
     return (): VNode => {
       const label = withLabels(props.labels);
       const { hiddenColumns: hidden, columnOrder } = binding.state.value;
       const columns = props.table.getColumns();
       const byId = new Map(columns.map(column => [column.id, column]));
       const lastVisible = columns.length - hidden.length === 1;
-      return h('details', { class: 'adt-columns', onToggle: (event: Event) => placeMenu(event.currentTarget as HTMLDetailsElement) }, [
+      return h('details', { class: 'adt-columns', ref: menu, onToggle: (event: Event) => placeMenu(event.currentTarget as HTMLDetailsElement) }, [
         toolbarSummary(props.button, label.columns, 'columns'),
         h('fieldset', [h('legend', label.showColumns), ...columnOrder.map((id, index) => {
           const column = byId.get(id)!;
@@ -811,7 +816,7 @@ export const AcunColumnToggle = /*#__PURE__*/ defineComponent({
           };
           return h('div', { class: 'adt-column-item', key: id }, [checkbox, move('up'), move('down')]);
         }), columnsChanged(props.table)
-          ? h('button', { type: 'button', class: 'adt-columns-reset', onClick: () => resetColumns(props.table) }, label.resetColumns)
+          ? h('button', { type: 'button', class: 'adt-columns-reset', onClick: () => { resetColumns(props.table); focusSummary(); } }, label.resetColumns)
           : null]),
       ]);
     };

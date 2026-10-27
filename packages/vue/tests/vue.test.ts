@@ -720,3 +720,24 @@ describe('unmount while a scroll waits for its frame', () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 });
+
+describe('AcunColumnToggle closes like a menu', () => {
+  it('Escape closes it with the focus back on its button; a click outside closes it; reset keeps the focus there', async () => {
+    const table = make();
+    await mount(() => h(AcunColumnToggle, { table }));
+    const menu = host.querySelector<HTMLDetailsElement>('details.adt-columns')!;
+    const summary = menu.querySelector('summary')!;
+    menu.open = true;
+    menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(menu.open).toBe(false);
+    expect(document.activeElement).toBe(summary);
+    menu.open = true;
+    document.body.click();
+    expect(menu.open).toBe(false);
+    table.setColumnWidth('total', 200);
+    await nextTick();
+    host.querySelector<HTMLButtonElement>('.adt-columns-reset')!.click();
+    expect(table.getState().columnWidths).toEqual({});
+    expect(document.activeElement).toBe(summary);
+  });
+});

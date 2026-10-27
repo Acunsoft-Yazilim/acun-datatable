@@ -9,7 +9,7 @@ import {
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
-import { frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
+import { closeLikeAMenu, frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
 /** Controls that do not touch rows accept a table of any row type. */
@@ -693,7 +693,9 @@ export function ColumnToggle({ table, labels: custom, reorderable = false, butto
   const columns = table.getColumns();
   const byId = new Map(columns.map(column => [column.id, column]));
   const lastVisible = columns.length - state.hiddenColumns.length === 1;
-  return h('details', { className: 'adt-columns', onToggle: (event: SyntheticEvent<HTMLDetailsElement>) => placeMenu(event.currentTarget) },
+  const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => (menu.current ? closeLikeAMenu(menu.current) : undefined), []); // Escape and a click outside close it
+  return h('details', { className: 'adt-columns', ref: menu, onToggle: (event: SyntheticEvent<HTMLDetailsElement>) => placeMenu(event.currentTarget) },
     (({ children, ...summary }) => h('summary', summary, ...children))(toolbarButton(button, labels.columns, 'columns')),
     h('fieldset', null, h('legend', null, labels.showColumns), state.columnOrder.map((id, index) => {
       const column = byId.get(id)!;
@@ -717,7 +719,7 @@ export function ColumnToggle({ table, labels: custom, reorderable = false, butto
       };
       return h('div', { className: 'adt-column-item', key: id }, checkbox, move('up'), move('down'));
     }), columnsChanged(table)
-      ? h('button', { type: 'button', className: 'adt-columns-reset', onClick: () => resetColumns(table) }, labels.resetColumns)
+      ? h('button', { type: 'button', className: 'adt-columns-reset', onClick: () => { resetColumns(table); menu.current?.querySelector<HTMLElement>(':scope > summary')?.focus(); } }, labels.resetColumns)
       : null));
 }
 

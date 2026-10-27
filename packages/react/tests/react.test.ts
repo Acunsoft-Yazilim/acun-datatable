@@ -656,3 +656,24 @@ describe('unmount while a scroll waits for its frame', () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 });
+
+describe('ColumnToggle closes like a menu', () => {
+  it('Escape closes it with the focus back on its button; a click outside closes it; reset keeps the focus there', () => {
+    const table = make();
+    render(h(ColumnToggle, { table }));
+    const menu = host.querySelector<HTMLDetailsElement>('details.adt-columns')!;
+    const summary = menu.querySelector('summary')!;
+    menu.open = true;
+    act(() => { menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    expect(menu.open).toBe(false);
+    expect(document.activeElement).toBe(summary);
+    menu.open = true;
+    click(document.body);
+    expect(menu.open).toBe(false);
+    menu.open = true;
+    act(() => table.setColumnWidth('total', 200));
+    click(host.querySelector('.adt-columns-reset'));
+    expect(table.getState().columnWidths).toEqual({});
+    expect(document.activeElement).toBe(summary);
+  });
+});

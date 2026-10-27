@@ -1,6 +1,7 @@
 import type { DataTable } from '@acunsoft/datatable-core';
 import { checkTarget, element, fillButton, icon, keepFocus, placeMenu, type RenderedComponent, type ToolbarButton } from './dom';
 import { labelsEn, type DataTableLabels } from './labels';
+import { closeLikeAMenu } from './table-model';
 
 export interface RenderColumnToggleOptions {
   readonly labels?: Partial<DataTableLabels>;
@@ -44,18 +45,7 @@ export function renderColumnToggle<TData>(
   root.append(summary, fieldset);
   root.addEventListener('toggle', () => placeMenu(root));
   container.replaceChildren(root);
-  // Close like a menu: Escape (focus back on the summary) or a click outside.
-  root.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && root.open) {
-      root.open = false;
-      summary.focus();
-    }
-  });
-  const outside = (event: Event): void => {
-    // The path at the time of the click: a control that re-rendered away still counts as inside.
-    if (root.open && !event.composedPath().includes(root)) root.open = false;
-  };
-  doc.addEventListener('click', outside);
+  const stopMenu = closeLikeAMenu(root);
 
   const update = (): void => keepFocus(fieldset, () => {
     const { hiddenColumns: hidden, columnOrder } = table.getState();
@@ -99,7 +89,7 @@ export function renderColumnToggle<TData>(
   return {
     destroy: () => {
       unsubscribe();
-      doc.removeEventListener('click', outside);
+      stopMenu();
       root.remove();
     },
   };

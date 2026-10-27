@@ -11,3 +11,4 @@ React and Vue draw what the DOM renderer draws:
 - A table removed (or unmounted) right after a scroll no longer draws once more: the pending animation frame is cancelled, in the DOM renderer too.
 - React's modal puts the details list (`<dl>`) right in the dialog, without an extra `<div>`.
 - The DOM renderer's error notice is `role="alert"` without `aria-live="polite"` (which made the error wait), as in React and Vue.
+- React's and Vue's column menu closes like a menu, as the DOM renderer's: Escape (focus back on its button), a click outside; after "Reset" the focus stays on its button.

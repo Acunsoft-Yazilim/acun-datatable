@@ -38,3 +38,25 @@ export function frameThrottle(view: FrameSource | null | undefined): { schedule(
     },
   };
 }
+
+/**
+ * A `<details>` menu closes like a menu: Escape closes it and puts the focus
+ * back on its `<summary>`, a click outside closes it. Returns the stop.
+ */
+export function closeLikeAMenu(details: HTMLDetailsElement): () => void {
+  const doc = details.ownerDocument;
+  const onKey = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape' && details.open) {
+      details.open = false;
+      details.querySelector<HTMLElement>(':scope > summary')?.focus();
+    }
+  };
+  // The path at the time of the click: a control that re-rendered away still counts as inside.
+  const outside = (event: Event): void => { if (details.open && !event.composedPath().includes(details)) details.open = false; };
+  details.addEventListener('keydown', onKey);
+  doc.addEventListener('click', outside);
+  return () => {
+    details.removeEventListener('keydown', onKey);
+    doc.removeEventListener('click', outside);
+  };
+}
