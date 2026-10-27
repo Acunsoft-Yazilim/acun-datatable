@@ -246,6 +246,7 @@ export function renderTable<TData>(
   container.replaceChildren(root);
   const stopMenus = closeRowMenusOnOutsideClick(doc, () => root);
 
+  let destroyed = false;
   // Rows whose details are open (kept across re-renders).
   const expanded = new Set<string>();
   // Child row content per row ID, kept while the row's data stays the same.
@@ -662,6 +663,7 @@ export function renderTable<TData>(
   // Without a rowHeight, the first real row drawn gives it: a table that loads its rows has
   // none at first (or only placeholders), so it is measured again until one is there.
   const render = (): void => {
+    if (destroyed) return; // a detail that arrives, or an editor closed, after destroy
     draw();
     if (!virtual || rowMeasured) return;
     const height = measureRowHeight(root);
@@ -706,6 +708,7 @@ export function renderTable<TData>(
     : () => undefined;
   return {
     destroy: () => {
+      destroyed = true;
       unsubscribe();
       unsubscribeStatus();
       closeDialog();

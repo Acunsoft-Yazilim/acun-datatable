@@ -281,6 +281,15 @@ describe('loading', () => {
     expect(document.querySelector('.adt-skeleton')).toBeNull();
   });
 
+  it('destroy() takes the loading or error placeholder away too', async () => {
+    vi.stubGlobal('fetch', json({ message: 'boom' }, 500));
+    const dt = new AcunDataTable('#orders', { serverSide: true, ajax: '/api/orders' });
+    await expect(dt.ready).rejects.toThrow();
+    expect(document.querySelector('#orders .adt-notice')).not.toBeNull();
+    dt.destroy();
+    expect(document.querySelector('#orders')!.children).toHaveLength(0);
+  });
+
   it('loads again from the start after a failed first load: Retry and reload(), server and client side', async () => {
     for (const serverSide of [true, false]) {
       document.body.innerHTML = '<div id="orders"></div>';

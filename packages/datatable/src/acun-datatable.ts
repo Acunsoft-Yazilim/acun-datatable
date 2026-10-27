@@ -758,6 +758,7 @@ export class AcunDataTable {
     this.table?.destroy();
     this.#listeners.clear();
     if (this.#original) this.element.replaceWith(this.#original);
+    else if (!this.#rendered) this.element.replaceChildren(); // the loading or error placeholder
   }
 }
 
