@@ -350,9 +350,9 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
         head.push(h('th', { scope: 'col', class: 'adt-select', key: '__select', 'data-lock': '__select', style: lockedWidth('__select') },
           selection.show
             ? [h('label', { class: 'adt-select-all' }, [h('input', {
-              type: 'checkbox', 'aria-label': label.selectAll, checked: selection.checked, indeterminate: selection.indeterminate,
+              type: 'checkbox', 'aria-label': all ? label.selectAllRows : label.selectAll, checked: selection.checked, indeterminate: selection.indeterminate,
               onChange: () => togglePageSelection(table, pageIds),
-            }), h('span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, label.selectAll)])]
+            }), h('span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, all ? label.selectAllRows : label.selectAll)])]
             : []));
       }
       const fixedLayout = Object.keys(state.columnWidths).length > 0 || lock !== undefined;
@@ -538,7 +538,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
       return h('div', { ref: wrapEl, class: wrapClassName, style: height ? { '--adt-scroll-y': height } : undefined }, [
         notice,
         // aria-busy on the rows' box, not around the notice (a busy region's changes may be held back).
-        h('div', { class: 'adt-scroll', onScroll: virtual ? onScroll : undefined, 'aria-busy': props.status ? String(busy) : undefined }, [h('table', { class: tableClassName, 'aria-rowcount': all ? all.length + 1 : undefined }, [
+        h('div', { class: 'adt-scroll', onScroll: virtual ? onScroll : undefined, 'aria-busy': props.status ? String(busy) : undefined }, [h('table', { class: tableClassName, 'aria-rowcount': all ? all.length + 1 + (columns.some(column => column.aggregate !== undefined) ? 1 : 0) : undefined }, [
           props.caption !== undefined ? h('caption', props.caption) : null,
           h('thead', [h('tr', head)]),
           h('tbody', skeleton ? { 'aria-hidden': 'true' } : null, body),

@@ -52,9 +52,20 @@ describe('virtual scrolling', () => {
     renderDataTable(host, table, { virtual: { rowHeight: 40 }, selectable: true });
     expect(host.querySelector('.adt-paging, .adt-length')).toBeNull();
     expect(host.querySelector('.adt-info')!.textContent).toBe('Showing 1 to 10,000 of 10,000 rows');
+    expect(host.querySelector('thead .adt-select input')!.getAttribute('aria-label')).toBe('Select all rows'); // not "on this page": every row
     host.querySelector<HTMLInputElement>('thead .adt-select input')!.click();
     expect(table.getState().selectedIds).toHaveLength(10_000);
     expect(() => renderTable(host, createDataTable<R>({ mode: 'server', columns }), { virtual: true })).toThrow('virtual scrolling needs a local table');
+  });
+});
+
+describe('aria-rowcount of a virtual table', () => {
+  it('counts the header, the rows and the totals row', () => {
+    type T = R & { total: number };
+    const totals: readonly ColumnDef<T>[] = [...(columns as readonly ColumnDef<T>[]), { id: 'total', header: 'Total', accessorKey: 'total', type: 'number', aggregate: 'sum' }];
+    renderTable(host, createDataTable<T>({ data: data.slice(0, 50).map(row => ({ ...row, total: 1 })), columns: totals }), { virtual: { rowHeight: 40 } });
+    expect(host.querySelector('table')!.getAttribute('aria-rowcount')).toBe('52');
+    expect(host.querySelectorAll('tfoot tr')).toHaveLength(1);
   });
 });
 

@@ -427,7 +427,8 @@ export function renderTable<TData>(
     const userWidths = Object.keys(widths).length > 0;
     const levels = priorityLevels(columns, rowActions.length > 0);
     const tableEl = element(doc, 'table', { class: tableClass({ collapsible, levels, detail: detailOf !== undefined, userWidths, locked: lock !== undefined }) });
-    if (page.all) tableEl.setAttribute('aria-rowcount', String(page.all.length + 1));
+    // Every row of a virtual table: the header row, the rows, and the totals row when there is one.
+    if (page.all) tableEl.setAttribute('aria-rowcount', String(page.all.length + 1 + (columns.some(column => column.aggregate !== undefined) ? 1 : 0)));
     if (options.caption !== undefined) tableEl.append(element(doc, 'caption', {}, options.caption));
 
     const headRow = element(doc, 'tr');
@@ -435,12 +436,12 @@ export function renderTable<TData>(
     if (selectable) {
       const th = element(doc, 'th', { scope: 'col', class: 'adt-select' });
       if (selectAllState(table, pageIds).show) {
-        const box = element(doc, 'input', { type: 'checkbox', 'aria-label': labels.selectAll, 'data-adt-focus': 'select-all' });
+        const box = element(doc, 'input', { type: 'checkbox', 'aria-label': page.all ? labels.selectAllRows : labels.selectAll, 'data-adt-focus': 'select-all' });
         box.addEventListener('change', () => togglePageSelection(table, pageIds));
         selectAll = box;
         // The text shows only in cards (phones), where the header row is gone; the box keeps its aria-label.
         const label = element(doc, 'label', { class: 'adt-select-all' });
-        label.append(box, element(doc, 'span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, labels.selectAll));
+        label.append(box, element(doc, 'span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, page.all ? labels.selectAllRows : labels.selectAll));
         th.append(label);
       }
       headRow.append(th);

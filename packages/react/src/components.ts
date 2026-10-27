@@ -316,9 +316,9 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
     head.push(h('th', { scope: 'col', className: 'adt-select', key: '__select', 'data-lock': '__select', style: lockedWidth('__select') },
       pageSelection.show
         ? h('label', { className: 'adt-select-all' }, h('input', {
-          type: 'checkbox', ref: selectAll, 'aria-label': labels.selectAll, checked: pageSelection.checked,
+          type: 'checkbox', ref: selectAll, 'aria-label': all ? labels.selectAllRows : labels.selectAll, checked: pageSelection.checked,
           onChange: () => togglePageSelection(table, pageIds),
-        }), h('span', { className: 'adt-select-all-text', 'aria-hidden': 'true' }, labels.selectAll))
+        }), h('span', { className: 'adt-select-all-text', 'aria-hidden': 'true' }, all ? labels.selectAllRows : labels.selectAll))
         : null));
   }
   const fixedLayout = Object.keys(state.columnWidths).length > 0 || lock !== undefined;
@@ -455,7 +455,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   },
     notice,
     // aria-busy on the rows' box, not around the notice (a busy region's changes may be held back).
-    h('div', { className: 'adt-scroll', onScroll: virtual ? onScroll : undefined, 'aria-busy': props.status ? busy : undefined }, h('table', { className: tableClassName, 'aria-rowcount': all ? all.length + 1 : undefined },
+    h('div', { className: 'adt-scroll', onScroll: virtual ? onScroll : undefined, 'aria-busy': props.status ? busy : undefined }, h('table', { className: tableClassName, 'aria-rowcount': all ? all.length + 1 + (columns.some(column => column.aggregate !== undefined) ? 1 : 0) : undefined },
       props.caption !== undefined ? h('caption', null, props.caption) : null,
       h('thead', null, h('tr', null, head)),
       h('tbody', skeleton ? { 'aria-hidden': true } : null, body),

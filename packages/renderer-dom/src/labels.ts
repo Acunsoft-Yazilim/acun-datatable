@@ -2,6 +2,8 @@
 export interface DataTableLabels {
   readonly empty: string;
   readonly selectAll: string;
+  /** The header checkbox of a virtual table, which holds every matching row. */
+  readonly selectAllRows: string;
   /** Receives the row's name (see `rowLabel`), not its raw ID. */
   readonly selectRow: (name: string) => string;
   readonly pagination: string;
@@ -96,6 +98,7 @@ const es = counter('es');
 export const labelsEn: DataTableLabels = Object.freeze({
   empty: 'No matching rows',
   selectAll: 'Select all rows on this page',
+  selectAllRows: 'Select all rows',
   selectRow: (name: string) => `Select ${name}`,
   pagination: 'Pagination',
   previous: 'Previous',
@@ -159,6 +162,7 @@ export const labelsEn: DataTableLabels = Object.freeze({
 export const labelsTr: DataTableLabels = Object.freeze({
   empty: 'Eşleşen kayıt yok',
   selectAll: 'Bu sayfadaki tüm satırları seç',
+  selectAllRows: 'Tüm satırları seç',
   selectRow: (name: string) => `${name} satırını seç`,
   pagination: 'Sayfalama',
   previous: 'Önceki',
@@ -222,6 +226,7 @@ export const labelsTr: DataTableLabels = Object.freeze({
 export const labelsDe: DataTableLabels = Object.freeze({
   empty: 'Keine passenden Einträge',
   selectAll: 'Alle Zeilen auf dieser Seite auswählen',
+  selectAllRows: 'Alle Zeilen auswählen',
   selectRow: (name: string) => `${name} auswählen`,
   pagination: 'Seitennavigation',
   previous: 'Zurück',
@@ -285,6 +290,7 @@ export const labelsDe: DataTableLabels = Object.freeze({
 export const labelsFr: DataTableLabels = Object.freeze({
   empty: 'Aucune ligne correspondante',
   selectAll: 'Sélectionner toutes les lignes de cette page',
+  selectAllRows: 'Sélectionner toutes les lignes',
   selectRow: (name: string) => `Sélectionner ${name}`,
   pagination: 'Pagination',
   previous: 'Précédent',
@@ -348,6 +354,7 @@ export const labelsFr: DataTableLabels = Object.freeze({
 export const labelsEs: DataTableLabels = Object.freeze({
   empty: 'No hay filas coincidentes',
   selectAll: 'Seleccionar todas las filas de esta página',
+  selectAllRows: 'Seleccionar todas las filas',
   selectRow: (name: string) => `Seleccionar ${name}`,
   pagination: 'Paginación',
   previous: 'Anterior',
