@@ -641,8 +641,8 @@ const { table } = useDataTable({
     install:"npm install react @acunsoft/datatable-core @acunsoft/datatable-react",
     lead:{tr:"React hook'ları ve bileşenleri: erişilebilir tablo, sayfalama, arama, kolon menüsü ve toplu işlemler; özel hücreler için <code>cells</code>. <code>useSyncExternalStore</code> ile eşzamanlı render'da tutarlı.",
           en:"React hooks and components: an accessible table, pagination, search, a column menu and bulk actions; <code>cells</code> for custom cells. Consistent under concurrent rendering via <code>useSyncExternalStore</code>."},
-    note:{tr:"React 18.2+ peer dependency (19 ile test edildi). Paket <code>\"use client\"</code> ile işaretli; Next.js App Router'da doğrudan kullanılabilir. Değerler React tarafından kaçışlanır; paket HTML enjekte etmez.",
-          en:"React 18.2+ peer dependency (tested with 19). The package is marked <code>\"use client\"</code>, so it works in the Next.js App Router. Values are escaped by React; the package never injects HTML."},
+    note:{tr:"React 18.2 veya 19 peer dependency (19 ile test edildi). Paket <code>\"use client\"</code> ile işaretli; Next.js App Router'da doğrudan kullanılabilir. Değerler React tarafından kaçışlanır; paket HTML enjekte etmez.",
+          en:"React 18.2 or 19 peer dependency (tested with 19). The package is marked <code>\"use client\"</code>, so it works in the Next.js App Router. Values are escaped by React; the package never injects HTML."},
     lang:"typescript", code:
 `import { DataTableLayout, labelsTr, useDataTable } from '@acunsoft/datatable-react';
 import '@acunsoft/datatable-dom/styles.css';

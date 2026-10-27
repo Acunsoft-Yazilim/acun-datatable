@@ -3,7 +3,7 @@
 React hooks and components for
 [`@acunsoft/datatable-core`](https://www.npmjs.com/package/@acunsoft/datatable-core):
 an accessible table, pagination, search, a column menu and bulk actions, with
-custom cell renderers. React 18.2+ (19 tested), marked `"use client"` for the
+custom cell renderers. React 18.2 or 19 (19 tested), marked `"use client"` for the
 Next.js App Router.
 
 ```bash
