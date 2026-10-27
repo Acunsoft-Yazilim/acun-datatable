@@ -741,3 +741,28 @@ describe('AcunColumnToggle closes like a menu', () => {
     expect(document.activeElement).toBe(summary);
   });
 });
+
+describe('option checks, as the DOM renderer and React', () => {
+  /** Mount with an error handler: Vue reports an error thrown while rendering there. */
+  const failure = async (props: Record<string, unknown>): Promise<unknown> => {
+    let caught: unknown;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined); // the prop validators' warnings
+    app = createApp(defineComponent({ setup: () => () => h(AcunDataTable, { table: make(), ...props }) }) as Component);
+    app.config.errorHandler = error => { caught = error; };
+    app.mount(host);
+    await nextTick();
+    warn.mockRestore();
+    return caught;
+  };
+
+  it('refuses a size, fixed columns or row actions the others refuse, instead of only warning', async () => {
+    expect(String(await failure({ size: 'xl' }))).toContain('size must be sm, md or lg');
+    expect(host.querySelector('.adt-size--xl')).toBeNull();
+    app!.unmount();
+    expect(String(await failure({ fixedColumns: { start: -1 } }))).toContain('fixedColumns');
+    app!.unmount();
+    expect(String(await failure({ rowActions: [{ id: 'edit', label: 'Edit' }] }))).toContain('needs onSelect');
+    app!.unmount();
+    expect(String(await failure({ rowActions: [{ id: 'a', label: 'A', onSelect: () => undefined }, { id: 'a', label: 'B', onSelect: () => undefined }] }))).toContain('duplicate action id "a"');
+  });
+});

@@ -10,7 +10,7 @@ import {
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
-import { closeLikeAMenu, frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
+import { checkActions, closeLikeAMenu, frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
 
 type AnyTable = DataTable<any>;
@@ -346,7 +346,10 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
       const rows = all && view ? all.slice(view.start, view.end) : page.rows;
       // With virtual scrolling "all" is every matching row, not only those drawn.
       const pageIds = (all ?? page.rows).map(row => row.id);
-      const actions = props.rowActions as readonly LooseAction[];
+      // Checked as the DOM renderer and React do: a wrong value is an error, not a warning.
+      const actions = checkActions<LooseAction>(props.rowActions, 'rowActions', ['hidden', 'disabled']);
+      const size = checkSize(props.size);
+      checkFixedColumns(props.fixedColumns);
       const rowLabel = props.rowLabel as ((row: AnyRow) => string) | undefined;
       const label = labels.value;
 
@@ -582,7 +585,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
           ])
           : h('div', { class: 'adt-notice', role: 'status', 'aria-live': 'polite' });
       const height = scrollHeight(props.scrollY) ?? (virtual ? '480px' : undefined);
-      const wrapClass = ['adt-table-wrap', `adt-responsive--${responsive}`, props.size === 'md' ? '' : `adt-size--${props.size}`,
+      const wrapClass = ['adt-table-wrap', `adt-responsive--${responsive}`, size === 'md' ? '' : `adt-size--${size}`,
         props.stickyHeader ? 'adt-sticky-header' : '', height ? 'adt-scroll-y' : '', busy ? 'adt-loading' : '', skeleton ? 'adt-skeleton-on' : '', virtual ? 'adt-virtual' : ''].filter(Boolean).join(' ');
       const tableClass = ['adt-table', collapsible && levels.has(2) ? 'adt-has-p2' : '', collapsible && levels.has(3) ? 'adt-has-p3' : '', detailSlot ? 'adt-has-detail' : '',
         Object.keys(state.columnWidths).length > 0 || lock ? 'adt-fixed-layout' : '', Object.keys(state.columnWidths).length > 0 ? 'adt-user-widths' : '']

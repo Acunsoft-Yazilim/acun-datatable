@@ -677,3 +677,14 @@ describe('ColumnToggle closes like a menu', () => {
     expect(document.activeElement).toBe(summary);
   });
 });
+
+describe('option checks, as the DOM renderer', () => {
+  it('refuses row actions without an id, label or onSelect, or with an id twice', () => {
+    const table = make();
+    const actions = (list: unknown) => () => render(h(DataTable<Order>, { table, rowActions: list as never }));
+    expect(actions([{ id: 'edit', label: 'Edit', onSelect: () => undefined }, { id: 'edit', label: 'Again', onSelect: () => undefined }])).toThrow('duplicate action id "edit"');
+    expect(actions([{ id: 'edit', label: '', onSelect: () => undefined }])).toThrow('needs a label');
+    expect(actions([{ id: 'edit', label: 'Edit' }])).toThrow('needs onSelect');
+    expect(actions([{ id: '1x', label: 'Edit', onSelect: () => undefined }])).toThrow('id must start with a letter');
+  });
+});

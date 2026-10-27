@@ -9,7 +9,7 @@ import {
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
-import { closeLikeAMenu, frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
+import { checkActions, closeLikeAMenu, frameThrottle, withoutIds } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
 /** Controls that do not touch rows accept a table of any row type. */
@@ -109,7 +109,8 @@ function useStatus(status: StatusSource | undefined): string {
  * elements, escaped by React unless you use `dangerouslySetInnerHTML`.
  */
 export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
-  const { table, selectable = false, locale = 'en', rowActions = [] } = props;
+  const { table, selectable = false, locale = 'en' } = props;
+  const rowActions = checkActions<RowAction<TData>>(props.rowActions ?? [], 'rowActions', ['hidden', 'disabled']); // as the DOM renderer
   const { state, page, visibleColumns: columns } = useTable(table);
   // Virtual scrolling: the scroll position and the measured row height decide the rows drawn.
   const virtual = checkVirtual(props.virtual);
