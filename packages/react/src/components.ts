@@ -311,7 +311,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   const lockKey = virtual ? layoutKey(columns, selectable, rowActions.length > 0, expandable) : '';
   const lock = virtual && locked?.key === lockKey ? locked.widths : undefined;
   const lockedWidth = (key: string): CSSProperties | undefined => (lock?.[key] ? { width: `${lock[key]}px` } : undefined);
-  if (expandable) head.push(h('td', { className: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }));
+  if (expandable) head.push(h('td', { className: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }, h('span', { className: 'adt-sr-only' }, labels.detailsColumn)));
   if (selectable) {
     head.push(h('th', { scope: 'col', className: 'adt-select', key: '__select', 'data-lock': '__select', style: lockedWidth('__select') },
       pageSelection.show
@@ -337,7 +337,8 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
       ? h('button', {
         type: 'button', className: sort.className,
         onClick: (event: MouseEvent) => table.setSorting(nextSorting(table.getState().sorting, column.id, event.shiftKey && props.multiSort !== false)),
-      }, column.header, h('span', { className: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark))
+      }, column.header, h('span', { className: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark),
+      sort.order ? h('span', { className: 'adt-sr-only' }, labels.sortOrder(sort.order.position, sort.order.direction)) : null)
       : column.header,
     props.resizableColumns ? h('span', { ...resize, className: resizeClass, tabIndex: 0 }) : null));
   }

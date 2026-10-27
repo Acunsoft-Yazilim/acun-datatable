@@ -50,6 +50,10 @@ export interface DataTableLabels {
   readonly showColumns: string;
   /** The resize handle of a column header. */
   readonly resizeColumn: (name: string) => string;
+  /** The name of the ⊕ column's header (read by screen readers only). */
+  readonly detailsColumn: string;
+  /** A sort rule's place when several are set (read by screen readers; the ▲2 mark is hidden). */
+  readonly sortOrder: (position: number, direction: 'asc' | 'desc') => string;
   readonly moveColumnUp: (name: string) => string;
   readonly moveColumnDown: (name: string) => string;
   /** Restores the column order and widths. */
@@ -126,6 +130,8 @@ export const labelsEn: DataTableLabels = Object.freeze({
   columns: 'Columns',
   showColumns: 'Show columns',
   resizeColumn: (name: string) => `Resize ${name}`,
+  detailsColumn: 'Details',
+  sortOrder: (position: number, direction: 'asc' | 'desc') => `sort ${position}, ${direction === 'asc' ? 'ascending' : 'descending'}`,
   moveColumnUp: (name: string) => `Move ${name} up`,
   moveColumnDown: (name: string) => `Move ${name} down`,
   resetColumns: 'Reset columns',
@@ -190,6 +196,8 @@ export const labelsTr: DataTableLabels = Object.freeze({
   columns: 'Kolonlar',
   showColumns: 'Gösterilecek kolonlar',
   resizeColumn: (name: string) => `${name} kolon genişliği`,
+  detailsColumn: 'Ayrıntılar',
+  sortOrder: (position: number, direction: 'asc' | 'desc') => `sıralama ${position}, ${direction === 'asc' ? 'artan' : 'azalan'}`,
   moveColumnUp: (name: string) => `${name} kolonunu yukarı taşı`,
   moveColumnDown: (name: string) => `${name} kolonunu aşağı taşı`,
   resetColumns: 'Kolonları sıfırla',
@@ -254,6 +262,8 @@ export const labelsDe: DataTableLabels = Object.freeze({
   columns: 'Spalten',
   showColumns: 'Angezeigte Spalten',
   resizeColumn: (name: string) => `Breite der Spalte ${name}`,
+  detailsColumn: 'Details',
+  sortOrder: (position: number, direction: 'asc' | 'desc') => `Sortierung ${position}, ${direction === 'asc' ? 'aufsteigend' : 'absteigend'}`,
   moveColumnUp: (name: string) => `Spalte ${name} nach oben verschieben`,
   moveColumnDown: (name: string) => `Spalte ${name} nach unten verschieben`,
   resetColumns: 'Spalten zurücksetzen',
@@ -318,6 +328,8 @@ export const labelsFr: DataTableLabels = Object.freeze({
   columns: 'Colonnes',
   showColumns: 'Colonnes affichées',
   resizeColumn: (name: string) => `Largeur de la colonne ${name}`,
+  detailsColumn: 'Détails',
+  sortOrder: (position: number, direction: 'asc' | 'desc') => `tri ${position}, ${direction === 'asc' ? 'croissant' : 'décroissant'}`,
   moveColumnUp: (name: string) => `Monter la colonne ${name}`,
   moveColumnDown: (name: string) => `Descendre la colonne ${name}`,
   resetColumns: 'Réinitialiser les colonnes',
@@ -382,6 +394,8 @@ export const labelsEs: DataTableLabels = Object.freeze({
   columns: 'Columnas',
   showColumns: 'Columnas visibles',
   resizeColumn: (name: string) => `Ancho de la columna ${name}`,
+  detailsColumn: 'Detalles',
+  sortOrder: (position: number, direction: 'asc' | 'desc') => `orden ${position}, ${direction === 'asc' ? 'ascendente' : 'descendente'}`,
   moveColumnUp: (name: string) => `Subir la columna ${name}`,
   moveColumnDown: (name: string) => `Bajar la columna ${name}`,
   resetColumns: 'Restablecer columnas',

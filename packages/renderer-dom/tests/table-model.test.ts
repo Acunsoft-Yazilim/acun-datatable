@@ -80,10 +80,10 @@ describe('header cells', () => {
     expect(headerClass({ id: 'total', type: 'decimal' }, 1, true, true)).toBe('adt-th adt-col--p2 adt-num adt-th--auto');
     expect(headerClass({ id: 'name' }, 0, false, false)).toBe('adt-th');
     const sorting = [{ field: 'total', direction: 'desc' as const }, { field: 'name', direction: 'asc' as const }];
-    expect(sortView('total', sorting)).toEqual({ className: 'adt-sort adt-sort--desc', mark: '▼1', ariaSort: 'descending' });
-    expect(sortView('name', sorting)).toEqual({ className: 'adt-sort adt-sort--asc', mark: '▲2', ariaSort: undefined });
-    expect(sortView('city', sorting)).toEqual({ className: 'adt-sort', mark: '', ariaSort: undefined });
-    expect(sortView('name', [sorting[1]!]).mark).toBe('▲');
+    expect(sortView('total', sorting)).toEqual({ className: 'adt-sort adt-sort--desc', mark: '▼1', ariaSort: 'descending', order: { position: 1, direction: 'desc' } });
+    expect(sortView('name', sorting)).toEqual({ className: 'adt-sort adt-sort--asc', mark: '▲2', ariaSort: undefined, order: { position: 2, direction: 'asc' } }); // read out: aria-sort names the first only
+    expect(sortView('city', sorting)).toEqual({ className: 'adt-sort', mark: '', ariaSort: undefined, order: undefined });
+    expect(sortView('name', [sorting[1]!])).toMatchObject({ mark: '▲', order: undefined }); // one rule: aria-sort says it all
     expect(resizeHandle('name', 'Resize Name', undefined)).not.toHaveProperty('aria-valuenow');
     expect(resizeHandle('name', 'Resize Name', 180)).toMatchObject({ role: 'separator', 'aria-valuenow': '180', 'data-column-id': 'name' });
   });

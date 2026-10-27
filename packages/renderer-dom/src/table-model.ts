@@ -170,6 +170,8 @@ export function headerClass(column: ColumnLike, index: number, collapsible: bool
 /** A sortable column's sort button: its class, the ▲/▼ mark (numbered with several rules), and `aria-sort` for the first rule. */
 export function sortView(columnId: string, sorting: readonly { readonly field: string; readonly direction: 'asc' | 'desc' }[]): {
   readonly className: string; readonly mark: string; readonly ariaSort: 'ascending' | 'descending' | undefined;
+  /** With several rules: this column's place and direction, for `labels.sortOrder` (aria-sort names the first only). */
+  readonly order: { readonly position: number; readonly direction: 'asc' | 'desc' } | undefined;
 } {
   const index = sorting.findIndex(rule => rule.field === columnId);
   const rule = sorting[index];
@@ -177,6 +179,7 @@ export function sortView(columnId: string, sorting: readonly { readonly field: s
     className: rule ? `adt-sort adt-sort--${rule.direction}` : 'adt-sort',
     mark: rule ? `${rule.direction === 'asc' ? '▲' : '▼'}${sorting.length > 1 ? index + 1 : ''}` : '',
     ariaSort: index === 0 ? (rule!.direction === 'asc' ? 'ascending' : 'descending') : undefined,
+    order: rule && sorting.length > 1 ? { position: index + 1, direction: rule.direction } : undefined,
   };
 }
 

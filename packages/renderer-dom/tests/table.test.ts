@@ -95,7 +95,8 @@ describe('renderTable sorting', () => {
     sortButton('Total').click();
     sortButton('Customer').dispatchEvent(new MouseEvent('click', { shiftKey: true, bubbles: true }));
     expect(table.getState().sorting).toEqual([{ field: 'total', direction: 'asc' }, { field: 'customer', direction: 'asc' }]);
-    expect(headers().filter(th => th.hasAttribute('aria-sort')).map(th => th.textContent)).toEqual(['Total▲1']);
+    expect(headers().filter(th => th.hasAttribute('aria-sort')).map(th => th.textContent)).toEqual(['Total▲1sort 1, ascending']);
+    expect(sortButton('Customer').textContent).toBe('Customer▲2sort 2, ascending'); // the second rule is read out too (aria-sort names the first only)
     expect(sortButton('Customer').querySelector('.adt-sort-mark')!.getAttribute('aria-hidden')).toBe('true');
     sortButton('Customer').dispatchEvent(new MouseEvent('click', { shiftKey: true, bubbles: true }));
     sortButton('Customer').dispatchEvent(new MouseEvent('click', { shiftKey: true, bubbles: true }));

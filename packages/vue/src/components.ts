@@ -344,7 +344,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
       lockKey = virtual ? layoutKey(columns, props.selectable, actions.length > 0, expandable) : '';
       const lock = virtual && locked.value?.key === lockKey ? locked.value.widths : undefined;
       const lockedWidth = (key: string): Record<string, string> | undefined => (lock?.[key] ? { width: `${lock[key]}px` } : undefined);
-      if (expandable) head.push(h('td', { class: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }));
+      if (expandable) head.push(h('td', { class: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }, [h('span', { class: 'adt-sr-only' }, label.detailsColumn)]));
       if (props.selectable) {
         const selection = selectAllState(table, pageIds);
         head.push(h('th', { scope: 'col', class: 'adt-select', key: '__select', 'data-lock': '__select', style: lockedWidth('__select') },
@@ -370,7 +370,8 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
             ? h('button', {
               type: 'button', class: sort.className,
               onClick: (event: MouseEvent) => table.setSorting(nextSorting(table.getState().sorting, column.id, event.shiftKey && props.multiSort)),
-            }, [column.header, h('span', { class: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark)])
+            }, [column.header, h('span', { class: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark),
+              sort.order ? h('span', { class: 'adt-sr-only' }, label.sortOrder(sort.order.position, sort.order.direction)) : null])
             : column.header,
           props.resizableColumns ? h('span', { ...resizeHandle(column.id, label.resizeColumn(column.header), width), tabindex: 0 }) : null,
         ]));

@@ -436,7 +436,11 @@ export function renderTable<TData>(
     if (options.caption !== undefined) tableEl.append(element(doc, 'caption', {}, options.caption));
 
     const headRow = element(doc, 'tr');
-    if (expandable) headRow.append(element(doc, 'td', { class: 'adt-expand-cell' }));
+    if (expandable) {
+      const cell = element(doc, 'td', { class: 'adt-expand-cell' });
+      cell.append(element(doc, 'span', { class: 'adt-sr-only' }, labels.detailsColumn)); // the ⊕ column's name
+      headRow.append(cell);
+    }
     if (selectable) {
       const th = element(doc, 'th', { scope: 'col', class: 'adt-select' });
       if (selectAllState(table, pageIds).show) {
@@ -463,6 +467,7 @@ export function renderTable<TData>(
         if (sort.ariaSort) th.setAttribute('aria-sort', sort.ariaSort);
         const button = element(doc, 'button', { type: 'button', class: sort.className, 'data-adt-focus': `sort:${column.id}` }, column.header);
         button.append(element(doc, 'span', { class: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark));
+        if (sort.order) button.append(element(doc, 'span', { class: 'adt-sr-only' }, labels.sortOrder(sort.order.position, sort.order.direction)));
         button.addEventListener('click', event => {
           table.setSorting(nextSorting(table.getState().sorting, column.id, event.shiftKey && options.multiSort !== false));
         });

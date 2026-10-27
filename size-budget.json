@@ -17,13 +17,13 @@
   "packages/react/dist/index.js": 10900,
   "//imports": "What an app pays for one import alone (bundled, minified, gzipped; React and Vue not counted, chunks loaded later by import() not counted): tree-shaking must keep these small.",
   "import { createDataTable } from '@acunsoft/datatable-core'": 11500,
-  "import { renderDataTable } from '@acunsoft/datatable-dom'": 24600,
+  "import { renderDataTable } from '@acunsoft/datatable-dom'": 24900,
   "import { connectTable, createHttpDataSource, createQueryRunner } from '@acunsoft/datatable-http'": 4400,
-  "import { AcunDataTable } from '@acunsoft/datatable'": 45000,
+  "import { AcunDataTable } from '@acunsoft/datatable'": 45300,
   "import { useDataTable } from '@acunsoft/datatable-react'": 11900,
   "import { Pagination } from '@acunsoft/datatable-react'": 5600,
-  "import { DataTableLayout } from '@acunsoft/datatable-react'": 24200,
+  "import { DataTableLayout } from '@acunsoft/datatable-react'": 24500,
   "import { useDataTable } from '@acunsoft/datatable-vue'": 12100,
   "import { AcunPagination } from '@acunsoft/datatable-vue'": 5900,
-  "import { AcunDataTableLayout } from '@acunsoft/datatable-vue'": 25100
+  "import { AcunDataTableLayout } from '@acunsoft/datatable-vue'": 25400
 }
