@@ -154,7 +154,9 @@ All notable changes to this repository. Each npm package also has its own
   cache lock), and the dialog ignores a second click while it starts.
   While polling, a `429` or `503` waits for `Retry-After` and goes on; an
   upload that failed (`429`, `5xx`, network) is offered again with the same
-  file and key.
+  file and key. The dialog names its progress bars, focuses the reason a start
+  is refused, and a file dropped beside the drop zone no longer makes the
+  browser open it.
   Both back ends: update and upsert need the import key column matched.
   Node: a run again goes on after the rows saved before, a failing store in
   the background is reported instead of ending the process, and `save()`

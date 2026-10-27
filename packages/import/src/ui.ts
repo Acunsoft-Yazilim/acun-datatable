@@ -196,7 +196,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
   const upload = (file: File): void => {
     running?.abort();
     running = new AbortController();
-    const bar = h('progress', { class: 'adt-import-progress', max: '100' }) as HTMLProgressElement;
+    const bar = h('progress', { class: 'adt-import-progress', max: '100', 'aria-label': labels.uploading(file.name) }) as HTMLProgressElement;
     show('uploading', heading(labels.uploading(file.name)), h('p', { class: 'adt-import-file' }, icon('file'), `${file.name} · ${size(file.size)}`), bar);
     live.textContent = labels.uploading(file.name);
     client.upload(file, {
@@ -223,7 +223,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
     const chosen = [...(state.mapping ?? headers.map(() => null))];
     const offered = state.modes ?? [];
     let mode: ImportMode | undefined = state.mode ?? offered[0];
-    const message = h('div', { class: 'adt-import-check', 'aria-live': 'polite' });
+    const message = h('div', { class: 'adt-import-check', 'aria-live': 'polite', tabindex: '-1' }); // focused when Start is refused
     const start = button(labels.start, () => begin(), 'primary');
     const check = (): boolean => {
       const missing = columns.filter(column => column.required && !chosen.includes(column.id)).map(column => column.title ?? column.id);
@@ -286,7 +286,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
   const follow = (state: ImportState): void => {
     current = state;
     if (FINAL_STATUSES.includes(state.status)) { result(state); return; }
-    const bar = h('progress', { class: 'adt-import-progress' }) as HTMLProgressElement;
+    const bar = h('progress', { class: 'adt-import-progress', 'aria-label': labels.working }) as HTMLProgressElement;
     const text = h('p', { class: 'adt-import-count' });
     const counts = h('p', { class: 'adt-import-hint' });
     const problemBox = h('div');
@@ -359,6 +359,8 @@ export function openImport(options: OpenImportOptions): ImportDialog {
 
   // ---- Closing
   closeButton.addEventListener('click', () => dialog.close());
+  // A file dropped beside the drop zone must not make the browser open it (and lose the dialog).
+  for (const type of ['dragover', 'drop']) dialog.addEventListener(type, event => event.preventDefault());
   dialog.addEventListener('click', event => {
     if (event.target !== dialog) return;
     const box = dialog.getBoundingClientRect();

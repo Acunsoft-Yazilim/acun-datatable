@@ -169,6 +169,26 @@ describe('openImport', () => {
   });
 });
 
+describe('openImport, accessibility', () => {
+  it('names its progress bars, focuses a refused start and keeps a file dropped beside the zone', async () => {
+    let finish: (state: ImportState) => void = () => undefined;
+    const client = fakeClient({ upload: vi.fn(() => new Promise<ImportState>(resolve => { finish = resolve; })) });
+    const { element: dialog } = openImport({ client, language: 'en' });
+    await flush();
+    const drop = new Event('drop', { cancelable: true, bubbles: true });
+    dialog.querySelector('.adt-import-hint, .adt-dialog-head')!.dispatchEvent(drop);
+    expect(drop.defaultPrevented).toBe(true); // the browser does not open the file instead
+    await choose(dialog);
+    expect(dialog.querySelector('progress')!.getAttribute('aria-label')).toBe('Uploading orders.csv…');
+    finish({ ...mapping, mapping: [null, null, null] }); // nothing matched yet
+    await flush();
+    const start = [...dialog.querySelectorAll<HTMLButtonElement>('.adt-import-actions button')].find(node => /import/i.test(node.textContent ?? ''))!;
+    start.click();
+    expect(document.activeElement).toBe(dialog.querySelector('.adt-import-check')); // the reason gets the focus
+    expect(dialog.querySelector('.adt-import-check')!.textContent).not.toBe('');
+  });
+});
+
 describe('openImport, clicked twice', () => {
   it('starts once while the first start runs', async () => {
     let finish: (state: ImportState) => void = () => undefined;
