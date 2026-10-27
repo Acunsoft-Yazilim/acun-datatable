@@ -250,10 +250,12 @@ describe('renderTable second-review additions', () => {
     set({ status: 'error', error: new Error('500') });
     expect(wrap.getAttribute('aria-busy')).toBe('false');
     expect(notice.getAttribute('role')).toBe('alert');
+    expect(notice.hasAttribute('aria-live')).toBe(false); // assertive, as role="alert" is
     host.querySelector<HTMLButtonElement>('.adt-retry')!.click();
     expect(retry).toHaveBeenCalledTimes(1);
     set({ status: 'success' });
     expect(notice.textContent).toBe('');
+    expect(notice.getAttribute('aria-live')).toBe('polite'); // a status again
     rendered.destroy();
     expect(listeners.size).toBe(0);
     expect(() => renderTable(host, make(), { status: {} as never })).toThrow('status must have getState and subscribe');

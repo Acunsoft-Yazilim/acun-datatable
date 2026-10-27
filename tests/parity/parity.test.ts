@@ -51,7 +51,6 @@ const scenarios: Record<string, Scenario> = {
 
 /** Known differences, each fixed in its own change (which removes the entry here). */
 const DIFFERENT: Readonly<Record<string, readonly Renderer[]>> = {
-  error: ['react', 'vue'], // the DOM notice keeps aria-live="polite" next to role="alert"
 };
 
 /** Differences that are fine: React and Vue draw the closed modal <dialog> up front, the DOM renderer when it first opens. */

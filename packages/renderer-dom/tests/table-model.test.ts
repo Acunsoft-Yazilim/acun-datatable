@@ -5,7 +5,7 @@ afterEach(() => vi.useRealTimers());
 
 describe('withoutIds', () => {
   it('keeps the order and drops the given ids, linear on large lists', () => {
-    expect(withoutIds(['1', '2', 3, '4'], ['2', 3])).toEqual(['1', '4']);
+    expect(withoutIds(['1', '2', '3', '4'], ['2', '3'])).toEqual(['1', '4']);
     const many = Array.from({ length: 200_000 }, (_, i) => String(i));
     const started = performance.now();
     expect(withoutIds(many, many)).toEqual([]);

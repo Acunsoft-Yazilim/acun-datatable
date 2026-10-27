@@ -10,3 +10,4 @@ React and Vue draw what the DOM renderer draws:
 - Unselecting a page or a Shift+click range is linear: with virtual scrolling, where every matching row is on the page, clearing 30,000 selected rows took about 730 ms (now as fast as the DOM renderer, which used a Set).
 - A table removed (or unmounted) right after a scroll no longer draws once more: the pending animation frame is cancelled, in the DOM renderer too.
 - React's modal puts the details list (`<dl>`) right in the dialog, without an extra `<div>`.
+- The DOM renderer's error notice is `role="alert"` without `aria-live="polite"` (which made the error wait), as in React and Vue.

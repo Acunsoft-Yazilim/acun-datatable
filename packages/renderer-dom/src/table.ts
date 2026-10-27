@@ -686,14 +686,20 @@ export function renderTable<TData>(
 
   const showStatus = (): void => {
     if (!status) return;
+    // role="alert" is assertive by itself: aria-live="polite" next to it would make an error wait.
+    const announce = (role: 'status' | 'alert'): void => {
+      notice.setAttribute('role', role);
+      if (role === 'alert') notice.removeAttribute('aria-live');
+      else notice.setAttribute('aria-live', 'polite');
+    };
     const { status: phase } = status.getState();
     root.setAttribute('aria-busy', phase === 'loading' ? 'true' : 'false');
     root.classList.toggle('adt-loading', phase === 'loading');
     if (phase === 'loading') {
-      notice.setAttribute('role', 'status');
+      announce('status');
       notice.replaceChildren(element(doc, 'span', { class: 'adt-notice-text' }, labels.loading));
     } else if (phase === 'error') {
-      notice.setAttribute('role', 'alert');
+      announce('alert');
       const parts: HTMLElement[] = [element(doc, 'span', { class: 'adt-notice-text' }, labels.error)];
       if (typeof status.retry === 'function') {
         const retry = element(doc, 'button', { type: 'button', class: 'adt-retry' }, labels.retry);
@@ -702,7 +708,7 @@ export function renderTable<TData>(
       }
       notice.replaceChildren(...parts);
     } else {
-      notice.setAttribute('role', 'status');
+      announce('status');
       notice.replaceChildren();
     }
   };
