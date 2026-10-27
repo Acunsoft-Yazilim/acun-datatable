@@ -173,8 +173,11 @@ export function createImportClient(options: ImportClientOptions): ImportClient {
     async file(url, signal) {
       const target = safeImportUrl(url, base);
       if (!target) throw new TypeError('Not an http(s) URL.');
-      const headers = new Headers(typeof options.headers === 'function' ? await options.headers() : options.headers);
-      const response = await send(target, { headers, credentials: options.credentials ?? 'same-origin', ...(signal ? { signal } : {}) });
+      // The client's headers (a bearer token) and credentials go to the import endpoint's origin
+      // only: a report on another host (a signed storage link) gets neither.
+      const own = new URL(target).origin === new URL(safeImportUrl('.', base) ?? target).origin;
+      const headers = own ? new Headers(typeof options.headers === 'function' ? await options.headers() : options.headers) : new Headers();
+      const response = await send(target, { headers, credentials: own ? options.credentials ?? 'same-origin' : 'omit', ...(signal ? { signal } : {}) });
       if (!response.ok) throw new ImportRequestError(readImportProblem(response.status, await response.text().catch(() => '')));
       return response.blob();
     },

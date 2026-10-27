@@ -83,6 +83,21 @@ describe('the import client against the in-memory back end', () => {
     await expect(imports.file('javascript:alert(1)')).rejects.toThrow('Not an http(s) URL.');
   });
 
+  it('keeps its headers and credentials for its own origin: a report on another host gets neither', async () => {
+    const calls: { url: string; headers: Headers; credentials: RequestCredentials | undefined }[] = [];
+    const imports = createImportClient({
+      url: 'https://app.example/import', headers: { Authorization: 'Bearer t0k3n' }, credentials: 'include', delay: instant,
+      fetch: async (input, init) => { calls.push({ url: String(input), headers: new Headers(init?.headers), credentials: init?.credentials }); return new Response('line,column'); },
+    });
+    await imports.file('https://storage.example/reports/1.csv?signature=abc');
+    expect(calls[0]).toMatchObject({ url: 'https://storage.example/reports/1.csv?signature=abc', credentials: 'omit' });
+    expect(calls[0]!.headers.has('authorization')).toBe(false);
+    await imports.file('/import/1/errors.csv');
+    expect(calls[1]!.url).toBe('https://app.example/import/1/errors.csv');
+    expect(calls[1]!.headers.get('authorization')).toBe('Bearer t0k3n');
+    expect(calls[1]!.credentials).toBe('include');
+  });
+
   it('sends the configured headers and an Idempotency-Key', async () => {
     const seen: Headers[] = [];
     const server = backend();

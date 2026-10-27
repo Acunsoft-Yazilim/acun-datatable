@@ -212,8 +212,10 @@ stopped as a whole (see `message`).
 
 Back ends MAY add fields; the UI ignores what it does not know. URLs
 (`errorReport`, `templateUrl`) are absolute `http(s)` URLs or paths relative
-to `{url}`; the UI refuses any other scheme. Every text is shown as text, never
-as HTML.
+to `{url}`; the UI refuses any other scheme. The client sends its headers (a
+bearer token) and credentials only to the origin of `{url}`: a report on
+another host, such as a signed storage link, is fetched with neither. Every
+text is shown as text, never as HTML.
 
 ## Problems
 
