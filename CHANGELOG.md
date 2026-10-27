@@ -143,6 +143,10 @@ All notable changes to this repository. Each npm package also has its own
   `fixedColumns`, selecting a row measured every column again (a forced
   layout per column); the two observers now skip a row's own state and the
   pin classes.
+- **`acunsoft/datatable-laravel` requires `laravel/framework`:** it asked for
+  four `illuminate/*` packages but uses queued jobs
+  (`Illuminate\Foundation\Bus\Dispatchable`), console, validation, routing,
+  cache and auth, which only the framework brings.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the
