@@ -116,8 +116,10 @@ function fromDataTables(raw: Record<string, unknown>, byId: Map<string, ServerCo
     return { id: typeof id === 'string' ? id : '', search: typeof search === 'string' ? search : '' };
   });
   const lengthRaw = raw['length'] ?? defaultPageSize;
-  const length = lengthRaw === '-1' || lengthRaw === -1 ? -1 : integer(lengthRaw, 'length', 1, 1_000_000);
-  const pageSize = length === -1 ? maxPageSize : Math.min(length, maxPageSize);
+  // "All" (-1), or more rows than a page may hold, is refused: a page cut short would leave rows
+  // out with no sign (DataTables shows no pager and counts them as shown).
+  if (lengthRaw === '-1' || lengthRaw === -1) throw new TableQueryError('length', `length -1 (all rows) is not allowed: at most ${maxPageSize} rows a page`);
+  const pageSize = integer(lengthRaw, 'length', 1, maxPageSize);
   const start = integer(raw['start'] ?? 0, 'start', 0, MAX_PAGE * maxPageSize);
   const sort = list(raw['order']).flatMap((rule, index) => {
     const entry = rule as Record<string, unknown> | undefined;

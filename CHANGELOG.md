@@ -5,6 +5,10 @@ All notable changes to this repository. Each npm package also has its own
 
 ## Unreleased
 
+- **Breaking (both back ends): DataTables "All" and oversized pages are
+  refused.** `length=-1` or a length past the endpoint's largest page got a
+  page cut short, with the other rows silently missing; now DataTables shows
+  the error (see UPGRADING.md).
 - **Breaking (Laravel): editing in place needs a policy.** Without a model
   policy anyone who saw a Livewire table could edit every `editable()` cell;
   now such an edit is refused unless the table's `editableWithoutPolicy()`

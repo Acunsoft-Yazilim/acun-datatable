@@ -293,6 +293,17 @@ describe('counting', () => {
   });
 });
 
+describe('DataTables page length', () => {
+  it('refuses "All" (-1) and more rows than a page may hold, instead of a page cut short', () => {
+    const ask = (length: string) => { try { return readTableQuery({ draw: '1', start: '0', length, columns: [{ data: 'customer' }] }, columns, { maxPageSize: 50 }).pageSize; } catch (error) { return (error as Error).message; } };
+    expect(ask('-1')).toBe('length -1 (all rows) is not allowed: at most 50 rows a page');
+    expect(ask('51')).toBe('length must be a whole number from 1 to 50');
+    expect(ask('50')).toBe(50);
+    const answer = tableError(new TableQueryError('length', 'x'), { draw: '7' });
+    expect(answer).toMatchObject({ status: 200, body: { draw: 7, error: 'x' } }); // what DataTables shows
+  });
+});
+
 describe('DataTables paging', () => {
   it('skips start rows, also when start is no whole number of pages (the page length changed)', () => {
     const query = readTableQuery({ draw: '3', start: '15', length: '10', columns: [{ data: 'customer' }] }, columns);

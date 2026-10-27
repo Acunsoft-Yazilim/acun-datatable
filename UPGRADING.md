@@ -19,6 +19,16 @@
    Query-builder rows have no policy: override `authorizeEdit()` (or
    `editableWithoutPolicy()`) for them.
 
+### Both back ends (`@acunsoft/datatable-server`, `acunsoft/datatable-laravel`)
+
+1. **DataTables "All" and oversized pages are refused.** A DataTables request
+   with `length=-1` ("All"), or with more rows than the endpoint's largest
+   page (`maxPageSize`, default 100), used to get a page cut down to that
+   size: DataTables showed no pager and the other rows were silently
+   missing. Now it gets DataTables' `error` (Node: `TableQueryError`, Laravel:
+   `InvalidTableQuery`, both on `length`). Keep `lengthMenu` within the
+   endpoint's largest page, or raise it on the endpoint.
+
 ## npm packages: 0.2.x → 0.4.0
 
 0.3.0 was prepared but not published, so 0.4.0 carries both releases. Most of
