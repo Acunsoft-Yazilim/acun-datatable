@@ -127,7 +127,7 @@
 .adt-search { position: relative; display: flex; align-items: center; width: 100%; color: var(--adt-muted); }
 .adt-search .adt-icon { position: absolute; left: 0.8rem; pointer-events: none; }
 .adt-search input { width: 100%; min-width: 0; padding-left: 2.4rem; }
-.adt-search input::placeholder { color: var(--adt-muted); opacity: 0.85; }
+.adt-search input::placeholder { color: var(--adt-muted); opacity: 1; } /* the muted colour is AA (4.9:1); fainter is not */
 .adt-search input::-webkit-search-cancel-button { cursor: pointer; }
 
 /* Table */

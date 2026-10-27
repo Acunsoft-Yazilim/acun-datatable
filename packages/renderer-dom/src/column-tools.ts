@@ -85,11 +85,13 @@ export function columnTools<TData>(container: HTMLElement, table: DataTable<TDat
     container.classList.remove('adt-resizing');
     doc.removeEventListener('pointermove', onMove);
     doc.removeEventListener('pointerup', onUp);
+    doc.removeEventListener('pointercancel', onCancel);
     doc.removeEventListener('keydown', onEscape, true);
     if (commit) table.setColumnWidth(id, width);
     else show(id, start);
   };
   const onUp = (): void => finish(true);
+  const onCancel = (): void => finish(false); // the browser took the pointer (a scroll, a lost window)
   const onEscape = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') { event.stopPropagation(); finish(false); }
   };
@@ -103,8 +105,11 @@ export function columnTools<TData>(container: HTMLElement, table: DataTable<TDat
     const start = widthOf(id);
     drag = { id, startX: event.clientX, start, width: start };
     container.classList.add('adt-resizing');
+    // Captured: the release reaches us even outside the window, so the drag never sticks.
+    try { handle.setPointerCapture?.(event.pointerId); } catch { /* not a real pointer (tests) */ }
     doc.addEventListener('pointermove', onMove);
     doc.addEventListener('pointerup', onUp);
+    doc.addEventListener('pointercancel', onCancel);
     doc.addEventListener('keydown', onEscape, true);
   };
   const onKeyDown = (event: KeyboardEvent): void => {

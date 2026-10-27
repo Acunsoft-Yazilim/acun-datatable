@@ -319,8 +319,12 @@ export function renderTable<TData>(
   const openDialog = (row: Row<TData>, cells: readonly string[], columns: readonly ColumnDef<TData>[]): void => {
     if (!dialog) {
       dialog = element(doc, 'dialog', { class: 'adt-dialog', 'aria-labelledby': `${uid}-dialog-title` });
-      // A click on the backdrop lands on the dialog itself.
-      dialog.addEventListener('click', event => { if (event.target === dialog) closeDialog(); });
+      // A click on the backdrop lands on the dialog itself; so does one on its own scrollbar, inside its box.
+      dialog.addEventListener('click', event => {
+        if (event.target !== dialog) return;
+        const box = dialog!.getBoundingClientRect();
+        if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeDialog();
+      });
       dialog.addEventListener('close', () => {
         // Back to the row's button (Safari does not focus a clicked button, so the browser cannot restore it).
         const opener = [...root.querySelectorAll<HTMLElement>('.adt-expand')].find(node => node.dataset['adtFocus'] === `expand:${dialogRow}`);

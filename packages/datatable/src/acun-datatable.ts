@@ -167,7 +167,7 @@ export interface AcunDataTableOptions {
    * `{ rowHeight, overscan }`; the height is `scrollY` (default 480px).
    */
   readonly virtual?: boolean | { readonly rowHeight?: number; readonly overscan?: number };
-  /** Narrow screens: `cards` (default), `scroll`, `collapse` or `modal`. */
+  /** Narrow screens: `cards` (default), `scroll`, `collapse`, `modal`, or `auto` (hide the columns that do not fit). */
   readonly responsive?: ResponsiveMode;
   readonly size?: TableSize;
   readonly caption?: string;
@@ -175,12 +175,6 @@ export interface AcunDataTableOptions {
   readonly selectable?: boolean;
   readonly rowActions?: readonly RowAction<Data>[];
   readonly bulkActions?: readonly BulkAction<Data>[];
-  /**
-   * A child row under each row (DataTables child rows), opened by a ⊕
-   * button: return a DOM node (`el()`), text, or a promise of either, e.g.
-   * `row => fetch('/orders/' + row.id + '/lines').then(…)` (shows "Loading…"
-   * meanwhile). With `responsive: 'modal'` it opens in the dialog.
-   */
   /**
    * Save a cell edited in place (columns with `editable`), e.g. with
    * `fetch(…, { method: 'PATCH' })`. Throw (or reject) to keep the editor
@@ -190,6 +184,12 @@ export interface AcunDataTableOptions {
    * that is not `ok` counts as a failure.
    */
   readonly onEdit?: (edit: EditEvent) => unknown;
+  /**
+   * A child row under each row (DataTables child rows), opened by a ⊕
+   * button: return a DOM node (`el()`), text, or a promise of either, e.g.
+   * `row => fetch('/orders/' + row.id + '/lines').then(…)` (shows "Loading…"
+   * meanwhile). With `responsive: 'modal'` it opens in the dialog.
+   */
   readonly detail?: (row: Data) => Node | string | null | undefined | Promise<Node | string | null | undefined>;
   /** Show the column menu. Default `true`. */
   readonly columnToggle?: boolean;

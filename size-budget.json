@@ -12,7 +12,7 @@
   "packages/import/dist/acun-datatable-import.min.js": 10900,
   "packages/import/dist/styles.css": 1600,
   "packages/datatable/dist/index.js": 11300,
-  "packages/datatable/dist/acun-datatable.min.js": 49200,
+  "packages/datatable/dist/acun-datatable.min.js": 49500,
   "packages/vue/dist/index.js": 13000,
   "packages/react/dist/index.js": 10900,
   "//imports": "What an app pays for one import alone (bundled, minified, gzipped; React and Vue not counted, chunks loaded later by import() not counted): tree-shaking must keep these small.",
