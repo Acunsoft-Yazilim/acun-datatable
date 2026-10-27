@@ -231,3 +231,49 @@ export function pagingView(
   const { page, pageCount } = table.getPage();
   return { page, pageCount, atStart: page <= 1, atEnd: page >= pageCount, known: table.getTotalRows() !== undefined, items: getPageItems(page, knownPages, items) };
 }
+
+/** The IDs from `a` to `b` (both included) in page order; just `[b]` when `a` is not on the page. */
+export function rangeOf(pageIds: readonly string[], a: string, b: string): string[] {
+  const start = pageIds.indexOf(a);
+  const end = pageIds.indexOf(b);
+  if (start === -1 || end === -1) return [b];
+  return pageIds.slice(Math.min(start, end), Math.max(start, end) + 1);
+}
+
+/** What the selection needs of a table. */
+interface Selectable {
+  getSelectionMode(): string;
+  getSelectionStatus(ids: readonly RowId[]): 'none' | 'some' | 'all';
+  getState(): { readonly selectedIds: readonly RowId[] };
+  selectRows(ids: readonly RowId[]): void;
+  setSelectedRows(ids: readonly RowId[]): void;
+  toggleRow(id: RowId): void;
+}
+
+/** The "select all" box of the page: shown with several rows to pick, checked or partly checked. */
+export function selectAllState(table: Selectable, pageIds: readonly string[]): { readonly show: boolean; readonly checked: boolean; readonly indeterminate: boolean } {
+  const status = table.getSelectionStatus(pageIds);
+  return { show: table.getSelectionMode() === 'multiple' && pageIds.length > 0, checked: status === 'all', indeterminate: status === 'some' };
+}
+
+/** The "select all" box changed: clear the page when all of it is selected, else select it. */
+export function togglePageSelection(table: Selectable, pageIds: readonly string[]): void {
+  if (table.getSelectionStatus(pageIds) === 'all') table.setSelectedRows(withoutIds(table.getState().selectedIds, pageIds));
+  else table.selectRows(pageIds);
+}
+
+/**
+ * A click on a row's checkbox: Shift+click selects (or clears, as the box now
+ * is) every row between the last clicked one and this one; a plain click
+ * toggles the row. Returns the row to count the next range from.
+ */
+export function clickRowCheckbox(table: Selectable, pageIds: readonly string[], anchor: string | undefined, rowId: string, shiftKey: boolean, checked: boolean): string {
+  if (shiftKey && anchor !== undefined && anchor !== rowId && table.getSelectionMode() === 'multiple') {
+    const ids = rangeOf(pageIds, anchor, rowId);
+    if (checked) table.selectRows(ids);
+    else table.setSelectedRows(withoutIds(table.getState().selectedIds, ids));
+  } else {
+    table.toggleRow(rowId);
+  }
+  return rowId;
+}

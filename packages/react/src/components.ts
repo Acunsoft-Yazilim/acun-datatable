@@ -5,13 +5,13 @@ import {
 import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import {
   cellValue, checkPageSizes, checkResponsive, checkSize, resolveLabels, filterControls, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
-  afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
+  afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, closeMenuOnEscape, rowActionsView, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
-  pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, withoutIds, wrapClass,
+  actionsCellClass, cellClass, checkActions, clickRowCheckbox, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
@@ -140,10 +140,10 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   const phase = useStatus(props.status);
   // With virtual scrolling "all" is every matching row, not only those drawn.
   const pageIds = (all ?? page.rows).map(row => row.id);
-  const pageStatus = table.getSelectionStatus(pageIds);
+  const pageSelection = selectAllState(table, pageIds);
   const selectAll = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (selectAll.current) selectAll.current.indeterminate = pageStatus === 'some';
+    if (selectAll.current) selectAll.current.indeterminate = pageSelection.indeterminate;
   });
   // Virtual tables scroll sideways on narrow screens unless told otherwise.
   const responsive = checkResponsive(props.responsive ?? (props.virtual ? 'scroll' : undefined));
@@ -315,12 +315,10 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   if (expandable) head.push(h('td', { className: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }));
   if (selectable) {
     head.push(h('th', { scope: 'col', className: 'adt-select', key: '__select', 'data-lock': '__select', style: lockedWidth('__select') },
-      table.getSelectionMode() === 'multiple' && pageIds.length > 0
+      pageSelection.show
         ? h('label', { className: 'adt-select-all' }, h('input', {
-          type: 'checkbox', ref: selectAll, 'aria-label': labels.selectAll, checked: pageStatus === 'all',
-          onChange: () => (table.getSelectionStatus(pageIds) === 'all'
-            ? table.setSelectedRows(withoutIds(table.getState().selectedIds, pageIds))
-            : table.selectRows(pageIds)),
+          type: 'checkbox', ref: selectAll, 'aria-label': labels.selectAll, checked: pageSelection.checked,
+          onChange: () => togglePageSelection(table, pageIds),
         }), h('span', { className: 'adt-select-all-text', 'aria-hidden': 'true' }, labels.selectAll))
         : null));
   }
@@ -403,15 +401,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
         type: 'checkbox', 'aria-label': labels.selectRow(name), checked: selected, onChange: () => undefined,
         // Shift+click selects (or clears) every row between the last clicked one and this one.
         onClick: (event: MouseEvent<HTMLInputElement>) => {
-          const from = anchor.current;
-          anchor.current = row.id;
-          if (event.shiftKey && from !== undefined && from !== row.id && table.getSelectionMode() === 'multiple') {
-            const ids = rangeOf(pageIds, from, row.id);
-            if (event.currentTarget.checked) table.selectRows(ids);
-            else table.setSelectedRows(withoutIds(table.getState().selectedIds, ids));
-          } else {
-            table.toggleRow(row.id);
-          }
+          anchor.current = clickRowCheckbox(table, pageIds, anchor.current, row.id, event.shiftKey, event.currentTarget.checked);
         },
       })));
     }

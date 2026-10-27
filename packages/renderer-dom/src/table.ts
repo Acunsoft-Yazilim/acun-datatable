@@ -9,11 +9,11 @@ import { autoResponsive } from './auto-responsive';
 import { checkVirtual, virtualWindow } from './virtual';
 import { afterPointerRelease, cellEditor, isEditable, type CellEditor, type EditHandler } from './edit';
 import {
-  actionsCellClass, cellClass, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, numeric, priorityLevels, priorityOf, resizeHandle,
-  responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, withoutIds, wrapClass,
+  actionsCellClass, cellClass, clickRowCheckbox, closeRowMenusOnOutsideClick, rangeOf, selectAllState, togglePageSelection, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, numeric, priorityLevels, priorityOf, resizeHandle,
+  responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, wrapClass,
 } from './table-model';
 
-export { numeric, priorityOf }; // defined with the other shared table logic in table-model.ts
+export { numeric, priorityOf, rangeOf }; // defined with the other shared table logic in table-model.ts
 
 export type { CellFormatter } from './cells';
 
@@ -381,9 +381,9 @@ export function renderTable<TData>(
       if (box) box.checked = selected;
     }
     if (selectAll) {
-      const state = table.getSelectionStatus(pageIds);
-      selectAll.checked = state === 'all';
-      selectAll.indeterminate = state === 'some';
+      const state = selectAllState(table, pageIds);
+      selectAll.checked = state.checked;
+      selectAll.indeterminate = state.indeterminate;
     }
   };
 
@@ -432,14 +432,9 @@ export function renderTable<TData>(
     if (expandable) headRow.append(element(doc, 'td', { class: 'adt-expand-cell' }));
     if (selectable) {
       const th = element(doc, 'th', { scope: 'col', class: 'adt-select' });
-      if (table.getSelectionMode() === 'multiple' && pageIds.length > 0) {
+      if (selectAllState(table, pageIds).show) {
         const box = element(doc, 'input', { type: 'checkbox', 'aria-label': labels.selectAll, 'data-adt-focus': 'select-all' });
-        box.addEventListener('change', () => {
-          if (table.getSelectionStatus(pageIds) === 'all') table.setSelectedRows(withoutIds(table.getState().selectedIds, pageIds));
-          else {
-            table.selectRows(pageIds);
-          }
-        });
+        box.addEventListener('change', () => togglePageSelection(table, pageIds));
         selectAll = box;
         // The text shows only in cards (phones), where the header row is gone; the box keeps its aria-label.
         const label = element(doc, 'label', { class: 'adt-select-all' });
@@ -546,17 +541,7 @@ export function renderTable<TData>(
         });
         box = input;
         // Shift+click selects (or clears) every row between the last clicked one and this one.
-        box.addEventListener('click', event => {
-          const from = anchor;
-          anchor = row.id;
-          if (event.shiftKey && from !== undefined && from !== row.id && table.getSelectionMode() === 'multiple') {
-            const ids = rangeOf(pageIds, from, row.id);
-            if (input.checked) table.selectRows(ids);
-            else table.setSelectedRows(withoutIds(table.getState().selectedIds, ids));
-            return;
-          }
-          table.toggleRow(row.id);
-        });
+        box.addEventListener('click', event => { anchor = clickRowCheckbox(table, pageIds, anchor, row.id, event.shiftKey, input.checked); });
         td.append(input);
         tr.append(td);
       }
@@ -727,10 +712,3 @@ export function renderTable<TData>(
   };
 }
 
-/** The IDs from `a` to `b` (both included) in page order; just `[b]` when `a` is not on the page. */
-export function rangeOf(pageIds: readonly string[], a: string, b: string): string[] {
-  const start = pageIds.indexOf(a);
-  const end = pageIds.indexOf(b);
-  if (start === -1 || end === -1) return [b];
-  return pageIds.slice(Math.min(start, end), Math.max(start, end) + 1);
-}

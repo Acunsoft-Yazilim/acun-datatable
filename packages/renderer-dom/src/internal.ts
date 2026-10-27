@@ -7,6 +7,7 @@ export { checkActions, closeMenuOnEscape, rowActionsView, type ActionView } from
 export { toolbarButtonModel } from './dom';
 export {
   actionsCellClass, cellClass, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels, resizeHandle,
-  pagingView, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, withoutIds, wrapClass,
+  clickRowCheckbox, pagingView, responsiveFlags, selectAllState, showDialog, showSkeleton, skeletonRows, sortView, tableClass, togglePageSelection, totalCells, withoutIds,
+  wrapClass,
   type FrameSource, type TotalCell,
 } from './table-model';

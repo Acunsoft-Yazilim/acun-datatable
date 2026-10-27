@@ -6,13 +6,13 @@ import {
 import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import {
   cellValue, checkPageSizes, checkResponsive, checkSize, resolveLabels, filterControls, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
-  afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
+  afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, closeMenuOnEscape, rowActionsView, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
-  pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, withoutIds, wrapClass,
+  actionsCellClass, cellClass, checkActions, clickRowCheckbox, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
 
@@ -347,14 +347,12 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
       const lockedWidth = (key: string): Record<string, string> | undefined => (lock?.[key] ? { width: `${lock[key]}px` } : undefined);
       if (expandable) head.push(h('td', { class: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }));
       if (props.selectable) {
-        const status = table.getSelectionStatus(pageIds);
+        const selection = selectAllState(table, pageIds);
         head.push(h('th', { scope: 'col', class: 'adt-select', key: '__select', 'data-lock': '__select', style: lockedWidth('__select') },
-          table.getSelectionMode() === 'multiple' && pageIds.length > 0
+          selection.show
             ? [h('label', { class: 'adt-select-all' }, [h('input', {
-              type: 'checkbox', 'aria-label': label.selectAll, checked: status === 'all', indeterminate: status === 'some',
-              onChange: () => (table.getSelectionStatus(pageIds) === 'all'
-                ? table.setSelectedRows(withoutIds(table.getState().selectedIds, pageIds))
-                : table.selectRows(pageIds)),
+              type: 'checkbox', 'aria-label': label.selectAll, checked: selection.checked, indeterminate: selection.indeterminate,
+              onChange: () => togglePageSelection(table, pageIds),
             }), h('span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, label.selectAll)])]
             : []));
       }
@@ -482,15 +480,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
             type: 'checkbox', 'aria-label': label.selectRow(name), checked: selected,
             // Shift+click selects (or clears) every row between the last clicked one and this one.
             onClick: (event: MouseEvent) => {
-              const from = anchor;
-              anchor = row.id;
-              if (event.shiftKey && from !== undefined && from !== row.id && table.getSelectionMode() === 'multiple') {
-                const ids = rangeOf(pageIds, from, row.id);
-                if ((event.currentTarget as HTMLInputElement).checked) table.selectRows(ids);
-                else table.setSelectedRows(withoutIds(table.getState().selectedIds, ids));
-              } else {
-                table.toggleRow(row.id);
-              }
+              anchor = clickRowCheckbox(table, pageIds, anchor, row.id, event.shiftKey, (event.currentTarget as HTMLInputElement).checked);
             },
           })]));
         }
