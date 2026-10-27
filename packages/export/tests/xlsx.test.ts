@@ -156,6 +156,20 @@ describe('readXlsx safety', () => {
   });
 });
 
+describe('dates in the user\'s time zone', () => {
+  it('reads a t="d" day as that local day, and describes a date by its local day', async () => {
+    const { importRows } = await import('../src/index');
+    const bytes = writeZip([
+      { name: 'xl/workbook.xml', data: new TextEncoder().encode('<workbook><sheets><sheet name="S" sheetId="1"/></sheets></workbook>') },
+      { name: 'xl/worksheets/sheet1.xml', data: new TextEncoder().encode('<worksheet><sheetData><row><c r="A1" t="str"><v>Day</v></c></row><row><c r="A2" t="d"><v>2026-10-23</v></c></row></sheetData></worksheet>') },
+    ]);
+    const sheet = await readXlsx(bytes);
+    expect(sheet.rows[0]![0]).toEqual(new Date(2026, 9, 23)); // local midnight, not UTC's
+    const result = importRows({ headers: ['Day'], rows: [[new Date(2026, 9, 23)]] }, [{ id: 'day', header: 'Day', accessorKey: 'day', type: 'number' }]);
+    expect(result.errors[0]!.value).toBe('2026-10-23'); // not 2026-10-22T21:00:00.000Z in Turkey
+  });
+});
+
 describe('text that looks like an escape', () => {
   it('reads back exactly, _x0041_ included', async () => {
     const sheet: Sheet = { headers: ['Note'], rows: [['_x0041_ literal'], ['a_x0041_b_x00'], ['_x005F_']] };

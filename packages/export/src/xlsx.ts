@@ -373,7 +373,9 @@ export function rowCells(xml: string, shared: readonly string[], parts: Workbook
       case 'str': cell = value ?? null; break;
       case 'b': cell = value === undefined ? null : value === '1' || value === 'true'; break;
       case 'e': cell = null; break; // #N/A, #DIV/0!: no value
-      case 'd': cell = value === undefined || Number.isNaN(Date.parse(value)) ? null : new Date(value); break;
+      // ISO text; a day without a time is that day here (new Date('2026-10-23') would be UTC midnight).
+      case 'd': cell = value === undefined || Number.isNaN(Date.parse(value)) ? null
+        : /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, Number(value.slice(8, 10))) : new Date(value); break;
       default: {
         if (value === undefined || value.trim() === '') break;
         const number = Number(value);
