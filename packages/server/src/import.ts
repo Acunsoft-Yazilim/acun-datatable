@@ -227,8 +227,8 @@ export function memoryImportStore(): ImportStore {
 
 /**
  * A store in a folder (`node:fs`): state, files and keys survive restarts and
- * are shared by processes on one machine. Expired entries are removed when
- * read; delete old folders from time to time (a cron, `find -mtime +1`).
+ * are shared by processes on one machine. An import's files expire with its
+ * state; delete old folders from time to time (a cron, `find -mtime +1`).
  */
 export function directoryImportStore(directory: string): ImportStore {
   const fs = import('node:fs/promises');
@@ -253,7 +253,9 @@ export function directoryImportStore(directory: string): ImportStore {
     get: id => readJson<StoredImport>(path(id, 'state.json')),
     put: (state, keepMs) => write(path(state.id, 'state.json'), JSON.stringify({ until: Date.now() + keepMs, value: state })),
     putFile: (id, name, bytes) => write(path(id, name), bytes),
+    // A file lives as long as its import: once the state has expired, its files are gone too.
     getFile: async (id, name) => {
+      if (!(await readJson<StoredImport>(path(id, 'state.json')))) return undefined;
       try { return new Uint8Array(await (await fs).readFile(path(id, name))); } catch { return undefined; }
     },
     deleteFile: async (id, name) => { await (await fs).rm(path(id, name), { force: true }); },

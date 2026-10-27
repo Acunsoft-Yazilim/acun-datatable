@@ -311,6 +311,25 @@ describe('memoryImportStore', () => {
   });
 });
 
+describe('directoryImportStore', () => {
+  it('keeps an import\'s files only as long as its state', async () => {
+    vi.useFakeTimers();
+    try {
+      const folder = mkdtempSync(`${tmpdir()}/adt-import-`);
+      folders.push(folder);
+      const store = directoryImportStore(folder);
+      const state = { id: 'imp_x', status: 'mapping' } as unknown as Parameters<typeof store.put>[0];
+      await store.putFile('imp_x', 'source', new Uint8Array([1, 2]), 1_000);
+      await store.put(state, 1_000);
+      expect(await store.getFile('imp_x', 'source')).toEqual(new Uint8Array([1, 2]));
+      vi.advanceTimersByTime(2_000);
+      expect(await store.getFile('imp_x', 'source')).toBeUndefined(); // expired with the import
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('two starts at once (a double click, a retry)', () => {
   const twoStarts = async (first: typeof globalThis.fetch, second: typeof globalThis.fetch) => {
     const uploaded = await (await upload(first, csv('Customer\nAyşe\nAli\nCan'))).json() as { id: string };
