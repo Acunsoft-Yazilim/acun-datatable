@@ -11,7 +11,8 @@ import {
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, closeLikeAMenu, columnSpan, frameThrottle, layoutKey, priorityLevels, responsiveFlags, skeletonRows, tableClass, withoutIds, wrapClass,
+  actionsCellClass, cellClass, checkActions, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, hideDialog, layoutKey, priorityLevels, responsiveFlags,
+  showDialog, skeletonRows, tableClass, withoutIds, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
 
@@ -179,19 +180,9 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
     const dialog = shallowRef<HTMLDialogElement | null>(null);
     const openDialog = (id: string): void => {
       dialogRow.value = id;
-      void nextTick(() => {
-        const node = dialog.value;
-        if (node && !node.open) {
-          if (typeof node.showModal === 'function') node.showModal();
-          else node.setAttribute('open', '');
-        }
-      });
+      void nextTick(() => showDialog(dialog.value));
     };
-    const closeDialog = (): void => {
-      const node = dialog.value;
-      if (node?.open && typeof node.close === 'function') node.close();
-      else node?.removeAttribute('open');
-    };
+    const closeDialog = (): void => hideDialog(dialog.value);
     const onDialogClose = (): void => {
       const id = dialogRow.value;
       dialogRow.value = undefined;
@@ -199,14 +190,9 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
       const buttons = dialog.value?.closest('.adt-table-wrap')?.querySelectorAll<HTMLElement>('.adt-expand') ?? [];
       [...buttons].find(button => button.dataset['row'] === id)?.focus();
     };
-    // One listener closes any open row "⋮" menu on a click outside it.
     const wrapEl = shallowRef<HTMLElement | null>(null);
-    const closeMenus = (event: Event): void => {
-      wrapEl.value?.querySelectorAll<HTMLDetailsElement>('.adt-row-menu[open]').forEach(menu => {
-        if (!event.composedPath().includes(menu)) menu.open = false;
-      });
-    };
-    onMounted(() => document.addEventListener('click', closeMenus));
+    let stopMenus: (() => void) | undefined;
+    onMounted(() => { stopMenus = closeRowMenusOnOutsideClick(document, () => wrapEl.value); });
     // Fixed columns: sticky offsets measured after every render.
     let unpin: (() => void) | undefined;
     watch([wrapEl, () => props.fixedColumns?.start, () => props.fixedColumns?.end], ([node]) => {
@@ -325,7 +311,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
     };
     onUpdated(mountEditor);
     onScopeDispose(closeEditor);
-    onScopeDispose(() => { if (typeof document !== 'undefined') document.removeEventListener('click', closeMenus); });
+    onScopeDispose(() => stopMenus?.());
     // Close the dialog when its row leaves the page (scrolled virtually: the matching rows).
     watch(() => binding.page.value, page => {
       const rows = props.virtual ? props.table.getFilteredRows() : page.rows;

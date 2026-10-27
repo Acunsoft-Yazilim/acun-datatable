@@ -136,3 +136,28 @@ export function closeLikeAMenu(details: HTMLDetailsElement): () => void {
     doc.removeEventListener('click', outside);
   };
 }
+
+/** Open a modal `<dialog>` (the `open` attribute where `showModal` is missing). */
+export function showDialog(dialog: HTMLDialogElement | null | undefined): void {
+  if (!dialog || dialog.open) return;
+  if (typeof dialog.showModal === 'function') dialog.showModal();
+  else dialog.setAttribute('open', '');
+}
+
+/** Close a `<dialog>` (removing `open` where `close` is missing). */
+export function hideDialog(dialog: HTMLDialogElement | null | undefined): void {
+  if (!dialog) return;
+  if (dialog.open && typeof dialog.close === 'function') dialog.close();
+  else dialog.removeAttribute('open');
+}
+
+/** One listener closes any open row "⋮" menu inside `root()` on a click outside it. Returns the stop. */
+export function closeRowMenusOnOutsideClick(doc: Document, root: () => ParentNode | null | undefined): () => void {
+  const close = (event: Event): void => {
+    root()?.querySelectorAll<HTMLDetailsElement>('.adt-row-menu[open]').forEach(menu => {
+      if (!event.composedPath().includes(menu)) menu.open = false;
+    });
+  };
+  doc.addEventListener('click', close);
+  return () => doc.removeEventListener('click', close);
+}

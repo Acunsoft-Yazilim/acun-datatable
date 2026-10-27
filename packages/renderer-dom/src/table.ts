@@ -9,7 +9,8 @@ import { autoResponsive } from './auto-responsive';
 import { checkVirtual, virtualWindow } from './virtual';
 import { afterPointerRelease, cellEditor, isEditable, type CellEditor, type EditHandler } from './edit';
 import {
-  actionsCellClass, cellClass, columnSpan, frameThrottle, layoutKey, numeric, priorityLevels, priorityOf, responsiveFlags, skeletonRows, tableClass, withoutIds, wrapClass,
+  actionsCellClass, cellClass, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, hideDialog, layoutKey, numeric, priorityLevels, priorityOf, responsiveFlags, showDialog,
+  skeletonRows, tableClass, withoutIds, wrapClass,
 } from './table-model';
 
 export { numeric, priorityOf }; // defined with the other shared table logic in table-model.ts
@@ -243,13 +244,7 @@ export function renderTable<TData>(
   const notice = element(doc, 'div', { class: 'adt-notice', role: 'status', 'aria-live': 'polite' });
   root.append(notice, scroller);
   container.replaceChildren(root);
-  // One listener closes any open row "⋮" menu on a click outside it.
-  const closeMenus = (event: Event): void => {
-    root.querySelectorAll<HTMLDetailsElement>('.adt-row-menu[open]').forEach(menu => {
-      if (!event.composedPath().includes(menu)) menu.open = false;
-    });
-  };
-  doc.addEventListener('click', closeMenus);
+  const stopMenus = closeRowMenusOnOutsideClick(doc, () => root);
 
   // Rows whose details are open (kept across re-renders).
   const expanded = new Set<string>();
@@ -300,11 +295,7 @@ export function renderTable<TData>(
   // Responsive modal: one dialog, filled for the row whose button was pressed.
   let dialog: HTMLDialogElement | undefined;
   let dialogRow: string | undefined;
-  const closeDialog = (): void => {
-    if (!dialog) return;
-    if (typeof dialog.close === 'function' && dialog.open) dialog.close();
-    else dialog.removeAttribute('open');
-  };
+  const closeDialog = (): void => hideDialog(dialog);
   const detailList = (row: Row<TData>, cells: readonly string[], columns: readonly ColumnDef<TData>[], all: boolean): HTMLDListElement => {
     const list = element(doc, 'dl', { class: 'adt-detail-list' });
     columns.forEach((column, index) => {
@@ -344,10 +335,7 @@ export function renderTable<TData>(
     head.append(element(doc, 'h2', { class: 'adt-dialog-title', id: `${uid}-dialog-title` }, labels.details(nameOf(row, cells))), close);
     dialog.replaceChildren(head, detailList(row, cells, columns, true), ...(detailOf ? [detailContent(row)] : []));
     dialogRow = row.id;
-    if (!dialog.open) {
-      if (typeof dialog.showModal === 'function') dialog.showModal();
-      else dialog.setAttribute('open', '');
-    }
+    showDialog(dialog);
   };
 
   // The cell being edited in place (the editor element moves into each re-render).
@@ -753,7 +741,7 @@ export function renderTable<TData>(
       unpin();
       stopAuto();
       stopTools();
-      doc.removeEventListener('click', closeMenus);
+      stopMenus();
       root.remove();
     },
   };

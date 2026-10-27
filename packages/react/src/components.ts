@@ -10,7 +10,8 @@ import {
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, closeLikeAMenu, columnSpan, frameThrottle, layoutKey, priorityLevels, responsiveFlags, skeletonRows, tableClass, withoutIds, wrapClass,
+  actionsCellClass, cellClass, checkActions, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, hideDialog, layoutKey, priorityLevels, responsiveFlags,
+  showDialog, skeletonRows, tableClass, withoutIds, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
@@ -158,15 +159,8 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   const anchor = useRef<string | undefined>(undefined);
   const dialogVisible = dialogRow !== undefined && pageIds.includes(dialogRow);
   useEffect(() => {
-    const node = dialog.current;
-    if (!node) return;
-    if (dialogVisible && !node.open) {
-      if (typeof node.showModal === 'function') node.showModal();
-      else node.setAttribute('open', '');
-    } else if (!dialogVisible && node.open) {
-      if (typeof node.close === 'function') node.close();
-      else node.removeAttribute('open');
-    }
+    if (dialogVisible) showDialog(dialog.current);
+    else if (dialog.current?.open) hideDialog(dialog.current);
   }, [dialogVisible]);
   // Fixed columns: sticky offsets measured after every render.
   const fixed = checkFixedColumns(props.fixedColumns);
@@ -262,21 +256,8 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
     const height = wrap.current?.querySelector<HTMLElement>('tbody .adt-row')?.getBoundingClientRect().height ?? 0;
     if (height > 0) setMeasuredRow(height);
   });
-  // One listener closes any open row "⋮" menu on a click outside it.
-  useEffect(() => {
-    const close = (event: Event): void => {
-      wrap.current?.querySelectorAll<HTMLDetailsElement>('.adt-row-menu[open]').forEach(menu => {
-        if (!event.composedPath().includes(menu)) menu.open = false;
-      });
-    };
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
-  }, []);
-  const closeDialog = (): void => {
-    const node = dialog.current;
-    if (node?.open && typeof node.close === 'function') node.close();
-    else node?.removeAttribute('open');
-  };
+  useEffect(() => closeRowMenusOnOutsideClick(document, () => wrap.current), []);
+  const closeDialog = (): void => hideDialog(dialog.current);
   const onDialogClose = (): void => {
     const id = dialogRow;
     setDialogRow(undefined);
