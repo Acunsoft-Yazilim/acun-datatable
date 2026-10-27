@@ -277,8 +277,27 @@ describe('loading', () => {
     vi.stubGlobal('fetch', json({ message: 'boom' }, 500));
     const dt = new AcunDataTable('#orders', { serverSide: true, ajax: '/api/orders' });
     await expect(dt.ready).rejects.toThrow();
-    expect(document.querySelector('.adt-notice[role="alert"]')!.textContent).toBe('The data could not be loaded.');
+    expect(document.querySelector('.adt-notice[role="alert"] .adt-notice-text')!.textContent).toBe('The data could not be loaded.');
     expect(document.querySelector('.adt-skeleton')).toBeNull();
+  });
+
+  it('loads again from the start after a failed first load: Retry and reload(), server and client side', async () => {
+    for (const serverSide of [true, false]) {
+      document.body.innerHTML = '<div id="orders"></div>';
+      let down = true;
+      const fetch = vi.fn(async () => (down ? new Response('{}', { status: 500 }) : new Response(JSON.stringify(serverSide ? { rows: orders.slice(0, 5), totalRows: 30 } : orders), { headers: { 'Content-Type': 'application/json' } })));
+      vi.stubGlobal('fetch', fetch);
+      const dt = new AcunDataTable('#orders', { serverSide, ajax: '/api/orders', pagination: { pageSize: 5 } });
+      await expect(dt.ready).rejects.toThrow();
+      document.querySelector<HTMLButtonElement>('.adt-notice .adt-retry')!.click(); // fails again: no unhandled rejection
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+      down = false;
+      await dt.reload();
+      expect(dt.table).toBeDefined();
+      expect(document.querySelectorAll('tbody .adt-row')).toHaveLength(5); // the table is there, with its rows
+      expect(String((fetch.mock.calls.at(-1) as unknown as [string])[0])).toContain(serverSide ? 'page=1' : '/api/orders');
+      dt.destroy();
+    }
   });
 });
 

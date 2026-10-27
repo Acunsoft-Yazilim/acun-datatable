@@ -236,10 +236,11 @@ describe('renderTable second-review additions', () => {
     expect(() => renderTable(host, make(), { rowLabel: 'x' as never })).toThrow('rowLabel must be a function');
   });
 
-  it('shows loading with aria-busy and an error with a retry button', () => {
+  it('shows loading with aria-busy and an error with a retry button', async () => {
     let state: { status: 'idle' | 'loading' | 'success' | 'error'; error?: unknown } = { status: 'loading' };
     const listeners = new Set<(s: typeof state) => void>();
-    const retry = vi.fn();
+    let retries = 0;
+    const retry = (): Promise<void> => { retries += 1; return Promise.reject(new Error('still down')); }; // fails again (no vi.fn: it would handle the rejection)
     const status = { getState: () => state, subscribe: (l: (s: typeof state) => void) => { listeners.add(l); return () => listeners.delete(l); }, retry };
     const set = (next: typeof state) => { state = next; listeners.forEach(l => l(state)); };
     const rendered = renderTable(host, make(), { status, labels: labelsTr });
@@ -252,8 +253,13 @@ describe('renderTable second-review additions', () => {
     expect(wrap.getAttribute('aria-busy')).toBe('false');
     expect(notice.getAttribute('role')).toBe('alert');
     expect(notice.hasAttribute('aria-live')).toBe(false); // assertive, as role="alert" is
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
     host.querySelector<HTMLButtonElement>('.adt-retry')!.click();
-    expect(retry).toHaveBeenCalledTimes(1);
+    expect(retries).toBe(1);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled(); // the failed retry shows as the error state, nothing else
     set({ status: 'success' });
     expect(notice.textContent).toBe('');
     expect(notice.getAttribute('aria-live')).toBe('polite'); // a status again

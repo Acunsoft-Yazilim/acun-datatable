@@ -648,7 +648,8 @@ export function renderTable<TData>(
       const parts: HTMLElement[] = [element(doc, 'span', { class: 'adt-notice-text' }, labels.error)];
       if (typeof status.retry === 'function') {
         const retry = element(doc, 'button', { type: 'button', class: 'adt-retry' }, labels.retry);
-        retry.addEventListener('click', () => { void status.retry!(); });
+        // A retry that fails shows as the error state again; its rejection is no unhandled error.
+        retry.addEventListener('click', () => { Promise.resolve(status.retry!()).catch(() => undefined); });
         parts.push(retry);
       }
       notice.replaceChildren(...parts);

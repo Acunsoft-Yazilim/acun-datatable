@@ -278,6 +278,8 @@ export class AcunDataTable {
   /** The columns' `render` and `cell` options, as the renderer gets them (for printing). */
   #format: Record<string, CellFormatter<Data>> = {};
   #cells: Record<string, CellRenderer<Data>> = {};
+  /** Load from the start again: what reload() does while no table could be made yet. */
+  #begin: (() => Promise<void>) | undefined;
   /** Rows without an ID field: an ID per row object (selection then lasts while the rows do). */
   #rowIds = new WeakMap<object, string>();
 
@@ -309,13 +311,14 @@ export class AcunDataTable {
       this.element = node;
     }
 
-    this.ready = this.#start(columns, rows).catch(error => {
+    this.#begin = () => this.#start(columns, rows).catch(error => {
       if (!this.#destroyed) {
         this.#loader?.fail(error);
         if (!this.table) this.#pending(true); // failed before the columns were known
       }
       throw error;
     });
+    this.ready = this.#begin();
     this.ready.catch(() => undefined); // reported through the loading state; callers may still await it
   }
 
@@ -461,6 +464,11 @@ export class AcunDataTable {
     if (options.processing === false) return;
     const labels = resolveLabels(options.language, options.labels);
     const notice = el('div', { class: 'adt-notice', role: failed ? 'alert' : 'status' }, el('span', { class: 'adt-notice-text' }, failed ? labels.error : labels.loading));
+    if (failed) {
+      const retry = el('button', { type: 'button', class: 'adt-retry' }, labels.retry);
+      retry.addEventListener('click', () => { this.reload().catch(() => undefined); }); // shown again if it fails
+      notice.append(retry);
+    }
     const rows = failed || options.skeleton === false ? [] : Array.from({ length: Math.min(pageSizeOf(options), 10) }, () =>
       el('tr', { class: 'adt-row adt-skeleton-row' }, ...Array.from({ length: 4 }, () => el('td', {}, el('span', { class: 'adt-skeleton' })))));
     const wrap = el('div', { class: `adt-table-wrap${rows.length > 0 ? ' adt-skeleton-on' : ''}` },
@@ -685,6 +693,8 @@ export class AcunDataTable {
   /** Load the rows again: the current page from the server, or every row from `ajax`. */
   async reload(): Promise<void> {
     if (this.#runner) return this.#runner.retry();
+    // The first load failed before the columns were known: no table yet, so start over.
+    if (!this.table && this.#begin) return this.#begin();
     const ajax = typeof this.#options.ajax === 'string' ? { url: this.#options.ajax } : this.#options.ajax;
     if (!ajax) return;
     try {

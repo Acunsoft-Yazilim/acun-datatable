@@ -528,7 +528,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
           ? h('div', { class: 'adt-notice', role: 'alert' }, [
             h('span', { class: 'adt-notice-text' }, label.error),
             typeof props.status?.retry === 'function'
-              ? h('button', { type: 'button', class: 'adt-retry', onClick: () => { void props.status!.retry!(); } }, label.retry)
+              ? h('button', { type: 'button', class: 'adt-retry', onClick: () => { Promise.resolve(props.status!.retry!()).catch(() => undefined); } }, label.retry)
               : null,
           ])
           : h('div', { class: 'adt-notice', role: 'status', 'aria-live': 'polite' });

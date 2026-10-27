@@ -443,7 +443,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
       ? h('div', { className: 'adt-notice', role: 'alert' },
         h('span', { className: 'adt-notice-text' }, labels.error),
         typeof props.status?.retry === 'function'
-          ? h('button', { type: 'button', className: 'adt-retry', onClick: () => { void props.status!.retry!(); } }, labels.retry)
+          ? h('button', { type: 'button', className: 'adt-retry', onClick: () => { Promise.resolve(props.status!.retry!()).catch(() => undefined); } }, labels.retry)
           : null)
       : h('div', { className: 'adt-notice', role: 'status', 'aria-live': 'polite' });
   const height = scrollHeight(props.scrollY) ?? (virtual ? '480px' : undefined);
