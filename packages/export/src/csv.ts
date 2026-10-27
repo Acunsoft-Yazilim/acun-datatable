@@ -26,6 +26,7 @@ export function cellText(cell: SheetCell, type?: string): string {
   if (typeof cell === 'number') return String(cell);
   if (typeof cell === 'boolean') return cell ? 'true' : 'false';
   if (isDecimal(cell)) return cell.text;
+  if (Number.isNaN(cell.getTime())) return ''; // an invalid Date, not "NaN-NaN-NaN"
   const day = `${String(cell.getFullYear()).padStart(4, '0')}-${pad(cell.getMonth() + 1)}-${pad(cell.getDate())}`;
   if (type === 'date') return day;
   return `${day} ${pad(cell.getHours())}:${pad(cell.getMinutes())}:${pad(cell.getSeconds())}`;

@@ -271,9 +271,10 @@ function columnIndex(ref: string): number | undefined {
   return index - 1;
 }
 
-function fromSerial(value: number, date1904: boolean): Date {
-  const ms = Math.round(value * 86_400) * 1000 + (date1904 ? EPOCH_1904 : EPOCH_1900);
-  const utc = new Date(ms);
+/** A date-styled number as a local date; one past any date (`9e300`) stays the number. */
+function fromSerial(value: number, date1904: boolean): Date | number {
+  const utc = new Date(Math.round(value * 86_400) * 1000 + (date1904 ? EPOCH_1904 : EPOCH_1900));
+  if (Number.isNaN(utc.getTime())) return value;
   return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate(), utc.getUTCHours(), utc.getUTCMinutes(), utc.getUTCSeconds());
 }
 

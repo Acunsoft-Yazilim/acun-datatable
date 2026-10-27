@@ -131,7 +131,7 @@ function convert(cell: SheetCell, type: ColumnType | undefined, options: ImportO
 }
 
 const describe = (cell: SheetCell): string => (cell === null ? '' : isDecimal(cell) ? cell.text
-  : cell instanceof Date ? cell.toISOString() : String(cell)).slice(0, 200);
+  : cell instanceof Date ? (Number.isNaN(cell.getTime()) ? '' : cell.toISOString()) : String(cell)).slice(0, 200);
 
 /**
  * Read a sheet (from `parseCsv` or `readXlsx`) into typed values for the

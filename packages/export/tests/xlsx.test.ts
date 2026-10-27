@@ -181,6 +181,21 @@ describe('reading damaged sheets', () => {
     });
   }
 
+  it('keeps a date-styled number past any date as the number, and importRows reports it', async () => {
+    const { importRows } = await import('../src/index');
+    const bytes = writeZip([
+      { name: 'xl/workbook.xml', data: new TextEncoder().encode('<workbook><sheets><sheet name="S" sheetId="1"/></sheets></workbook>') },
+      { name: 'xl/styles.xml', data: new TextEncoder().encode('<styleSheet><cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>') },
+      { name: 'xl/worksheets/sheet1.xml', data: new TextEncoder().encode('<worksheet><sheetData><row><c r="A1" t="str"><v>Day</v></c></row><row><c r="A2" s="1"><v>9e300</v></c></row><row><c r="A3" s="1"><v>45953</v></c></row></sheetData></worksheet>') },
+    ]);
+    const sheet = await readXlsx(bytes);
+    expect(sheet.rows[0]).toEqual([9e300]); // not an Invalid Date
+    expect(sheet.rows[1]![0]).toEqual(new Date(2025, 9, 23));
+    const result = importRows(sheet, [{ id: 'day', header: 'Day', accessorKey: 'day', type: 'date' }]);
+    expect(result.rows.map(row => row.values['day'])).toEqual([new Date(2025, 9, 23)]);
+    expect(result.errors).toMatchObject([{ line: 2, column: 'day' }]); // reported, not thrown
+  });
+
   it('still reads a well-formed sheet as before, prefixes and empty elements included', async () => {
     const bytes = workbook('<x:row><x:c r="A1" t="inlineStr"><x:is><x:t>Ad</x:t><x:rPh><x:t>ignored</x:t></x:rPh></x:is></x:c><x:c r="B1" t="str"><x:v>Şehir</x:v></x:c></x:row><row/><row><c r="A2" t="str"><v>Ayşe</v></c><c r="B2"/></row>');
     expect(await readXlsx(bytes)).toEqual({ headers: ['Ad', 'Şehir'], rows: [['Ayşe', null]] });
