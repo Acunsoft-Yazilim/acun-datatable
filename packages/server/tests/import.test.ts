@@ -191,6 +191,28 @@ describe('createImportHandler', () => {
     expect((await fetch(`${URL_BASE}/${id}`, { method: 'DELETE', headers: as('u1') })).status).toBe(409);
   });
 
+  it('run again by a worker after a crash, goes on after the rows saved before', async () => {
+    const jobs: (() => Promise<void>)[] = [];
+    const lines: number[] = [];
+    let calls = 0;
+    const { fetch, handler } = setup({
+      background: () => true, schedule: run => { jobs.push(run); },
+      save: async (rows, context) => {
+        if (++calls === 2) return new Promise<void>(() => {}); // the worker dies while saving the second chunk
+        lines.push(...rows.map(row => row.line));
+        context.inserted(rows.length);
+      },
+    });
+    const { id } = await (await upload(fetch, csv(`Customer\n${Array.from({ length: 8 }, (_, i) => `C${i}`).join('\n')}\n`))).json() as { id: string };
+    await start(fetch, id, { mapping: ['customer'], mode: 'insert' });
+    void jobs[0]!();
+    await vi.waitFor(() => expect(calls).toBe(2));
+    expect(await (await fetch(`${URL_BASE}/${id}`, { headers: as('u1') })).json()).toMatchObject({ status: 'running', processed: 3, inserted: 3 });
+    await handler.process(id); // the queue runs it again
+    expect(await (await fetch(`${URL_BASE}/${id}`, { headers: as('u1') })).json()).toMatchObject({ status: 'done', processed: 8, inserted: 8, failed: 0 });
+    expect(lines).toEqual([2, 3, 4, 5, 6, 7, 8, 9]); // each line once
+  });
+
   it('a save() that throws fails the import as a whole, with a general message', async () => {
     const onError = vi.fn();
     const { fetch } = setup({ save: () => { throw new Error('database is down: secret details'); }, onError });

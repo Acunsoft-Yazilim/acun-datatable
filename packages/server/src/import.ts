@@ -405,14 +405,20 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
       const sheet = await read(bytes, state.extension, chunkSize);
       // The user's mapping as headers the reader knows (column IDs); file columns left out get none.
       const headers = state.mapping.map(column => column ?? '');
+      // A run again (a worker's retry after a crash) goes on after the rows saved before; the
+      // error report then lists the problems of this run (the first 100 are kept in the state).
+      const saved = state.processed;
       let start = 0;
       for await (const rows of sheet.chunks) {
+        const skip = Math.min(rows.length, Math.max(0, saved - start));
+        if (skip === rows.length) { start += rows.length; continue; }
         if (cancelled.has(id) || (await store.get(id))?.status === 'cancelled') { cancelled.add(id); break; }
-        const result = importRows({ headers, rows }, definitions, { required, maxErrors: Number.MAX_SAFE_INTEGER, ...options.read });
+        const from = start + skip;
+        const result = importRows({ headers, rows: skip > 0 ? rows.slice(skip) : rows }, definitions, { required, maxErrors: Number.MAX_SAFE_INTEGER, ...options.read });
         rejected = [];
-        await options.save(result.rows.map(row => ({ line: row.line + start, values: row.values })), context);
+        await options.save(result.rows.map(row => ({ line: row.line + from, values: row.values })), context);
         const problems = [
-          ...result.errors.map((issue: ImportIssue) => ({ line: issue.line + start, ...(issue.column ? { column: issue.column } : {}), ...(issue.value ? { value: issue.value } : {}), code: issue.code, message: issue.message })),
+          ...result.errors.map((issue: ImportIssue) => ({ line: issue.line + from, ...(issue.column ? { column: issue.column } : {}), ...(issue.value ? { value: issue.value } : {}), code: issue.code, message: issue.message })),
           ...rejected,
         ];
         for (const error of problems) report.push([String(error.line), error.column ? titles.get(error.column) ?? error.column : '', error.value ?? '', error.message].map(csvCell).join(','));
