@@ -4,7 +4,7 @@ import {
 } from 'react';
 import { COLUMN_WIDTH_LIMITS, getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
 import {
-  cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
+  cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, resolveLabels, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
   afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
@@ -860,7 +860,9 @@ export function DataTableLayout<TData>(props: DataTableLayoutProps<TData>): Reac
     pageSizes, search = true, searchPlaceholder, debounceMs, filters = true, columnToggle = true, tools = [], bulkActions = [], filterPanel, toolbarButtons,
     paging = {}, topStart, topEnd, bottomStart, bottomEnd, size = 'md', ...tableProps
   } = props;
-  const { table, labels, locale = 'en' } = props;
+  const { table, locale = 'en' } = props;
+  // The texts of `locale` (tr, de, fr, es), with `labels` over them, as renderDataTable does.
+  const labels = resolveLabels(locale, props.labels);
   const hasFilters = filters && filterControls(table.getColumns()).length > 0;
   const bar = (position: 'top' | 'bottom', start: ReactNode[], end: ReactNode[]): ReactElement =>
     h('div', { className: `adt-bar adt-${position}` }, h('div', { className: 'adt-bar-start' }, ...start), h('div', { className: 'adt-bar-end' }, ...end));
@@ -879,7 +881,7 @@ export function DataTableLayout<TData>(props: DataTableLayoutProps<TData>): Reac
     hasFilters ? h(FilterChips, { table, locale, ...(labels ? { labels } : {}) }) : null,
     // The selection bar (count, "select all N matching", clear, bulk actions) with any selectable table.
     props.selectable || bulkActions.length > 0 ? h(BulkActions<TData>, { table, actions: bulkActions, ...(labels ? { labels } : {}) }) : null,
-    h(DataTable<TData>, tableProps as DataTableProps<TData>),
+    h(DataTable<TData>, { ...tableProps, labels } as DataTableProps<TData>),
     bar('bottom', [h(PageInfo, { key: 'info', table, all: Boolean(props.virtual), ...(labels ? { labels } : {}) }), bottomStart ?? null],
       [bottomEnd ?? null, props.virtual ? null : h(Pagination, { key: 'paging', table, locale, ...paging, ...(labels ? { labels } : {}) })]));
 }

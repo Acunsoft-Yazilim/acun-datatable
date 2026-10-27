@@ -766,3 +766,15 @@ describe('option checks, as the DOM renderer and React', () => {
     expect(String(await failure({ rowActions: [{ id: 'a', label: 'A', onSelect: () => undefined }, { id: 'a', label: 'B', onSelect: () => undefined }] }))).toContain('duplicate action id "a"');
   });
 });
+
+describe('AcunDataTableLayout locale', () => {
+  it('shows the texts of its locale, as renderDataTable does; labels still win', async () => {
+    await mount(() => h(AcunDataTableLayout, { table: make(), locale: 'tr' }));
+    expect(host.querySelector('.adt-columns summary')!.textContent).toBe('Kolonlar');
+    expect(host.querySelector('.adt-search .adt-sr-only')!.textContent).toBe('Ara');
+    app!.unmount();
+    await mount(() => h(AcunDataTableLayout, { table: make(), locale: 'de-DE', labels: { columns: 'Felder' } }));
+    expect(host.querySelector('.adt-columns summary')!.textContent).toBe('Felder');
+    expect(host.querySelector('.adt-search .adt-sr-only')!.textContent).toBe('Suchen');
+  });
+});

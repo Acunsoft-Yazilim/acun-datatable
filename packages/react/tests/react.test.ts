@@ -688,3 +688,16 @@ describe('option checks, as the DOM renderer', () => {
     expect(actions([{ id: '1x', label: 'Edit', onSelect: () => undefined }])).toThrow('id must start with a letter');
   });
 });
+
+describe('DataTableLayout locale', () => {
+  it('shows the texts of its locale, as renderDataTable does; labels still win', () => {
+    render(h(DataTableLayout<Order>, { table: make(), locale: 'tr' }));
+    expect(host.querySelector('.adt-columns summary')!.textContent).toBe('Kolonlar');
+    expect(host.querySelector('.adt-search .adt-sr-only')!.textContent).toBe('Ara');
+    act(() => root!.unmount());
+    root = undefined;
+    render(h(DataTableLayout<Order>, { table: make(), locale: 'de-DE', labels: { columns: 'Felder' } }));
+    expect(host.querySelector('.adt-columns summary')!.textContent).toBe('Felder');
+    expect(host.querySelector('.adt-search .adt-sr-only')!.textContent).toBe('Suchen');
+  });
+});

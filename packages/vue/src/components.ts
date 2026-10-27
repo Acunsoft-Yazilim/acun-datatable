@@ -5,7 +5,7 @@ import {
 } from 'vue';
 import { COLUMN_WIDTH_LIMITS, getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
 import {
-  cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
+  cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, resolveLabels, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
   afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
@@ -973,7 +973,9 @@ export const AcunDataTableLayout = /*#__PURE__*/ defineComponent({
   },
   setup(props, { attrs, slots }) {
     return (): VNode => {
-      const common = { table: props.table, labels: props.labels };
+      // The texts of `locale` (tr, de, fr, es), with `labels` over them, as renderDataTable does.
+      const labels = resolveLabels(props.locale, props.labels);
+      const common = { table: props.table, labels };
       const hasFilters = props.filters && filterControls(props.table.getColumns()).length > 0;
       const tableSlots = Object.fromEntries(Object.entries(slots).filter(([name]) => name === 'cell' || name === 'empty' || name === 'detail' || name.startsWith('cell-')));
       const bar = (position: 'top' | 'bottom', start: (VNode | null | VNode[] | undefined)[], end: (VNode | null | VNode[] | undefined)[]): VNode =>
@@ -987,7 +989,7 @@ export const AcunDataTableLayout = /*#__PURE__*/ defineComponent({
           slots['top-end']?.(),
           hasFilters ? h(AcunFilters, { ...common, locale: props.locale, panel: props.filterPanel, ...(props.toolbarButtons.filters ? { button: props.toolbarButtons.filters } : {}) }) : null,
           props.columnToggle ? h(AcunColumnToggle, { ...common, reorderable: props.reorderableColumns, ...(props.toolbarButtons.columns ? { button: props.toolbarButtons.columns } : {}) }) : null,
-          props.tools.length > 0 ? h(AcunTools, { items: props.tools, labels: props.labels, ...(props.toolbarButtons.tools ? { button: props.toolbarButtons.tools } : {}) }) : null,
+          props.tools.length > 0 ? h(AcunTools, { items: props.tools, labels, ...(props.toolbarButtons.tools ? { button: props.toolbarButtons.tools } : {}) }) : null,
         ]),
         hasFilters ? h(AcunFilterChips, { ...common, locale: props.locale }) : null,
         // The selection bar (count, "select all N matching", clear, bulk actions) with any selectable table.
