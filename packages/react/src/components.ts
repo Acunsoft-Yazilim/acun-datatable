@@ -1,5 +1,5 @@
 import {
-  createElement as h, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
+  createElement as h, Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
   type ChangeEvent, type CSSProperties, type KeyboardEvent, type RefObject, type MouseEvent, type ReactElement, type ReactNode, type SyntheticEvent,
 } from 'react';
 import { COLUMN_WIDTH_LIMITS, getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
@@ -434,7 +434,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
         h('div', { className: 'adt-dialog-head', key: 'head' },
           h('h2', { className: 'adt-dialog-title', id: `${uid}-dialog-title` }, labels.details(name)),
           h('button', { type: 'button', className: 'adt-dialog-close', 'aria-label': labels.close, onClick: closeDialog }, icon('close'))),
-        h('div', { key: 'body' }, detailList(row, texts, name, true)),
+        h(Fragment, { key: 'body' }, detailList(row, texts, name, true)), // the <dl> right in the dialog, as the DOM renderer and Vue
         detail ? h('div', { className: 'adt-detail-content', key: 'detail' }, detail(row)) : null,
       ];
     }

@@ -51,7 +51,6 @@ const scenarios: Record<string, Scenario> = {
 
 /** Known differences, each fixed in its own change (which removes the entry here). */
 const DIFFERENT: Readonly<Record<string, readonly Renderer[]>> = {
-  'modal, a row open': ['react'], // an extra <div> around the details in the dialog
   error: ['react', 'vue'], // the DOM notice keeps aria-live="polite" next to role="alert"
 };
 
