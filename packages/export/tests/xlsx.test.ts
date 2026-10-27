@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { isDecimal, normalizeValue } from '@acunsoft/datatable-core';
 import { ImportError, readXlsx, toXlsx, type Sheet } from '../src/index';
 import { openZip, writeZip } from '../src/zip';
+import { streamXlsx } from '../src/stream';
 
 const fixture = (name: string) => new Uint8Array(readFileSync(new URL(`./fixtures/${name}`, import.meta.url)));
 const decimal = (text: string) => normalizeValue(text, 'decimal') as Sheet['rows'][number][number];
@@ -152,5 +153,36 @@ describe('readXlsx safety', () => {
     const back = await readXlsx(toXlsx({ headers: ['n'], rows: [[decimal('0.10')]] }));
     expect(back.rows[0]![0]).toBe(0.1);
     expect(isDecimal(back.rows[0]![0])).toBe(false);
+  });
+});
+
+describe('reading damaged sheets', () => {
+  // Elements that never close: regular expressions with a lazy body searched to the end
+  // once for each of them (seconds for a small file); the scanner stays linear.
+  const workbook = (sheet: string) => writeZip([
+    { name: 'xl/workbook.xml', data: new TextEncoder().encode('<workbook><sheets><sheet name="S" sheetId="1"/></sheets></workbook>') },
+    { name: 'xl/worksheets/sheet1.xml', data: new TextEncoder().encode(`<worksheet><sheetData>${sheet}</sheetData></worksheet>`) },
+  ]);
+  const cases = {
+    'cells that never close': `<row><c r="A1" t="str"><v>Ad</v></c></row><row>${'<c r="A1">'.repeat(40_000)}</row>`,
+    'rows that never close': `<row><c r="A1" t="str"><v>Ad</v></c></row>${'<row>'.repeat(40_000)}`,
+    'strings that never close': `<row><c r="A1" t="inlineStr"><is>${'<t>'.repeat(40_000)}</is></c></row>`,
+  };
+  for (const [name, sheet] of Object.entries(cases)) {
+    it(`reads ${name} in linear time`, async () => {
+      const bytes = workbook(sheet);
+      let started = performance.now();
+      await readXlsx(bytes).catch(() => undefined);
+      expect(performance.now() - started).toBeLessThan(1000);
+      started = performance.now();
+      const stream = await streamXlsx(bytes).catch(() => undefined);
+      if (stream) for await (const _ of stream.chunks) { /* drain */ }
+      expect(performance.now() - started).toBeLessThan(1000);
+    });
+  }
+
+  it('still reads a well-formed sheet as before, prefixes and empty elements included', async () => {
+    const bytes = workbook('<x:row><x:c r="A1" t="inlineStr"><x:is><x:t>Ad</x:t><x:rPh><x:t>ignored</x:t></x:rPh></x:is></x:c><x:c r="B1" t="str"><x:v>Şehir</x:v></x:c></x:row><row/><row><c r="A2" t="str"><v>Ayşe</v></c><c r="B2"/></row>');
+    expect(await readXlsx(bytes)).toEqual({ headers: ['Ad', 'Şehir'], rows: [['Ayşe', null]] });
   });
 });

@@ -255,6 +255,8 @@ async function* elements(source: AsyncIterator<string>, name: string, container?
   let inside = !container;
   let scanned = 0; // where the search for the end of an incomplete element goes on
   let final = false;
+  // No end for an element before the text (or the container) ends: no later one can end either.
+  let unclosed = false;
   for (;;) {
     if (!inside && begin) {
       begin.lastIndex = 0;
@@ -288,15 +290,18 @@ async function* elements(source: AsyncIterator<string>, name: string, container?
         scanned = 0;
         continue;
       }
+      if (unclosed) { buffer = buffer.slice(1); continue; } // not an element, and nothing to search
       close.lastIndex = Math.max(tagEnd + 1, scanned);
       const end = close.exec(buffer);
       if (!end) {
-        if (final) { buffer = buffer.slice(1); scanned = 0; continue; } // never closed: not an element
+        if (final) { unclosed = true; buffer = buffer.slice(1); scanned = 0; continue; } // never closed: not an element
         scanned = Math.max(0, buffer.length - 128); // its end can only be in what comes next
         break;
       }
       if (end[1] === name) yield buffer.slice(tagEnd + 1, end.index);
-      // else the container closes inside it: as in `readXlsx`, not an element; the container ends next.
+      // else the container closes inside it: as in `readXlsx`, not an element; the container ends next,
+      // with no end for any element before it.
+      else unclosed = true;
       buffer = buffer.slice(end[1] === name ? close.lastIndex : 1);
       scanned = 0;
     }
