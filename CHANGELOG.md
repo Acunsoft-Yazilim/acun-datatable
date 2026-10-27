@@ -130,6 +130,11 @@ All notable changes to this repository. Each npm package also has its own
   of 3). The properties now travel through Livewire's synthesizers.
   While a task runs, the table's 2-second check no longer renders the table
   again (its page, count and totals were read every 2 seconds).
+- **Laravel query-builder tables page in a stable order:** the key
+  tie-breaker was added for Eloquent only, so `DB::table()` pages and export
+  chunks sorted by a column with equal values could repeat or skip rows.
+  `TableResponse` and `TableExport` take `->key('id')`; Livewire tables use
+  `keyName()`.
 
 ## npm 0.4.0 and `acunsoft/datatable-laravel` 0.5.0 (2026-10-25)
 
