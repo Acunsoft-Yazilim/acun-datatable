@@ -4,13 +4,13 @@ import {
 } from 'react';
 import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import {
-  cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, resolveLabels, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
+  cellValue, checkPageSizes, checkResponsive, checkSize, resolveLabels, filterControls, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
   afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  actionsCellClass, cellClass, checkActions, closeMenuOnEscape, rowActionsView, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
   pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, withoutIds, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
@@ -268,38 +268,26 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   const span = columnSpan(columns.length, { selectable, actions: rowActions.length > 0, expandable });
   // Buttons in the row, the rest in a "⋮" menu; icons, danger colour and a confirm question.
   const actionButtons = (row: Row<TData>, name: string, maxInline = props.maxInlineActions ?? Infinity): ReactNode[] => {
-    const { inline, menu } = splitActions(rowActions, row, maxInline);
-    const run = (action: RowAction<TData>, disabled: boolean): void => { if (!disabled && confirmed(action, row)) action.onSelect(row); };
-    const buttons: ReactNode[] = inline.map(action => {
-      const disabled = action.disabled?.(row) === true;
-      const iconOnly = action.iconOnly === true && action.icon !== undefined;
-      return h('button', {
-        type: 'button', key: action.id, 'data-action': action.id,
-        className: ['adt-action', iconOnly ? 'adt-action--icon' : '', action.danger ? 'adt-action--danger' : ''].filter(Boolean).join(' '),
-        'aria-label': labels.rowAction(action.label, name), title: iconOnly ? action.label : undefined,
-        'aria-disabled': disabled ? 'true' : undefined, onClick: () => run(action, disabled),
-      }, action.icon ? icon(action.icon) : null, iconOnly ? null : h('span', null, action.label));
-    });
-    if (menu.length > 0) {
+    const { inline, menu } = rowActionsView(rowActions, row, name, labels, maxInline);
+    const buttons: ReactNode[] = inline.map(view => h('button', {
+      type: 'button', key: view.action.id, 'data-action': view.action.id, className: view.className,
+      'aria-label': view.ariaLabel, title: view.title, 'aria-disabled': view.disabled ? 'true' : undefined, onClick: view.run,
+    }, view.icon ? icon(view.icon) : null, view.text === undefined ? null : h('span', null, view.text)));
+    if (menu) {
       buttons.push(h('details', {
         className: 'adt-row-menu', key: '__menu', onToggle: (event: SyntheticEvent<HTMLDetailsElement>) => placeMenu(event.currentTarget),
-        onKeyDown: (event: KeyboardEvent<HTMLDetailsElement>) => {
-          if (event.key === 'Escape' && event.currentTarget.open) { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); }
-        },
+        onKeyDown: (event: KeyboardEvent<HTMLDetailsElement>) => closeMenuOnEscape(event.nativeEvent),
       },
-      h('summary', { className: 'adt-action adt-action--icon', 'aria-label': labels.moreActions(name), title: labels.moreActions(name) }, icon('more')),
-      h('div', { className: 'adt-menu-list' }, menu.map(action => {
-        const disabled = action.disabled?.(row) === true;
-        return h('button', {
-          type: 'button', key: action.id, 'data-action': action.id, className: action.danger ? 'adt-menu-item adt-menu-item--danger' : 'adt-menu-item',
-          'aria-label': labels.rowAction(action.label, name), 'aria-disabled': disabled ? 'true' : undefined,
-          onClick: (event: MouseEvent) => {
-            const details = (event.currentTarget as HTMLElement).closest('details');
-            if (details) details.open = false;
-            run(action, disabled);
-          },
-        }, action.icon ? icon(action.icon) : null, h('span', null, action.label));
-      }))));
+      h('summary', { className: 'adt-action adt-action--icon', 'aria-label': menu.label, title: menu.label }, icon('more')),
+      h('div', { className: 'adt-menu-list' }, menu.items.map(view => h('button', {
+        type: 'button', key: view.action.id, 'data-action': view.action.id, className: view.className,
+        'aria-label': view.ariaLabel, 'aria-disabled': view.disabled ? 'true' : undefined,
+        onClick: (event: MouseEvent) => {
+          const details = (event.currentTarget as HTMLElement).closest('details');
+          if (details) details.open = false;
+          view.run();
+        },
+      }, view.icon ? icon(view.icon) : null, h('span', null, view.text))))));
     }
     return buttons;
   };

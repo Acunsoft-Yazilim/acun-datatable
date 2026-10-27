@@ -43,6 +43,55 @@ export function splitActions<TData>(actions: readonly RowAction<TData>[], row: R
   return { inline: visible.slice(0, keep), menu: visible.slice(keep) };
 }
 
+/** One row action as the three renderers draw it; `run` asks the confirm question and calls `onSelect` unless disabled. */
+export interface ActionView<TData> {
+  readonly action: RowAction<TData>;
+  readonly className: string;
+  readonly ariaLabel: string;
+  /** Only for an icon-only button: its name as a tooltip. */
+  readonly title: string | undefined;
+  readonly disabled: boolean;
+  readonly icon: ActionIcon | undefined;
+  /** The text shown; undefined for an icon-only button in the row (menu items always show it). */
+  readonly text: string | undefined;
+  run(): void;
+}
+
+/** A row's actions: the buttons in the row and, past `maxInline`, the "⋮" menu with its label. */
+export function rowActionsView<TData>(
+  actions: readonly RowAction<TData>[], row: Row<TData>, name: string, labels: Pick<DataTableLabels, 'rowAction' | 'moreActions'>,
+  maxInline = Infinity, view: { confirm(message: string): boolean } = globalThis as never,
+): { readonly inline: readonly ActionView<TData>[]; readonly menu: { readonly label: string; readonly items: readonly ActionView<TData>[] } | undefined } {
+  const { inline, menu } = splitActions(actions, row, maxInline);
+  const describe = (action: RowAction<TData>, inMenu: boolean): ActionView<TData> => {
+    const disabled = action.disabled?.(row) === true;
+    const iconOnly = !inMenu && action.iconOnly === true && action.icon !== undefined;
+    return {
+      action, disabled, icon: action.icon,
+      className: inMenu
+        ? (action.danger ? 'adt-menu-item adt-menu-item--danger' : 'adt-menu-item')
+        : ['adt-action', iconOnly ? 'adt-action--icon' : '', action.danger ? 'adt-action--danger' : ''].filter(Boolean).join(' '),
+      ariaLabel: labels.rowAction(action.label, name),
+      title: iconOnly ? action.label : undefined,
+      text: iconOnly ? undefined : action.label,
+      run: () => { if (!disabled && confirmed(action, row, view)) action.onSelect(row); },
+    };
+  };
+  return {
+    inline: inline.map(action => describe(action, false)),
+    menu: menu.length > 0 ? { label: labels.moreActions(name), items: menu.map(action => describe(action, true)) } : undefined,
+  };
+}
+
+/** Escape in an open `<details>` menu closes it and puts the focus back on its `<summary>`. */
+export function closeMenuOnEscape(event: KeyboardEvent): void {
+  const details = event.currentTarget as HTMLDetailsElement | null;
+  if (event.key === 'Escape' && details?.open) {
+    details.open = false;
+    details.querySelector<HTMLElement>(':scope > summary')?.focus();
+  }
+}
+
 /** What a bulk action receives. */
 export interface BulkSelection<TData> {
   /** Every selected row ID, also those on other pages in server mode. */
@@ -186,48 +235,32 @@ export function actionCell<TData>(
   doc: Document, actions: readonly RowAction<TData>[], row: Row<TData>, name: string, labels: DataTableLabels, maxInline = Infinity,
 ): HTMLTableCellElement {
   const td = element(doc, 'td', { class: 'adt-actions', 'data-label': labels.actions });
-  const run = (action: RowAction<TData>, disabled: boolean): void => {
-    if (!disabled && confirmed(action, row, doc.defaultView ?? (globalThis as never))) action.onSelect(row);
-  };
-  const { inline, menu } = splitActions(actions, row, maxInline);
-  for (const action of inline) {
-    const disabled = action.disabled?.(row) === true;
+  const { inline, menu } = rowActionsView(actions, row, name, labels, maxInline, doc.defaultView ?? (globalThis as never));
+  for (const view of inline) {
     const button = element(doc, 'button', {
-      type: 'button',
-      class: ['adt-action', action.iconOnly && action.icon ? 'adt-action--icon' : '', action.danger ? 'adt-action--danger' : ''].filter(Boolean).join(' '),
-      'data-action': action.id,
-      'aria-label': labels.rowAction(action.label, name),
-      title: action.iconOnly && action.icon ? action.label : undefined,
-      'aria-disabled': disabled ? 'true' : undefined,
-      'data-adt-focus': `action:${action.id}:${row.id}`,
+      type: 'button', class: view.className, 'data-action': view.action.id, 'aria-label': view.ariaLabel, title: view.title,
+      'aria-disabled': view.disabled ? 'true' : undefined, 'data-adt-focus': `action:${view.action.id}:${row.id}`,
     });
-    if (action.icon) button.append(icon(doc, action.icon));
-    if (!(action.iconOnly && action.icon)) button.append(element(doc, 'span', {}, action.label));
-    button.addEventListener('click', () => run(action, disabled));
+    if (view.icon) button.append(icon(doc, view.icon));
+    if (view.text !== undefined) button.append(element(doc, 'span', {}, view.text));
+    button.addEventListener('click', view.run);
     td.append(button);
   }
-  if (menu.length > 0) {
+  if (menu) {
     const details = element(doc, 'details', { class: 'adt-row-menu' });
-    const summary = element(doc, 'summary', {
-      class: 'adt-action adt-action--icon', 'aria-label': labels.moreActions(name), title: labels.moreActions(name),
-      'data-adt-focus': `actions:${row.id}`,
-    });
+    const summary = element(doc, 'summary', { class: 'adt-action adt-action--icon', 'aria-label': menu.label, title: menu.label, 'data-adt-focus': `actions:${row.id}` });
     summary.append(icon(doc, 'more'));
     const list = element(doc, 'div', { class: 'adt-menu-list' });
-    for (const action of menu) {
-      const disabled = action.disabled?.(row) === true;
+    for (const view of menu.items) {
       const item = element(doc, 'button', {
-        type: 'button', class: action.danger ? 'adt-menu-item adt-menu-item--danger' : 'adt-menu-item', 'data-action': action.id,
-        'aria-label': labels.rowAction(action.label, name), 'aria-disabled': disabled ? 'true' : undefined,
+        type: 'button', class: view.className, 'data-action': view.action.id, 'aria-label': view.ariaLabel, 'aria-disabled': view.disabled ? 'true' : undefined,
       });
-      if (action.icon) item.append(icon(doc, action.icon));
-      item.append(element(doc, 'span', {}, action.label));
-      item.addEventListener('click', () => { details.open = false; run(action, disabled); });
+      if (view.icon) item.append(icon(doc, view.icon));
+      item.append(element(doc, 'span', {}, view.text!));
+      item.addEventListener('click', () => { details.open = false; view.run(); });
       list.append(item);
     }
-    details.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && details.open) { details.open = false; summary.focus(); }
-    });
+    details.addEventListener('keydown', closeMenuOnEscape);
     details.addEventListener('toggle', () => placeMenu(details));
     details.append(summary, list);
     td.append(details);
