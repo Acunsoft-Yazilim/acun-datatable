@@ -213,6 +213,19 @@ describe('createImportHandler', () => {
     expect(lines).toEqual([2, 3, 4, 5, 6, 7, 8, 9]); // each line once
   });
 
+  it('in the background, reports a store that fails instead of ending the process', async () => {
+    const memory = memoryImportStore();
+    const errors: unknown[] = [];
+    const { fetch } = setup({
+      background: () => true,
+      store: { ...memory, put: async (state, keepMs) => { if (state.status === 'running') throw new Error('disk full'); return memory.put(state, keepMs); } },
+      onError: error => { errors.push(error); throw new Error('the logger fails too'); },
+    });
+    const { id } = await (await upload(fetch, csv('Customer\nA\n'))).json() as { id: string };
+    expect(await (await start(fetch, id, { mapping: ['customer'], mode: 'insert' })).json()).toMatchObject({ status: 'queued' });
+    await vi.waitFor(() => expect(errors).toEqual([new Error('disk full')]));
+  });
+
   it('a save() that throws fails the import as a whole, with a general message', async () => {
     const onError = vi.fn();
     const { fetch } = setup({ save: () => { throw new Error('database is down: secret details'); }, onError });

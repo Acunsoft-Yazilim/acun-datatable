@@ -382,6 +382,11 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
     return problems;
   };
 
+  // A logger that throws must not change how an import ends.
+  const failure = (error: unknown, id: string): void => {
+    try { options.onError?.(error, id); } catch { /* ignored */ }
+  };
+
   const process = async (id: string): Promise<void> => {
     let state = await store.get(id);
     if (!state || (state.status !== 'queued' && state.status !== 'running')) return;
@@ -441,7 +446,7 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
         state.report = true;
       }
     } catch (error) {
-      options.onError?.(error, id);
+      failure(error, id);
       state.status = 'failed';
       state.message = text.failed;
     }
@@ -551,7 +556,8 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
           await store.put(state, keepMs);
           const run = () => process(state.id);
           if (options.schedule) options.schedule(run, { id: state.id, rows: state.rows });
-          else setTimeout(() => { void run(); }, 0);
+          // Nothing awaits it here: a store that fails is reported, never an unhandled rejection.
+          else setTimeout(() => { run().catch(error => failure(error, state.id)); }, 0);
           return json(200, view(state));
         }
         state.status = 'running';
