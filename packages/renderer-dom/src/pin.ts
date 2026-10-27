@@ -1,3 +1,5 @@
+import { changesWidths } from './dom';
+
 /** Columns kept in place while the table scrolls sideways (DataTables `fixedColumns`). */
 export interface FixedColumns {
   /** Data columns at the start; the checkbox and ⊕ columns before them stay too. */
@@ -83,7 +85,7 @@ export function pinColumns(container: HTMLElement, fixed: FixedColumns): () => v
     queueMicrotask(() => { queued = false; apply(); });
   };
   if (start > 0 || end > 0) {
-    if (view && typeof view.MutationObserver === 'function') observer = new view.MutationObserver(schedule);
+    if (view && typeof view.MutationObserver === 'function') observer = new view.MutationObserver(records => { if (changesWidths(records)) schedule(); });
     apply();
   }
   const resize = (start > 0 || end > 0) && view && typeof (view as { ResizeObserver?: unknown }).ResizeObserver === 'function'

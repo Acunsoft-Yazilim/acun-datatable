@@ -1,3 +1,5 @@
+import { changesWidths } from './dom';
+
 /**
  * `responsive: 'auto'`: hide the columns that do not fit, measured instead
  * of fixed breakpoints (DataTables Responsive). Columns go lowest priority
@@ -14,7 +16,7 @@ export function autoResponsive(container: HTMLElement): () => void {
   const view = container.ownerDocument.defaultView;
   let observer: MutationObserver | undefined;
   // Re-renders, and class changes such as a Livewire update putting the markup back.
-  const watch = (): void => observer?.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  const watch = (): void => observer?.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
 
   const apply = (): void => {
     observer?.disconnect(); // our own changes must not trigger another pass
@@ -58,7 +60,8 @@ export function autoResponsive(container: HTMLElement): () => void {
     queued = true;
     queueMicrotask(() => { queued = false; apply(); });
   };
-  if (view && typeof view.MutationObserver === 'function') observer = new view.MutationObserver(schedule);
+  // Not for a row's selection, nor for the pinned columns' classes: no new widths, no new pass.
+  if (view && typeof view.MutationObserver === 'function') observer = new view.MutationObserver(records => { if (changesWidths(records, /^adt-pin/)) schedule(); });
   apply();
   const resize = view && typeof (view as { ResizeObserver?: unknown }).ResizeObserver === 'function'
     ? new (view as unknown as { ResizeObserver: typeof ResizeObserver }).ResizeObserver(schedule)

@@ -139,6 +139,10 @@ All notable changes to this repository. Each npm package also has its own
   groups are named for screen readers; `aria-busy` marks the rows, not the
   "Loading…" notice; the page info and the selection count are written only
   when their words change.
+- **Less layout work on a checkbox click:** with `responsive: 'auto'` or
+  `fixedColumns`, selecting a row measured every column again (a forced
+  layout per column); the two observers now skip a row's own state and the
+  pin classes.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the

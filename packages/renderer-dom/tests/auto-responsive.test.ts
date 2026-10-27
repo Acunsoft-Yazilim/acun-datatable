@@ -32,6 +32,28 @@ afterEach(() => vi.restoreAllMocks());
 const hidden = () => [...host.querySelectorAll('thead .adt-auto-hidden')].map(cell => cell.textContent);
 const shown = () => [...host.querySelectorAll('.adt-detail .adt-detail-item.adt-auto-shown dt')].map(dt => dt.textContent);
 
+describe("responsive: 'auto' and fixedColumns measure again only when widths may change", () => {
+  it('not for a row selected, nor for the pinned classes; again for a re-render', async () => {
+    const table = createDataTable<Order>({ data: [...data, { id: 2, customer: 'Ali', city: 'Ankara', total: 5, note: '' }], columns });
+    renderTable(host, table, { responsive: 'auto', selectable: true, fixedColumns: { start: 1 } });
+    const flush = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+    await flush();
+    const widths = vi.mocked(Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth')!.get!);
+    const boxes = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+    widths.mockClear();
+    table.toggleRow('1'); // a class on the row: no new widths
+    await flush();
+    expect([widths.mock.calls.length, boxes.mock.calls.length]).toEqual([0, 0]);
+    host.querySelector('tbody td')!.classList.add('adt-pin--edge-start'); // a pinned class only
+    await flush();
+    expect(widths.mock.calls.length).toBe(0);
+    table.setData([...data]); // a re-render: both measure again
+    await flush();
+    expect(widths.mock.calls.length).toBeGreaterThan(0);
+    expect(boxes.mock.calls.length).toBeGreaterThan(0);
+  });
+});
+
 describe("responsive: 'auto'", () => {
   it('hides nothing while the table fits', () => {
     renderTable(host, createDataTable<Order>({ data, columns }), { responsive: 'auto' });

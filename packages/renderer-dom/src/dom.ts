@@ -185,6 +185,24 @@ function pinMenu(menu: HTMLDetailsElement, panel: HTMLElement): void {
   view.addEventListener('resize', place, { passive: true });
 }
 
+/**
+ * Whether mutations can change the widths of a table's columns: a re-render, or
+ * the class or style of the table or a cell, not a row's own state (selected,
+ * expanded). Class changes only in `ignore` (e.g. the pin classes) do not count.
+ * For observers that measure the table again (auto-responsive, pinned columns).
+ */
+export function changesWidths(records: readonly MutationRecord[], ignore?: RegExp): boolean {
+  return records.some(record => {
+    if (record.type !== 'attributes') return true;
+    const target = record.target as Element;
+    if (target.tagName === 'TR') return false;
+    if (!ignore || record.attributeName !== 'class') return true;
+    const before = new Set((record.oldValue ?? '').split(/\s+/).filter(Boolean));
+    const changed = [...target.classList].filter(name => !before.delete(name)).concat([...before]);
+    return changed.some(name => !ignore.test(name));
+  });
+}
+
 /** Write a text only when it changed: a live region rewritten with the same words may be read out again. */
 export function setText(node: Node, text: string): void {
   if (node.textContent !== text) node.textContent = text;
