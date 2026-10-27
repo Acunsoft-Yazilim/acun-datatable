@@ -288,6 +288,29 @@ describe('createImportHandler', () => {
   });
 });
 
+describe('memoryImportStore', () => {
+  it('drops what expired within a minute of a write, read again or not', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryImportStore();
+      const removed = vi.spyOn(Map.prototype, 'delete');
+      await store.putFile('imp_left', 'source', new Uint8Array(1024), 1_000); // an upload nobody comes back for
+      await store.putKey('key', 'imp_left', 1_000);
+      vi.advanceTimersByTime(30_000);
+      await store.putFile('imp_new', 'source', new Uint8Array(1), 86_400_000);
+      expect(removed).not.toHaveBeenCalledWith('imp_left/source'); // swept at most once a minute
+      vi.advanceTimersByTime(31_000);
+      await store.putFile('imp_newer', 'source', new Uint8Array(1), 86_400_000);
+      expect(removed).toHaveBeenCalledWith('imp_left/source');
+      expect(removed).toHaveBeenCalledWith('key');
+      expect(removed).not.toHaveBeenCalledWith('imp_new/source');
+      removed.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('two starts at once (a double click, a retry)', () => {
   const twoStarts = async (first: typeof globalThis.fetch, second: typeof globalThis.fetch) => {
     const uploaded = await (await upload(first, csv('Customer\nAyşe\nAli\nCan'))).json() as { id: string };

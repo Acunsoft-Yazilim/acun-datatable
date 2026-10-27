@@ -188,7 +188,7 @@ export interface ImportHandler {
 
 const ID = /^imp_[A-Za-z0-9]{32}$/;
 
-/** A store in memory: one process; state and files are lost on restart. */
+/** A store in memory: one process; state and files are lost on restart. Expired entries are dropped within a minute of a write. */
 export function memoryImportStore(): ImportStore {
   const states = new Map<string, { state: StoredImport; until: number }>();
   const files = new Map<string, { bytes: Uint8Array; until: number }>();
@@ -199,14 +199,24 @@ export function memoryImportStore(): ImportStore {
     if (entry && entry.until < Date.now()) { map.delete(key); return undefined; }
     return entry;
   };
+  // Uploads nobody comes back for (left at the mapping step) would keep their bytes for good.
+  let swept = Date.now();
+  const sweep = (): void => {
+    const now = Date.now();
+    if (now - swept < 60_000) return;
+    swept = now;
+    for (const map of [states, files, keys, claims] as Map<string, { until: number }>[]) {
+      for (const [key, entry] of map) if (entry.until < now) map.delete(key);
+    }
+  };
   return {
     get: async id => (alive(states, id) ? structuredClone(states.get(id)!.state) : undefined),
-    put: async (state, keepMs) => { states.set(state.id, { state: structuredClone(state), until: Date.now() + keepMs }); },
-    putFile: async (id, name, bytes, keepMs) => { files.set(`${id}/${name}`, { bytes, until: Date.now() + keepMs }); },
+    put: async (state, keepMs) => { sweep(); states.set(state.id, { state: structuredClone(state), until: Date.now() + keepMs }); },
+    putFile: async (id, name, bytes, keepMs) => { sweep(); files.set(`${id}/${name}`, { bytes, until: Date.now() + keepMs }); },
     getFile: async (id, name) => alive(files, `${id}/${name}`)?.bytes,
     deleteFile: async (id, name) => { files.delete(`${id}/${name}`); },
     getKey: async key => alive(keys, key)?.id,
-    putKey: async (key, id, keepMs) => { keys.set(key, { id, until: Date.now() + keepMs }); },
+    putKey: async (key, id, keepMs) => { sweep(); keys.set(key, { id, until: Date.now() + keepMs }); },
     claim: async (id, keepMs) => {
       if (alive(claims, id)) return false;
       claims.set(id, { until: Date.now() + keepMs });
@@ -392,7 +402,7 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
 
   const process = async (id: string): Promise<void> => {
     let state = await store.get(id);
-    if (!state || (state.status !== 'queued' && state.status !== 'running')) return;
+    if (!state || (state.status !== 'queued' && state.status !== 'running')) { cancelled.delete(id); return; }
     state.status = 'running';
     await store.put(state, keepMs);
     let inserted = state.inserted;
@@ -453,6 +463,7 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
       state.status = 'failed';
       state.message = text.failed;
     }
+    cancelled.delete(id);
     await store.deleteFile(id, 'source');
     await store.put(state, keepMs);
   };
@@ -529,8 +540,9 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
     if (parts.length === 1 && request.method === 'GET') return json(200, view(state));
     if (parts.length === 1 && request.method === 'DELETE') {
       if (FINAL.includes(state.status)) return problem(409, text.finished);
-      cancelled.add(state.id);
+      // A running import stops at its next chunk; one at the mapping step never runs.
       if (state.status === 'mapping') await store.deleteFile(state.id, 'source');
+      else cancelled.add(state.id);
       state.status = 'cancelled';
       await store.put(state, keepMs);
       return json(200, view(state));
