@@ -201,6 +201,58 @@ describe('useDataTable', () => {
     const live = [...seen].filter(table => (table as { getState(): unknown }).getState() !== undefined);
     expect(live.length).toBeGreaterThan(0);
   });
+
+  it('settles when the data is a new array on every render (an inline filter)', () => {
+    let renders = 0;
+    let setMin!: (min: number) => void;
+    function Orders(): ReactElement {
+      const [min, set] = useState(0);
+      setMin = set;
+      renders += 1;
+      const { page } = useDataTable<Order>({ data: orders.filter(order => Number(order.total) >= min), columns });
+      return h('p', null, String(page.totalRows));
+    }
+    render(h(StrictMode, null, h(Orders)));
+    expect(host.textContent).toBe('3');
+    expect(renders).toBeLessThan(10);
+    renders = 0;
+    act(() => setMin(100));
+    expect(host.textContent).toBe('2');
+    expect(renders).toBeLessThan(10);
+  });
+
+  it('still takes a new array of the same records, e.g. after a record changed in place', () => {
+    const rows = orders.map(order => ({ ...order }));
+    let setRows!: (rows: Order[]) => void;
+    let table!: ReturnType<typeof useDataTable<Order>>['table'];
+    function Orders(): ReactElement {
+      const [data, set] = useState(rows);
+      setRows = set;
+      const view = useDataTable<Order>({ data, columns });
+      table = view.table;
+      return h('p', null, view.page.rows.map(row => row.original.customer).join(','));
+    }
+    render(h(Orders));
+    act(() => table.setSorting([{ field: 'customer', direction: 'asc' }])); // a table event first
+    expect(host.textContent).toBe('Ali,Ayşe,Can');
+    rows[0]!.customer = 'Zeynep';
+    act(() => setRows([...rows]));
+    expect(host.textContent).toBe('Ali,Can,Zeynep'); // sorted again: the new array was applied
+  });
+
+  it('keeps table events with an inline array and does not apply it again', () => {
+    let table!: ReturnType<typeof useDataTable<Order>>['table'];
+    function Orders(): ReactElement {
+      const view = useDataTable<Order>({ data: orders.filter(() => true), columns });
+      table = view.table;
+      return h('p', null, view.page.rows.map(row => row.original.customer).join(','));
+    }
+    render(h(StrictMode, null, h(Orders)));
+    const setData = vi.spyOn(table, 'setData');
+    act(() => table.setSorting([{ field: 'customer', direction: 'desc' }]));
+    expect(host.textContent).toBe('Can,Ayşe,Ali');
+    expect(setData).not.toHaveBeenCalled();
+  });
 });
 
 describe('responsive modes and sizes', () => {

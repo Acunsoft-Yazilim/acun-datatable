@@ -33,20 +33,30 @@ export function useTable<TData>(table: DataTable<TData>): TableView<TData> {
  * `const { table, page } = useDataTable({ data, columns })`.
  *
  * Options are read once, except `data`: passing a new array (local mode)
- * replaces the rows with `setData`; records are never copied. The table only
- * holds listeners, which React removes on unmount, so it is not destroyed
- * explicitly (that keeps Strict Mode's double mount safe).
+ * replaces the rows with `setData`; records are never copied. A new array
+ * made on every render (`data: orders.filter(…)`) is fine: when the table
+ * itself caused the render and the array holds the same records in the same
+ * order, it is not applied again. The table only holds listeners, which React
+ * removes on unmount, so it is not destroyed explicitly (that keeps Strict
+ * Mode's double mount safe).
  */
 export function useDataTable<TData>(options: DataTableOptions<TData>): TableView<TData> {
   const [table] = useState(() => createDataTable<TData>(options));
+  const view = useTable(table);
   const data = options.data;
-  const first = useRef(true);
+  const applied = useRef(data); // the array the table holds
+  const committed = useRef(view.state); // the table state of the previous commit
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    if (table.getMode() === 'local') table.setData(data ?? []);
-  }, [table, data]);
-  return useTable(table);
+    const byTable = view.state !== committed.current; // a table event (or the last setData) caused this render
+    committed.current = view.state;
+    if (data === applied.current || table.getMode() !== 'local') return;
+    const same = sameRecords(data ?? [], applied.current ?? []);
+    applied.current = data;
+    if (same && byTable) return;
+    table.setData(data ?? []);
+  });
+  return view;
 }
+
+const sameRecords = (a: readonly unknown[], b: readonly unknown[]): boolean =>
+  a.length === b.length && a.every((record, index) => record === b[index]);
