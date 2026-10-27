@@ -54,6 +54,7 @@ export interface ImportSaveContext {
 /** The state of one import, as a store keeps it (JSON-safe). */
 export interface StoredImport {
   readonly id: string;
+  /** Who uploaded it, as `owner()` gave it; with `tenant`, who may see it. */
   readonly owner: string;
   readonly tenant: string | null;
   readonly name: string;
@@ -462,11 +463,10 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
     const who = await options.owner(request);
     if (who === null || who === '') return problem(401, text.unauthorized);
     const tenant = (await options.tenant?.(request)) ?? null;
-    const owner = `${who}|${tenant ?? ''}`;
     const load = async (id: string): Promise<StoredImport | undefined> => {
       if (!ID.test(id)) return undefined;
       const state = await store.get(id);
-      return state && state.owner === owner ? state : undefined;
+      return state && state.owner === who && state.tenant === tenant ? state : undefined;
     };
 
     if (parts.length === 0 && request.method === 'GET') {
@@ -474,7 +474,7 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
     }
     if (parts.length === 0 && request.method === 'POST') {
       const key = request.headers.get('idempotency-key') ?? '';
-      const keyId = /^[\x21-\x7e]{1,200}$/.test(key) ? `${owner}\u0000${key}` : undefined;
+      const keyId = /^[\x21-\x7e]{1,200}$/.test(key) ? `${who}\u0000${tenant ?? ''}\u0000${key}` : undefined;
       const known = keyId ? await store.getKey(keyId) : undefined;
       const again = known ? await load(known) : undefined;
       if (again) return json(200, view(again));
@@ -512,7 +512,7 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
       const id = randomId();
       await store.putFile(id, 'source', bytes, keepMs);
       const state: StoredImport = {
-        id, owner, tenant, name: name.slice(0, 200), extension, headers: sheet.headers.map(String), rows: count,
+        id, owner: who, tenant, name: name.slice(0, 200), extension, headers: sheet.headers.map(String), rows: count,
         preview: previewRows.map((cells, index) => ({ line: index + 2, cells: sheet.headers.map((_, i) => cellText(cells[i])) })),
         status: 'mapping', mapping: suggest(sheet.headers), mode: null, processed: 0, inserted: 0, updated: 0, skipped: 0, failed: 0,
         errors: [], errorsTruncated: false, report: false, message: null, expiresAt: new Date(Date.now() + keepMs).toISOString(),

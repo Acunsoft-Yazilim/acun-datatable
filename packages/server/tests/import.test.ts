@@ -226,6 +226,15 @@ describe('createImportHandler', () => {
     await vi.waitFor(() => expect(errors).toEqual([new Error('disk full')]));
   });
 
+  it('gives save() the owner and tenant as owner() and tenant() gave them', async () => {
+    const seen: [string, string | null][] = [];
+    const { fetch } = setup({ save: (rows, context) => { seen.push([context.owner, context.tenant]); context.inserted(rows.length); } });
+    const { id } = await (await upload(fetch, csv('Customer\nA\n'), as('42', 'acme'))).json() as { id: string };
+    await start(fetch, id, { mapping: ['customer'], mode: 'insert' }, as('42', 'acme'));
+    expect(seen).toEqual([['42', 'acme']]);
+    expect((await fetch(`${URL_BASE}/${id}`, { headers: as('42', 'other') })).status).toBe(404); // still kept per tenant
+  });
+
   it('a save() that throws fails the import as a whole, with a general message', async () => {
     const onError = vi.fn();
     const { fetch } = setup({ save: () => { throw new Error('database is down: secret details'); }, onError });
