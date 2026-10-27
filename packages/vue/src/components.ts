@@ -82,7 +82,7 @@ export interface DetailSlotProps {
  * custom cells, `empty` for the empty state, `detail` (`{ row }`) for child rows. Slot content is rendered by Vue,
  * so it is escaped unless you inject HTML yourself.
  */
-export const AcunDataTable = defineComponent({
+export const AcunDataTable = /*#__PURE__*/ defineComponent({
   name: 'AcunDataTable',
   props: {
     table: tableProp,
@@ -640,7 +640,7 @@ const iconNode = (name: keyof typeof ICONS | { readonly path: string }): VNode =
  * there are more pages than fit. With an unknown server total it numbers the
  * pages seen so far and keeps "next" while the page is full.
  */
-export const AcunPagination = defineComponent({
+export const AcunPagination = /*#__PURE__*/ defineComponent({
   name: 'AcunPagination',
   props: {
     table: tableProp,
@@ -684,7 +684,7 @@ export const AcunPagination = defineComponent({
 });
 
 /** A rows-per-page select with a visually hidden label. */
-export const AcunPageSize = defineComponent({
+export const AcunPageSize = /*#__PURE__*/ defineComponent({
   name: 'AcunPageSize',
   props: {
     table: tableProp,
@@ -709,7 +709,7 @@ export const AcunPageSize = defineComponent({
 });
 
 /** The visible range and the total, `1–25 of 5,000 rows`, as a polite live region. */
-export const AcunPageInfo = defineComponent({
+export const AcunPageInfo = /*#__PURE__*/ defineComponent({
   name: 'AcunPageInfo',
   props: {
     table: tableProp, labels: labelsProp,
@@ -726,7 +726,7 @@ export const AcunPageInfo = defineComponent({
 });
 
 /** A search input with an icon and a visually hidden label, bound to the global search; debounced, Enter applies at once. */
-export const AcunSearch = defineComponent({
+export const AcunSearch = /*#__PURE__*/ defineComponent({
   name: 'AcunSearch',
   props: {
     table: tableProp,
@@ -766,7 +766,7 @@ export const AcunSearch = defineComponent({
 });
 
 /** A "Columns" menu (`<details>`) with a labelled checkbox per column. */
-export const AcunColumnToggle = defineComponent({
+export const AcunColumnToggle = /*#__PURE__*/ defineComponent({
   name: 'AcunColumnToggle',
   props: {
     table: tableProp, labels: labelsProp,
@@ -819,7 +819,7 @@ export const AcunColumnToggle = defineComponent({
  * A bar for actions on the selected rows (see `renderBulkActions`): "N
  * selected", the actions, "Select all N matching" and "Clear selection".
  */
-export const AcunBulkActions = defineComponent({
+export const AcunBulkActions = /*#__PURE__*/ defineComponent({
   name: 'AcunBulkActions',
   props: {
     table: tableProp,
@@ -866,7 +866,7 @@ function domControl(name: string, render: (el: HTMLElement, props: { table: AnyT
  * The "Filters" button: a control per column with `filter`, under the button
  * (default), in a drawer or a modal (`panel`; see `renderFilters`).
  */
-export const AcunFilters = defineComponent({
+export const AcunFilters = /*#__PURE__*/ defineComponent({
   name: 'AcunFilters',
   props: {
     table: tableProp, labels: labelsProp, locale: { type: String, default: 'en' },
@@ -893,12 +893,12 @@ export const AcunFilters = defineComponent({
   },
 });
 /** Only the filter fields and "Clear filters", for your own drawer, modal or sidebar (see `renderFilterPanel`). */
-export const AcunFilterPanel = domControl('AcunFilterPanel', (el, props) => renderFilterPanel(el, props.table, props));
+export const AcunFilterPanel = /*#__PURE__*/ domControl('AcunFilterPanel', (el, props) => renderFilterPanel(el, props.table, props));
 /** The active filters as removable chips (see `renderFilterChips`). */
-export const AcunFilterChips = domControl('AcunFilterChips', (el, props) => renderFilterChips(el, props.table, props));
+export const AcunFilterChips = /*#__PURE__*/ domControl('AcunFilterChips', (el, props) => renderFilterChips(el, props.table, props));
 
 /** A tools menu (export, copy, print, your own actions) with `items` (see `renderMenu`). */
-export const AcunTools = defineComponent({
+export const AcunTools = /*#__PURE__*/ defineComponent({
   name: 'AcunTools',
   props: {
     items: { type: Array as PropType<readonly MenuItem[]>, required: true },
@@ -931,7 +931,7 @@ export const AcunTools = defineComponent({
  * responsive, stickyHeader, …), and so do its cell slots. Slots `top-start`,
  * `top-end`, `bottom-start` and `bottom-end` add your own controls.
  */
-export const AcunDataTableLayout = defineComponent({
+export const AcunDataTableLayout = /*#__PURE__*/ defineComponent({
   name: 'AcunDataTableLayout',
   inheritAttrs: false,
   props: {

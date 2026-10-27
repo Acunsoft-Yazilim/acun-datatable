@@ -1,0 +1,56 @@
+[
+  {
+    "app": "Next.js",
+    "page": "/empty",
+    "what": "no table",
+    "files": 5,
+    "rawKB": 445.3,
+    "gzipKB": 131.6,
+    "tableGzipKB": 0
+  },
+  {
+    "app": "Next.js",
+    "page": "/",
+    "what": "table (rows from the server page)",
+    "files": 7,
+    "rawKB": 544.4,
+    "gzipKB": 162.4,
+    "tableGzipKB": 30.8
+  },
+  {
+    "app": "Next.js",
+    "page": "/remote",
+    "what": "table (server mode)",
+    "files": 7,
+    "rawKB": 548.6,
+    "gzipKB": 164.3,
+    "tableGzipKB": 32.7
+  },
+  {
+    "app": "Nuxt",
+    "page": "/empty",
+    "what": "no table",
+    "files": 2,
+    "rawKB": 179.9,
+    "gzipKB": 65.9,
+    "tableGzipKB": 0
+  },
+  {
+    "app": "Nuxt",
+    "page": "/",
+    "what": "table (rows from the server page)",
+    "files": 3,
+    "rawKB": 279.8,
+    "gzipKB": 96.8,
+    "tableGzipKB": 30.9
+  },
+  {
+    "app": "Nuxt",
+    "page": "/remote",
+    "what": "table (server mode)",
+    "files": 3,
+    "rawKB": 283.8,
+    "gzipKB": 98.6,
+    "tableGzipKB": 32.7
+  }
+]

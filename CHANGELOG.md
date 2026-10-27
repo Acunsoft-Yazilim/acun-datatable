@@ -15,6 +15,13 @@ All notable changes to this repository. Each npm package also has its own
   distinct join counted 1 row (and Laravel's own exact count counted
   duplicates); they are counted as a subquery with their columns. Export size
   checks stop after limit + 1 rows instead of counting every row.
+- **Smaller bundles, measured:** the Vue components tree-shake (`useDataTable`
+  alone 11.2 KB gzip instead of 33 KB; `AcunPagination` 5.5 KB instead of
+  23 KB); `@acunsoft/datatable` loads the Excel and CSV writers at the first
+  export (first load 42.0 KB instead of 46.0 KB). `npm run size` now also
+  checks what one import alone costs, and `npm run size:ssr` measures the
+  JavaScript of the Next.js and Nuxt test apps: the table adds about 31 KB
+  gzip to either (`bench/results/ssr-size.json`).
 - **Documentation in four groups:** HTML / JavaScript (with the Web
   Component), React · Next.js, Vue · Nuxt and Laravel · Livewire (with
   Inertia); the Node.js back end is a section of the server guide. The old

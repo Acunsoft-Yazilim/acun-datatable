@@ -6,10 +6,13 @@ import {
   type BulkAction, type FilterPanelMode, type ToolbarButtons, type CellFormatter, type CellRenderer, type DataTableLabels, type DataTableLayout, type LayoutSlot,
   type CellEdit, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type RowAction, type StatusSource, type TableSize,
 } from '@acunsoft/datatable-dom';
-import { tableToSheet, toCsv, toXlsx, type Sheet } from '@acunsoft/datatable-export';
+import type { Sheet } from '@acunsoft/datatable-export';
 import { connectTable, createHttpDataSource, createQueryRunner, fromDataTablesResponse, serializeDataTablesQuery, type QueryRunner } from '@acunsoft/datatable-http';
 
 type Data = Record<string, unknown>;
+
+/** The Excel and CSV writers, loaded at the first export: a bundle whose tables never export leaves them out. */
+const exportKit = () => import('./export-kit');
 
 /** A column in the DataTables style: the field of a row and its title. */
 export interface ColumnOptions {
@@ -550,18 +553,21 @@ export class AcunDataTable {
       if (typeof button !== 'string') return button;
       switch (button) {
         case 'excel':
-          return { id: 'excel', label: labels.exportExcel, group: labels.export, onSelect: async () => { downloadFile(toXlsx(await this.#sheet()), `${name}.xlsx`); } };
+          return { id: 'excel', label: labels.exportExcel, group: labels.export, onSelect: async () => { const sheet = await this.#sheet(); downloadFile((await exportKit()).toXlsx(sheet), `${name}.xlsx`); } };
         case 'csv':
           return {
             id: 'csv', label: labels.exportCsv, group: labels.export,
-            onSelect: async () => { downloadFile(toCsv(await this.#sheet(), { delimiter: this.#options.language === 'tr' ? ';' : ',' }), `${name}.csv`); },
+            onSelect: async () => {
+              const sheet = await this.#sheet();
+              downloadFile((await exportKit()).toCsv(sheet, { delimiter: this.#options.language === 'tr' ? ';' : ',' }), `${name}.csv`);
+            },
           };
         case 'copy':
           return {
             id: 'copy', label: labels.copy, group: labels.export,
             onSelect: async () => {
               const sheet = await this.#sheet();
-              await navigator.clipboard.writeText(toCsv(sheet, { delimiter: '\t', bom: false, newline: '\n' }));
+              await navigator.clipboard.writeText((await exportKit()).toCsv(sheet, { delimiter: '\t', bom: false, newline: '\n' }));
               return labels.copied(sheet.rows.length);
             },
           };
@@ -578,6 +584,7 @@ export class AcunDataTable {
    * by page). "Every matching row" chosen in the selection bar counts as no choice of rows.
    */
   async #sheet(): Promise<Sheet> {
+    const { tableToSheet } = await exportKit();
     return this.#exported((table, rows) => tableToSheet(table, { rows }));
   }
 

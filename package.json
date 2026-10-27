@@ -28,6 +28,7 @@
     "version-packages": "changeset version && npm install --package-lock-only",
     "release": "npm run check && npm run test && npm run build && changeset publish",
     "size": "node scripts/size.mjs",
+    "size:ssr": "node scripts/ssr-size.mjs",
     "e2e:ssr": "npm run build && node scripts/ssr-apps.mjs && ADT_SSR=1 playwright test e2e/ssr.spec.ts",
     "e2e:visual": "npm run build && ADT_VISUAL=1 playwright test e2e/visual.spec.ts --project=chromium",
     "demo": "npm run build && node scripts/demo-assets.mjs"
