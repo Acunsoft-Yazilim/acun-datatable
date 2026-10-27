@@ -37,6 +37,12 @@ describe('tableToSheet', () => {
     table.selectRows(['3', '1']);
     expect(tableToSheet(table, { rows: 'page' }).rows.map(row => row[0])).toEqual(['Ayşe', 'Ali']);
     expect(tableToSheet(table, { rows: 'selected' }).rows.map(row => row[0])).toEqual(['Ayşe', 'Can']);
+    table.setSorting([{ field: 'customer', direction: 'desc' }]);
+    expect(tableToSheet(table, { rows: 'selected' }).rows.map(row => row[0])).toEqual(['Can', 'Ayşe']); // in view order, as printed
+    table.setGlobalSearch('can');
+    expect(tableToSheet(table, { rows: 'selected' }).rows.map(row => row[0])).toEqual(['Can']); // a selected row the search hides is not exported
+    table.setGlobalSearch('');
+    table.setSorting([]);
     const all = tableToSheet(table, { columns: 'all', value: { secret: () => 'hidden', customer: value => String(value).toUpperCase() } });
     expect(all.headers).toEqual(['Müşteri', 'Tutar', 'Tarih', 'Gizli']);
     expect(all.rows[0]).toEqual(['AYŞE', expect.anything(), new Date(2026, 9, 23), 'hidden']);

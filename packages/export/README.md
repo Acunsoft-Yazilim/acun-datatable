@@ -21,7 +21,8 @@ downloadFile(toCsv(sheet, { delimiter: ';' }), 'siparisler.csv');
 
 - **`tableToSheet(table, options?)`**: the headers and rows of the table.
   `rows: 'all'` (default: every row matching the current filters and search, in
-  the current order), `'page'` or `'selected'`; `columns: 'visible'` (default)
+  the current order), `'page'` or `'selected'` (the selected ones among them,
+  in the same order); `columns: 'visible'` (default)
   or `'all'`; `value: { columnId: (value, row) => cell }` to change a column.
   Typed columns give real numbers, exact decimals, dates and booleans, not
   display text. In server mode only the loaded page is in the browser: export

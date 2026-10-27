@@ -128,6 +128,11 @@ All notable changes to this repository. Each npm package also has its own
 - **Editing rows without an ID field:** after a save the row got a new ID,
   so its selection and open details were lost and the focus fell to the
   page; it now keeps its ID.
+- **Exports and print take the same selected rows:** an export of the
+  selection (`tableToSheet(table, { rows: 'selected' })`, the Excel and CSV
+  buttons) wrote them in data order, with selected rows the search hid; print
+  showed them sorted and filtered. Both now take the selected rows among the
+  matching ones, in the table's order, as DataTables does.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the
