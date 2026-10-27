@@ -72,7 +72,9 @@ or `createHttpDataSource({ url: '/api/orders' })` with the React or Vue package.
   looked for in numbers or dates), sorting with the key as the last
   tie-breaker, and `LIMIT`/`OFFSET` (`OFFSET … FETCH` on SQL Server). `scope`
   is your own condition (tenant, owner) with `?` placeholders, whatever the
-  dialect; every query stays inside it. Filter operators must suit the
+  dialect; every query stays inside it. Every `?` in it is a placeholder,
+  also inside quotes: write literals as values, and PostgreSQL's jsonb `?`
+  operator as `jsonb_exists(…)`. Filter operators must suit the
   column type (`contains` is for text, `gt` not for yes/no), and `LIKE`
   patterns are escaped with `!`, which means the same in every SQL mode.
 - **Cursor paging** (`paging=cursor`): the page continues after the last row

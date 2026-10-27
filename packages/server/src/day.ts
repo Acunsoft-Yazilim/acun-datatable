@@ -17,6 +17,12 @@ export class TableDay extends Date {
  */
 export const exactInstants = new WeakSet<Date>();
 
+const isMidnight = (date: Date): boolean => date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0 && date.getMilliseconds() === 0;
+/** A whole day: a `TableDay` from `readTableQuery` (in the user's zone), or a `Date` at the server's midnight. */
+export const isDay = (value: unknown): value is Date => value instanceof TableDay || (value instanceof Date && !exactInstants.has(value) && isMidnight(value));
+/** The first instant of the day after a whole day. */
+export const nextDay = (date: Date): Date => (date instanceof TableDay ? date.next : new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1));
+
 /** Whether `name` is a time zone this runtime knows (`Europe/Istanbul`, `UTC`). */
 export function isTimeZone(name: unknown): name is string {
   if (typeof name !== 'string' || name === '' || name.length > 64) return false;

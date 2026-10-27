@@ -1,7 +1,7 @@
 import { foldText } from '@acunsoft/datatable-core';
 import { checkIdentifier, type ServerColumn } from './columns';
 import { CURSOR_TEXT, decodeCursor, encodeCursor, sortSignature } from './cursor';
-import { exactInstants, TableDay } from './day';
+import { isDay, nextDay } from './day';
 import { TableQueryError, type ServerFilter, type ServerTableQuery } from './query';
 
 export type SqlDialect = 'postgres' | 'mysql' | 'sqlite' | 'sqlserver';
@@ -54,10 +54,6 @@ export interface SqlTableQuery {
 }
 
 const pad = (value: number): string => String(value).padStart(2, '0');
-const isMidnight = (date: Date): boolean => date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0 && date.getMilliseconds() === 0;
-/** A whole day: a `TableDay` from `readTableQuery` (in the user's zone), or a `Date` at the server's midnight. */
-const isDay = (value: unknown): value is Date => value instanceof TableDay || (value instanceof Date && !exactInstants.has(value) && isMidnight(value));
-const nextDay = (date: Date): Date => (date instanceof TableDay ? date.next : new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1));
 
 /**
  * Parameterized SQL for a checked query (`readTableQuery`): filters, the
