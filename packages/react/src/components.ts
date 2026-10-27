@@ -2,7 +2,7 @@ import {
   createElement as h, Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
   type ChangeEvent, type CSSProperties, type KeyboardEvent, type RefObject, type MouseEvent, type ReactElement, type ReactNode, type SyntheticEvent,
 } from 'react';
-import { getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
+import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import {
   cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, resolveLabels, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
   afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
@@ -11,7 +11,7 @@ import {
 } from '@acunsoft/datatable-dom';
 import {
   actionsCellClass, cellClass, checkActions, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
-  resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, withoutIds, wrapClass,
+  pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, withoutIds, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
@@ -529,13 +529,11 @@ export interface PaginationProps {
 export function Pagination({
   table, siblings = 1, boundaries = 1, firstLast = false, locale = 'en', labels: custom,
 }: PaginationProps): ReactElement {
-  const { page, totalRows } = useTable(table);
+  useTable(table); // follow the table
   const labels = withLabels(custom);
   const numbers = useMemo(() => new Intl.NumberFormat(locale), [locale]);
-  const known = totalRows !== undefined;
-  const items = getPageItems(page.page, knownPageCount(table), { siblings, boundaries });
-  const atStart = page.page <= 1;
-  const atEnd = page.page >= page.pageCount;
+  const page = pagingView(table, knownPageCount(table), { siblings, boundaries });
+  const { known, items, atStart, atEnd } = page;
   const arrow = (name: 'first' | 'previous' | 'next' | 'last', disabled: boolean, target: number): ReactElement => h('button', {
     type: 'button', className: `adt-page adt-page-arrow adt-${name}`, 'aria-label': labels[name],
     'aria-disabled': disabled ? 'true' : undefined, onClick: () => { if (!disabled) table.setPage(target); },
@@ -637,13 +635,11 @@ export interface ColumnToggleProps {
 
 /** A toolbar button's classes, tooltip and content, as `fillButton` builds them in the DOM. */
 function toolbarButton(custom: ToolbarButton | undefined, label: string, fallback: keyof typeof ICONS): { className?: string; title?: string; children: ReactNode[] } {
-  const text = custom?.label ?? label;
-  const chosen = custom?.icon ?? fallback;
-  const className = [custom?.iconOnly ? 'adt-icon-only' : '', custom?.className ?? ''].filter(Boolean).join(' ');
+  const model = toolbarButtonModel(custom, { label, icon: fallback });
   return {
-    ...(className ? { className } : {}),
-    ...(custom?.iconOnly ? { title: text } : {}),
-    children: [chosen === false ? null : icon(chosen), h('span', { className: 'adt-summary-text' }, text)], // spread as arguments, so no keys
+    ...(model.className ? { className: model.className } : {}),
+    ...(model.title !== undefined ? { title: model.title } : {}),
+    children: [model.icon === false ? null : icon(model.icon), h('span', { className: 'adt-summary-text' }, model.label)], // spread as arguments, so no keys
   };
 }
 

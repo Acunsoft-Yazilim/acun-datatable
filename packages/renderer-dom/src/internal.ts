@@ -4,8 +4,9 @@
  * release; use the package's main entry instead.
  */
 export { checkActions } from './actions';
+export { toolbarButtonModel } from './dom';
 export {
   actionsCellClass, cellClass, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels, resizeHandle,
-  responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, withoutIds, wrapClass,
+  pagingView, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, withoutIds, wrapClass,
   type FrameSource, type TotalCell,
 } from './table-model';

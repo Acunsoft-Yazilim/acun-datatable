@@ -1,6 +1,7 @@
 import { getPageItems, type DataTable } from '@acunsoft/datatable-core';
 import { ariaDisabled, checkTarget, element, icon, keepFocus, type RenderedComponent } from './dom';
 import { labelsEn, type DataTableLabels } from './labels';
+import { pagingView } from './table-model';
 
 export interface RenderPaginationOptions {
   /** Pages shown on each side of the current page. Default 1. */
@@ -50,10 +51,7 @@ export function renderPagination<TData>(
   container.replaceChildren(root);
 
   const update = (): void => {
-    const page = table.getPage();
-    const known = table.getTotalRows() !== undefined;
-    const atStart = page.page <= 1;
-    const atEnd = page.page >= page.pageCount;
+    const { page: current, atStart, atEnd, known, items } = pagingView(table, knownPageCount(table), itemOptions);
     if (first) ariaDisabled(first, atStart);
     ariaDisabled(previous, atStart);
     ariaDisabled(next, atEnd);
@@ -62,12 +60,11 @@ export function renderPagination<TData>(
       last.hidden = !known; // the last page of an unknown total is not known
     }
     // Unknown total: number only the pages that are known to exist.
-    const items = getPageItems(page.page, knownPageCount(table), itemOptions);
     keepFocus(numbers, () => numbers.replaceChildren(...items.map(item => {
       if (item === 'gap') return element(doc, 'span', { class: 'adt-page-gap', 'aria-hidden': 'true' }, '…');
       const button = element(doc, 'button', {
         type: 'button', class: 'adt-page', 'aria-label': labels.page(item), 'data-adt-focus': `page:${item}`,
-        'aria-current': item === page.page ? 'page' : undefined,
+        'aria-current': item === current ? 'page' : undefined,
       }, numberFormat.format(item));
       button.addEventListener('click', () => table.setPage(item));
       return button;

@@ -14,3 +14,4 @@ React and Vue draw what the DOM renderer draws:
 - React's and Vue's column menu closes like a menu, as the DOM renderer's: Escape (focus back on its button), a click outside; after "Reset" the focus stays on its button.
 - React and Vue check `rowActions` as the DOM renderer does (an id, a label and `onSelect`, no id twice), and Vue refuses a wrong `size` or `fixedColumns` with an error instead of a warning (a wrong size drew `adt-size--<value>`).
 - **Visible change:** `DataTableLayout` and `AcunDataTableLayout` show the texts of their `locale` (`tr`, `de`, `fr`, `es`), with `labels` over them, as `renderDataTable` does; before, `locale` changed only numbers and dates and the texts stayed English unless `labels` were given.
+- React's and Vue's toolbar buttons (`button`, `toolbarButtons`) refuse an icon that is not an icon name or `{ path }`, as the DOM renderer does.

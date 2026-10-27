@@ -111,21 +111,13 @@ export interface ToolbarButtons {
 export function fillButton(
   doc: Document, button: HTMLElement, defaults: { readonly label: string; readonly icon: keyof typeof ICONS }, custom: ToolbarButton = {},
 ): void {
-  if (custom.icon !== undefined && custom.icon !== false && typeof custom.icon !== 'string' && typeof custom.icon?.path !== 'string') {
-    throw new TypeError('toolbar button icon must be an icon name, { path } or false');
-  }
-  if (typeof custom.icon === 'string' && !(custom.icon in ICONS)) throw new RangeError(`Unknown icon "${custom.icon}"`);
-  const label = custom.label ?? defaults.label;
-  const chosen = custom.icon ?? defaults.icon;
+  const model = toolbarButtonModel(custom, defaults);
   button.prepend(...[
-    ...(chosen === false ? [] : [icon(doc, chosen)]),
-    element(doc, 'span', { class: 'adt-summary-text' }, label),
+    ...(model.icon === false ? [] : [icon(doc, model.icon)]),
+    element(doc, 'span', { class: 'adt-summary-text' }, model.label),
   ]);
-  if (custom.iconOnly) {
-    button.classList.add('adt-icon-only');
-    button.title = label;
-  }
-  if (custom.className) button.classList.add(...custom.className.split(/\s+/).filter(Boolean));
+  if (model.title !== undefined) button.title = model.title;
+  if (model.className) button.classList.add(...model.className.split(' '));
 }
 
 /**
@@ -168,4 +160,25 @@ export function el<K extends keyof HTMLElementTagNameMap>(
     node.append(typeof child === 'number' ? String(child) : child);
   }
   return node;
+}
+
+/**
+ * A toolbar button (columns, filters, tools): its text, icon (`false` for
+ * none), classes, and a title when only the icon shows. Refuses an icon
+ * that is not one of ICONS or `{ path }`.
+ */
+export function toolbarButtonModel(custom: ToolbarButton | undefined, defaults: { readonly label: string; readonly icon: keyof typeof ICONS }): {
+  readonly label: string; readonly icon: keyof typeof ICONS | { readonly path: string } | false; readonly className: string; readonly title: string | undefined;
+} {
+  const chosen = custom?.icon;
+  if (chosen !== undefined && chosen !== false && typeof chosen !== 'string' && typeof chosen?.path !== 'string') {
+    throw new TypeError('toolbar button icon must be an icon name, { path } or false');
+  }
+  if (typeof chosen === 'string' && !(chosen in ICONS)) throw new RangeError(`Unknown icon "${chosen}"`);
+  const label = custom?.label ?? defaults.label;
+  return {
+    label, icon: chosen ?? defaults.icon,
+    className: [custom?.iconOnly ? 'adt-icon-only' : '', ...(custom?.className ?? '').split(/\s+/)].filter(Boolean).join(' '),
+    title: custom?.iconOnly ? label : undefined,
+  };
 }

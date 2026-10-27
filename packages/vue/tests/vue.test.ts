@@ -778,3 +778,14 @@ describe('AcunDataTableLayout locale', () => {
     expect(host.querySelector('.adt-search .adt-sr-only')!.textContent).toBe('Suchen');
   });
 });
+
+describe('toolbar buttons, as the DOM renderer', () => {
+  it('refuses an icon that is not one of ICONS or { path }', async () => {
+    let caught: unknown;
+    app = createApp(defineComponent({ setup: () => () => h(AcunColumnToggle, { table: make(), button: { icon: 'rocket' as never } }) }) as Component);
+    app.config.errorHandler = error => { caught = error; };
+    app.mount(host);
+    await nextTick();
+    expect(String(caught)).toContain('Unknown icon "rocket"');
+  });
+});

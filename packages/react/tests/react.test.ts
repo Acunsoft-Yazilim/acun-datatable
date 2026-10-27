@@ -701,3 +701,10 @@ describe('DataTableLayout locale', () => {
     expect(host.querySelector('.adt-search .adt-sr-only')!.textContent).toBe('Suchen');
   });
 });
+
+describe('toolbar buttons, as the DOM renderer', () => {
+  it('refuses an icon that is not one of ICONS or { path }', () => {
+    expect(() => render(h(ColumnToggle, { table: make(), button: { icon: 'rocket' as never } }))).toThrow('Unknown icon "rocket"');
+    expect(() => render(h(ColumnToggle, { table: make(), button: { icon: 42 as never } }))).toThrow('icon must be an icon name');
+  });
+});

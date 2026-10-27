@@ -1,7 +1,7 @@
 // What the DOM renderer, the React and the Vue adapter decide alike, as plain
 // functions of the table: the renderers only turn the answers into their own
 // elements. Shared through '@acunsoft/datatable-dom/internal' (see internal.ts).
-import { COLUMN_WIDTH_LIMITS, type Aggregate, type RowId } from '@acunsoft/datatable-core';
+import { COLUMN_WIDTH_LIMITS, getPageItems, type Aggregate, type RowId } from '@acunsoft/datatable-core';
 import type { ResponsiveMode, TableSize } from './table';
 
 /** What the class helpers read of a column. */
@@ -221,4 +221,13 @@ export function totalCells<TColumn extends ColumnLike & { readonly header: strin
 /** Placeholder rows show while a table with a status source loads its first rows (unless `skeleton: false`). */
 export function showSkeleton(skeleton: boolean | undefined, hasStatus: boolean, phase: string | undefined, rows: number): boolean {
   return skeleton !== false && hasStatus && phase === 'loading' && rows === 0;
+}
+
+/** Where the page numbers stand: the page, whether it is the first or the last, whether the total is known, the numbers to show. */
+export function pagingView(
+  table: { getPage(): { readonly page: number; readonly pageCount: number }; getTotalRows(): number | undefined },
+  knownPages: number, items: { readonly siblings: number; readonly boundaries: number },
+): { readonly page: number; readonly pageCount: number; readonly atStart: boolean; readonly atEnd: boolean; readonly known: boolean; readonly items: readonly (number | 'gap')[] } {
+  const { page, pageCount } = table.getPage();
+  return { page, pageCount, atStart: page <= 1, atEnd: page >= pageCount, known: table.getTotalRows() !== undefined, items: getPageItems(page, knownPages, items) };
 }

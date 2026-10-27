@@ -3,7 +3,7 @@ import {
   computed, defineComponent, h, nextTick, onBeforeMount, onMounted, onScopeDispose, onUpdated, shallowRef, watch,
   type PropType, type SlotsType, type VNode,
 } from 'vue';
-import { getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
+import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import {
   cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, resolveLabels, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
   afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
@@ -12,7 +12,7 @@ import {
 } from '@acunsoft/datatable-dom';
 import {
   actionsCellClass, cellClass, checkActions, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
-  resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, withoutIds, wrapClass,
+  pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, withoutIds, wrapClass,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
 
@@ -596,11 +596,9 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
 
 /** A toolbar button's summary, as `fillButton` builds it in the DOM. */
 function toolbarSummary(custom: ToolbarButton | undefined, label: string, fallback: keyof typeof ICONS): VNode {
-  const text = custom?.label ?? label;
-  const chosen = custom?.icon ?? fallback;
-  const className = [custom?.iconOnly ? 'adt-icon-only' : '', custom?.className ?? ''].filter(Boolean).join(' ');
-  return h('summary', { ...(className ? { class: className } : {}), ...(custom?.iconOnly ? { title: text } : {}) },
-    [...(chosen === false ? [] : [iconNode(chosen)]), h('span', { class: 'adt-summary-text' }, text)]);
+  const model = toolbarButtonModel(custom, { label, icon: fallback });
+  return h('summary', { ...(model.className ? { class: model.className } : {}), ...(model.title !== undefined ? { title: model.title } : {}) },
+    [...(model.icon === false ? [] : [iconNode(model.icon)]), h('span', { class: 'adt-summary-text' }, model.label)]);
 }
 
 const iconNode = (name: keyof typeof ICONS | { readonly path: string }): VNode => h('svg', {
@@ -630,16 +628,14 @@ export const AcunPagination = /*#__PURE__*/ defineComponent({
     const numbers = computed(() => new Intl.NumberFormat(props.locale));
     return (): VNode => {
       const label = withLabels(props.labels);
-      const page = binding.page.value;
-      const known = binding.totalRows.value !== undefined;
+      void binding.page.value; // follow the table
       const { table } = props;
-      const atStart = page.page <= 1;
-      const atEnd = page.page >= page.pageCount;
+      const page = pagingView(table, knownPageCount(table), { siblings: props.siblings, boundaries: props.boundaries });
+      const { known, items, atStart, atEnd } = page;
       const arrow = (name: 'first' | 'previous' | 'next' | 'last', disabled: boolean, target: number): VNode => h('button', {
         type: 'button', class: `adt-page adt-page-arrow adt-${name}`, 'aria-label': label[name],
         'aria-disabled': disabled ? 'true' : undefined, onClick: () => { if (!disabled) table.setPage(target); },
       }, [iconNode(name)]);
-      const items = getPageItems(page.page, knownPageCount(props.table), { siblings: props.siblings, boundaries: props.boundaries });
       return h('nav', { class: 'adt-paging', 'aria-label': label.pagination }, [
         props.firstLast ? arrow('first', atStart, 1) : null,
         arrow('previous', atStart, page.page - 1),
