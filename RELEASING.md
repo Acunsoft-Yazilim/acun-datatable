@@ -30,8 +30,10 @@ change for users. Commit the generated `.changeset/*.md` with the change.
    "Unreleased" in the root `CHANGELOG.md`, and commit
    (`chore: release 0.x.y`) through a pull request so CI runs.
 2. Start the **Release** workflow by hand (Actions → Release → Run workflow,
-   on `main`). It refuses to run while unversioned changesets exist, runs the
-   end-to-end tests in Chromium, Firefox and WebKit, then `npm run release` (check, test, build,
+   on `main`). A read-only job refuses to run while unversioned changesets
+   exist and runs the end-to-end tests in Chromium, Firefox and WebKit (PHP
+   too, for Livewire); then a second job, the only one with the publish
+   rights, installs without install scripts and runs `npm run release` (check, test, build,
    `changeset publish` through npm trusted publishing, with provenance) and
    pushes the `@acunsoft/…@x.y.z` tags. No npm token is involved.
 

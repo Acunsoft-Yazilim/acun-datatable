@@ -1,7 +1,14 @@
 name: CI
+# main on every push; other branches through their pull request (not twice per push).
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.ref }}
+  # A newer push to a pull request replaces its run; every commit on main is checked.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 # Checks only: the token of these jobs reads the repository and nothing more.
 permissions:
   contents: read
@@ -58,6 +65,12 @@ jobs:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite, zip
           coverage: none
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ runner.os }}-${{ hashFiles('packages/adapter-laravel/composer.json') }}
+          restore-keys: composer-${{ runner.os }}-
       - run: composer update --no-interaction --no-progress --prefer-dist
         working-directory: packages/adapter-laravel
       - run: npm run e2e
@@ -120,6 +133,12 @@ jobs:
           coverage: none
       # A library: no committed lock file; resolve the newest versions allowed
       # by composer.json for this PHP version.
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ runner.os }}-${{ hashFiles('packages/adapter-laravel/composer.json') }}
+          restore-keys: composer-${{ runner.os }}-
       - run: composer update --no-interaction --no-progress --prefer-dist
       - run: composer test
 
@@ -154,6 +173,12 @@ jobs:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite, pdo_pgsql, pdo_mysql, zip
           coverage: none
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ runner.os }}-${{ hashFiles('packages/adapter-laravel/composer.json') }}
+          restore-keys: composer-${{ runner.os }}-
       - run: composer update --no-interaction --no-progress --prefer-dist
       - name: PostgreSQL
         run: vendor/bin/phpunit --filter PostgresCountTest
