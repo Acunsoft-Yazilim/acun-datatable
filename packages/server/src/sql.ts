@@ -1,6 +1,6 @@
 import { foldText } from '@acunsoft/datatable-core';
 import { checkIdentifier, type ServerColumn } from './columns';
-import { decodeCursor, encodeCursor, sortSignature } from './cursor';
+import { CURSOR_TEXT, decodeCursor, encodeCursor, sortSignature } from './cursor';
 import { exactInstants, TableDay } from './day';
 import { TableQueryError, type ServerFilter, type ServerTableQuery } from './query';
 
@@ -203,7 +203,14 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
       pageWhere = `${filterSql}${filterSql ? ' AND' : ' WHERE'} ${bound === undefined ? '' : `${bound} AND `}${nest(0)}`;
     }
   }
-  const page: SqlStatement = { text: `SELECT ${select} FROM ${table}${pageWhere} ${orderBy} ${limit}`, values };
+  // node-postgres reads a timestamp as a Date, which keeps milliseconds: a cursor made from it
+  // would repeat or skip rows stored with microseconds. The page also reads each date-time sort
+  // column as text (any DateStyle), and the cursor carries that.
+  const exact = dialect === 'postgres' && query.cursorPaging
+    ? orders.map((order, index) => (query.sorting[index]?.column.type === 'datetime' ? `${CURSOR_TEXT}${index}` : undefined))
+    : [];
+  const texts = exact.map((alias, index) => (alias ? `, to_char(${quote(orders[index]!.column)}, 'YYYY-MM-DD HH24:MI:SS.US OF') AS "${alias}"` : '')).join('');
+  const page: SqlStatement = { text: `SELECT ${select}${texts} FROM ${table}${pageWhere} ${orderBy} ${limit}`, values };
   if (values.length > MAX_BINDINGS[dialect]) {
     throw new TableQueryError('filters', `the query needs ${values.length} values; ${dialect} allows ${MAX_BINDINGS[dialect]} per statement`);
   }
@@ -211,7 +218,9 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
   return Object.freeze({
     page,
     count,
-    cursorOf: (row: Readonly<Record<string, unknown>>) => encodeCursor(signature, orders.map(order => {
+    cursorOf: (row: Readonly<Record<string, unknown>>) => encodeCursor(signature, orders.map((order, index) => {
+      const text = exact[index] === undefined ? undefined : row[exact[index]!];
+      if (typeof text === 'string') return text;
       const name = order.column.split('.').pop()!;
       if (!(name in row)) throw new TypeError(`the row has no "${name}" for the cursor; select it (${keyName} too)`);
       return row[name];

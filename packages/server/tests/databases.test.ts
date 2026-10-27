@@ -144,3 +144,44 @@ for (const [name, url, open] of servers) {
     });
   });
 }
+
+// node-postgres reads timestamps as Dates (milliseconds): rows stored with microseconds
+// inside one millisecond must still page by cursor once each, in order.
+describe.skipIf(!process.env['ADT_TEST_PGSQL'])('cursor paging on PostgreSQL timestamps with microseconds', () => {
+  const stamped = defineColumns({ at: { type: 'datetime', sortable: true }, zoned: { type: 'datetime', sortable: true } });
+  let client: { query(text: string, values?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>; end(): Promise<void> };
+  beforeAll(async () => {
+    const { default: pg } = await import('pg');
+    client = new pg.Client({ connectionString: process.env['ADT_TEST_PGSQL'] });
+    await (client as unknown as { connect(): Promise<void> }).connect();
+    await client.query('CREATE TEMPORARY TABLE adt_stamped (id int PRIMARY KEY, at timestamp, zoned timestamptz)');
+    for (let id = 1; id <= 10; id++) {
+      const micro = String((id * 7) % 10) + String(id % 10) + '5'; // .123 plus three digits, not in id order
+      await client.query('INSERT INTO adt_stamped VALUES ($1, $2, $3)', [id, `2026-10-01 10:00:00.123${micro}`, `2026-10-01 10:00:00.123${micro}+00`]);
+    }
+  }, 60_000);
+  afterAll(async () => { await client?.end(); });
+
+  for (const sort of ['at:asc', 'at:desc', 'zoned:asc', 'zoned:desc']) {
+    it(`pages ${sort} by cursor to the rows OFFSET gives`, async () => {
+      const ask = async (params: string) => {
+        const query = readTableQuery(new URLSearchParams(params), stamped);
+        const sql = sqlQuery(query, stamped, { dialect: 'postgres', table: 'adt_stamped' });
+        return tableResponse(query, (await client.query(sql.page.text, [...sql.page.values])).rows, undefined, { cursorOf: sql.cursorOf });
+      };
+      const byOffset = ((await ask(`sort=${sort}&pageSize=10`))['rows'] as { id: number }[]).map(row => row.id);
+      const byCursor: number[] = [];
+      let cursor: string | undefined;
+      let pages = 0;
+      do {
+        const body = await ask(`sort=${sort}&pageSize=3&paging=cursor${cursor ? `&cursor=${cursor}` : ''}`);
+        const rows = body['rows'] as Record<string, unknown>[];
+        expect(Object.keys(rows[0]!).some(name => name.startsWith('__adt'))).toBe(false); // cursor text is not answered
+        byCursor.push(...rows.map(row => Number(row['id'])));
+        cursor = body['nextCursor'] as string | undefined;
+      } while (cursor && ++pages < 10);
+      expect(new Set(byOffset).size).toBe(10);
+      expect(byCursor).toEqual(byOffset);
+    });
+  }
+});

@@ -1,3 +1,4 @@
+import { CURSOR_TEXT } from './cursor';
 import { TableQueryError, type ServerTableQuery } from './query';
 
 export interface TableResponseOptions<TRow> {
@@ -5,7 +6,7 @@ export interface TableResponseOptions<TRow> {
   readonly cursorOf?: (row: TRow) => string;
   /** DataTables' `recordsTotal` (every row before filters). Default: the filtered total. */
   readonly recordsTotal?: number;
-  /** Map each row to what the browser should get (leave out what it must not see). */
+  /** Map each row to what the browser should get (leave out what it must not see). It also gets `sqlQuery`'s `__adt_cursor_…` columns. */
   readonly map?: (row: TRow) => unknown;
   /**
    * `total` is a lower bound: you stopped counting (e.g. counted at most
@@ -28,7 +29,10 @@ export function tableResponse<TRow extends Record<string, unknown>>(query: Serve
   const page = more ? rows.slice(0, query.pageSize) : rows;
   const count = total === undefined ? undefined : Number(total); // drivers return COUNT(*) as bigint or text
   if (count !== undefined && (!Number.isSafeInteger(count) || count < 0)) throw new TypeError('total must be a whole number');
-  const out = options.map ? page.map(options.map) : [...page];
+  // sqlQuery's cursor columns are for cursorOf only.
+  const own = page[0] ? Object.keys(page[0]).filter(name => name.startsWith(CURSOR_TEXT)) : [];
+  const out = options.map ? page.map(options.map)
+    : own.length > 0 ? page.map(row => Object.fromEntries(Object.entries(row).filter(([name]) => !name.startsWith(CURSOR_TEXT)))) : [...page];
   if (query.draw !== undefined) {
     return { draw: query.draw, recordsTotal: options.recordsTotal ?? count ?? out.length, recordsFiltered: count ?? out.length, data: out };
   }

@@ -101,6 +101,11 @@ All notable changes to this repository. Each npm package also has its own
   page below its button (above when there is no room), inside the window, and
   follows the button while the page or the table scrolls; in the DOM
   renderer, React, Vue, the Web Component and Livewire.
+- **Cursor paging over PostgreSQL timestamps with microseconds:** the Node
+  back end's cursor took node-postgres' `Date`, which keeps milliseconds, so
+  an ascending sort served the same rows again without end and a descending
+  one skipped rows (10 rows in one millisecond: 7 skipped, measured). The page
+  now also reads each date-time sort column as text for the cursor.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the

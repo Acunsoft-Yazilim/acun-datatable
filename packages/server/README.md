@@ -86,9 +86,11 @@ or `createHttpDataSource({ url: '/api/orders' })` with the React or Vue package.
   are tied to their sort. Mark sort columns that may hold `NULL` with
   `nullable: true`, so later pages also reach the `NULL` rows (in the
   database's own `NULL` order). Big integers (`bigint`) and dates travel in
-  the cursor as they are. node-postgres reads timestamps as JavaScript
-  dates, which keep milliseconds: sort by a `timestamp(3)` column, or have
-  the driver return timestamps as text, so microseconds never split a page.
+  the cursor as they are. On PostgreSQL the page also reads each date-time
+  sort column as text (`__adt_cursor_…`, left out by `tableResponse`), so
+  microseconds that node-postgres' `Date` drops never repeat or skip rows.
+  mysql2 and mssql read `datetime(6)` / `datetime2` as `Date` too: sort by a
+  column with milliseconds at most, or have the driver return dates as text.
 - **`prismaQuery`** gives `findMany` / `count` arguments instead
   (`insensitive: false` on MySQL, SQLite and SQL Server). Nullable sort
   columns are sorted with `nulls` (Prisma 4.16 or later).

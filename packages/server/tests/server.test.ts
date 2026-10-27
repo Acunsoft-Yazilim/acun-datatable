@@ -221,6 +221,21 @@ describe('NULL values, big integers and odd requests', () => {
     expect(next({ score: null, id: 4 }).text).toContain('WHERE "score" IS NULL AND ("score" IS NULL AND "id" > $1)');
   });
 
+  it('reads PostgreSQL date-time sort columns as text for the cursor, which the answer leaves out', () => {
+    const stamped = defineColumns({ at: { type: 'datetime', sortable: true }, name: { sortable: true } });
+    const query = readTableQuery(new URLSearchParams('sort=at:desc,name:asc&paging=cursor&pageSize=1'), stamped);
+    const sql = sqlQuery(query, stamped, { dialect: 'postgres', table: 'events', select: ['id', 'at', 'name'] });
+    expect(sql.page.text).toContain(`SELECT "id", "at", "name", to_char("at", 'YYYY-MM-DD HH24:MI:SS.US OF') AS "__adt_cursor_0" FROM "events"`);
+    const rows = [0, 1].map(id => ({ id, at: new Date(2026, 9, 1, 10, 0, 0, 123), name: 'a', __adt_cursor_0: `2026-10-01 10:00:00.12345${id} +03` }));
+    const body = tableResponse(query, rows, undefined, { cursorOf: sql.cursorOf });
+    expect(body['rows']).toEqual([{ id: 0, at: rows[0]!.at, name: 'a' }]);
+    const next = sqlQuery(readTableQuery(new URLSearchParams(`sort=at:desc,name:asc&paging=cursor&cursor=${body['nextCursor']}`), stamped), stamped, { dialect: 'postgres', table: 'events' });
+    expect(next.page.values[0]).toBe('2026-10-01 10:00:00.123450 +03'); // the microseconds, not the Date
+    // Offset paging and the other dialects read no extra column.
+    expect(sqlQuery(readTableQuery(new URLSearchParams('sort=at:desc'), stamped), stamped, { dialect: 'postgres', table: 'events' }).page.text).not.toContain('to_char');
+    expect(sqlQuery(query, stamped, { dialect: 'sqlite', table: 'events' }).page.text).not.toContain('__adt');
+  });
+
   it('carries big integers and keeps Prisma NULL-aware', () => {
     const query = readTableQuery(new URLSearchParams('sort=score:asc&paging=cursor'), scored);
     const prisma = prismaQuery(query, scored);
