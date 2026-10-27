@@ -5,6 +5,21 @@ All notable changes to this repository. Each npm package also has its own
 
 ## Unreleased
 
+- **React render loop fixed:** `useDataTable` with a new `data` array on every
+  render (`orders.filter(…)`) no longer renders without end.
+- **Server-side exports fixed:** `@acunsoft/datatable` fetched 1,000 rows a
+  request, which the Node back end refused (422) and Laravel's DataTables
+  answer cut to 100 rows. It now asks for `exportPageSize` rows (new, default
+  100) and pages by what a back end answers.
+- **Laravel counts of `distinct()`, `having()` and union queries fixed:** a
+  distinct join counted 1 row (and Laravel's own exact count counted
+  duplicates); they are counted as a subquery with their columns. Export size
+  checks stop after limit + 1 rows instead of counting every row.
+- **Filter days in the user's time zone:** with a day among the filters,
+  `datatable-http` sends `tz` (the browser's zone); the Node server and
+  Laravel take the day there, so a server in UTC no longer shifts Istanbul's
+  days by three hours. `timeZone` (Node) and `TableResponse::timeZone()`
+  (Laravel) let the server decide. Without `tz` nothing changes.
 - **Import protocol (not released yet):** `acun-import/1`
   ([packages/import/PROTOCOL.md](packages/import/PROTOCOL.md)) and its test kit
   in the private `@acunsoft/datatable-import` package: answer readers, the
