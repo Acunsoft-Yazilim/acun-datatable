@@ -125,6 +125,9 @@ All notable changes to this repository. Each npm package also has its own
   button (`@acunsoft/datatable`) and Livewire's `exportDelimiter()` wrote `;`
   only for exactly `tr`; now for `tr`, `de`, `fr` and `es`, regional tags
   included.
+- **Editing rows without an ID field:** after a save the row got a new ID,
+  so its selection and open details were lost and the focus fell to the
+  page; it now keeps its ID.
 - **Import fixes (not released yet):** the client sends its headers and
   cookies only to its own origin (an error report on another host got the
   bearer token); a chunked upload is counted while it is read (413 past the

@@ -492,6 +492,24 @@ describe('editing in place', () => {
     expect(orders[0]!.customer).toBe('Ayşe 1'); // your array is not changed
   });
 
+  it('keeps the row, its selection and the focus when the rows have no ID field', async () => {
+    const plain = orders.slice(0, 3).map(({ customer, total }) => ({ customer, total })); // e.g. read from <table> markup
+    const dt = new AcunDataTable('#orders', { data: plain, selectable: true, onEdit: async () => undefined, columns: [{ data: 'customer', title: 'Customer', editable: true }, { data: 'total' }] });
+    await dt.ready;
+    dt.table!.toggleRow(dt.table!.getCoreRows()[0]!.id);
+    const before = dt.table!.getState().selectedIds;
+    const button = dt.element.querySelector<HTMLButtonElement>('tbody tr:first-child .adt-edit')!;
+    button.focus();
+    button.click();
+    const input = dt.element.querySelector<HTMLInputElement>('.adt-edit-control')!;
+    input.value = 'Renamed';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await vi.waitFor(() => expect(dt.element.querySelector('.adt-editor')).toBeNull());
+    expect(dt.element.querySelector('tbody tr:first-child td:not(.adt-select)')!.textContent).toBe('Renamed');
+    expect(dt.table!.getState().selectedIds).toEqual(before); // the same row, still selected
+    expect(document.activeElement).toBe(dt.element.querySelector('tbody tr:first-child .adt-edit')); // focus back on its button
+  });
+
   it('reloads the page of a server table after a save', async () => {
     const fetch = json({ rows: orders.slice(0, 5), totalRows: 30 });
     vi.stubGlobal('fetch', fetch);

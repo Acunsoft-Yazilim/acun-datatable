@@ -278,6 +278,8 @@ export class AcunDataTable {
   /** The columns' `render` and `cell` options, as the renderer gets them (for printing). */
   #format: Record<string, CellFormatter<Data>> = {};
   #cells: Record<string, CellRenderer<Data>> = {};
+  /** Rows without an ID field: an ID per row object (selection then lasts while the rows do). */
+  #rowIds = new WeakMap<object, string>();
 
   constructor(target: string | HTMLElement, options: AcunDataTableOptions = {}) {
     const node = typeof target === 'string' ? document.querySelector<HTMLElement>(target) : target;
@@ -412,7 +414,6 @@ export class AcunDataTable {
       .filter((column): column is ColumnOptions => 'data' in column && column.visible === false)
       .map(column => column.data);
     const rowId = options.rowId ?? (columns.some(column => column.id === 'id') ? 'id' : undefined);
-    const fallback = new WeakMap<object, string>();
     let next = 0;
     const table = createDataTable<Data>({
       mode,
@@ -424,9 +425,8 @@ export class AcunDataTable {
         if (typeof rowId === 'function') return rowId(row);
         const value = rowId === undefined ? undefined : row[rowId];
         if (typeof value === 'string' || typeof value === 'number') return value;
-        // No ID field: a stable ID per row object (selection then lasts while the rows do).
-        let id = fallback.get(row);
-        if (id === undefined) fallback.set(row, id = `row-${++next}`);
+        let id = this.#rowIds.get(row);
+        if (id === undefined) this.#rowIds.set(row, id = `row-${++next}`);
         return id;
       },
       initialState: {
@@ -668,6 +668,10 @@ export class AcunDataTable {
       return;
     }
     const updated = isPlainObject(result) ? result as Data : { ...edit.row.original, [field]: edit.value };
+    // The edited row is a new object: without an ID field it keeps the old one, and with it its
+    // selection, its open details and the focus the editor gives back.
+    const id = this.#rowIds.get(edit.row.original as object);
+    if (id !== undefined && !this.#rowIds.has(updated as object)) this.#rowIds.set(updated as object, id);
     this.#setData(this.table.getCoreRows().map(row => (row.id === edit.row.id ? updated : row.original)));
   }
 

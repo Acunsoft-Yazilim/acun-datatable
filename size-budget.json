@@ -19,7 +19,7 @@
   "import { createDataTable } from '@acunsoft/datatable-core'": 11500,
   "import { renderDataTable } from '@acunsoft/datatable-dom'": 24300,
   "import { connectTable, createHttpDataSource, createQueryRunner } from '@acunsoft/datatable-http'": 4400,
-  "import { AcunDataTable } from '@acunsoft/datatable'": 44300,
+  "import { AcunDataTable } from '@acunsoft/datatable'": 44600,
   "import { useDataTable } from '@acunsoft/datatable-react'": 11900,
   "import { Pagination } from '@acunsoft/datatable-react'": 5600,
   "import { DataTableLayout } from '@acunsoft/datatable-react'": 23900,
