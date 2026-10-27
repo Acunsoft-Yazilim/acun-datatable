@@ -31,7 +31,7 @@ change for users. Commit the generated `.changeset/*.md` with the change.
    (`chore: release 0.x.y`) through a pull request so CI runs.
 2. Start the **Release** workflow by hand (Actions → Release → Run workflow,
    on `main`). It refuses to run while unversioned changesets exist, runs the
-   Chromium end-to-end tests, then `npm run release` (check, test, build,
+   end-to-end tests in Chromium, Firefox and WebKit, then `npm run release` (check, test, build,
    `changeset publish` through npm trusted publishing, with provenance) and
    pushes the `@acunsoft/…@x.y.z` tags. No npm token is involved.
 

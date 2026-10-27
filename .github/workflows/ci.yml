@@ -2,6 +2,9 @@ name: CI
 on:
   push:
   pull_request:
+# Checks only: the token of these jobs reads the repository and nothing more.
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest

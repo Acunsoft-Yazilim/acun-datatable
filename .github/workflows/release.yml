@@ -42,8 +42,9 @@ jobs:
         run: |
           pending=$(find .changeset -name '*.md' ! -name 'README.md')
           if [ -n "$pending" ]; then echo "Run 'npm run version-packages' first:"; echo "$pending"; exit 1; fi
-      - run: npx playwright install --with-deps chromium
-      - run: npm run e2e:chromium
+      # The same browsers as CI: a release is not tested on less than a push.
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run e2e
       # check + test + build + changeset publish (only versions not yet on npm).
       - run: npm --version
       - run: npm run release

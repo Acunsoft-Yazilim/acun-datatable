@@ -19,6 +19,10 @@ concurrency:
   group: split-laravel
   cancel-in-progress: false
 
+# The mirror is pushed with SPLIT_TOKEN; GITHUB_TOKEN only checks out.
+permissions:
+  contents: read
+
 jobs:
   split:
     runs-on: ubuntu-latest
