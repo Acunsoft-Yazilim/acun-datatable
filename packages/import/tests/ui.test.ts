@@ -206,4 +206,31 @@ describe('openImport, clicked twice', () => {
     await choose(other, new File(['y'], 'other.csv', { type: 'text/csv' }));
     expect(keys[2]).not.toBe(keys[0]); // another file: another key
   });
+
+  it('offers to send the file again after a 5xx, a 429 or a network error, not after a 422', async () => {
+    const keys: string[] = [];
+    const failures: unknown[] = [new ImportRequestError({ status: 503, message: 'Busy.', errors: {} }), new TypeError('The upload failed (network).'), new ImportRequestError({ status: 422, message: 'No header row.', errors: {} })];
+    const client = fakeClient({
+      upload: vi.fn(async (_file: File, options?: { idempotencyKey?: string }) => {
+        keys.push(options?.idempotencyKey ?? '');
+        const failure = failures.shift();
+        if (failure) throw failure;
+        return mapping;
+      }),
+    });
+    const { element: dialog } = openImport({ client, language: 'en' });
+    await flush();
+    await choose(dialog);
+    const retry = () => [...dialog.querySelectorAll<HTMLButtonElement>('[role="alert"] button')].find(node => /try again/i.test(node.textContent ?? ''));
+    expect(dialog.querySelector('[role="alert"]')!.textContent).toContain('Busy.');
+    retry()!.click(); // the same file, the same key
+    await flush();
+    expect(dialog.querySelector('[role="alert"]')!.textContent).toContain('could not be reached');
+    retry()!.click();
+    await flush();
+    expect(dialog.querySelector('[role="alert"]')!.textContent).toContain('No header row.');
+    expect(retry()).toBeUndefined(); // the file itself is wrong: choose another
+    expect(new Set(keys).size).toBe(1);
+    expect(keys).toHaveLength(3);
+  });
 });

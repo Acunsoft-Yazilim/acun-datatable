@@ -207,7 +207,13 @@ export function openImport(options: OpenImportOptions): ImportDialog {
       current = state;
       if (state.status === 'mapping') mappingStep(state);
       else follow(state);
-    }, error => { if (!closed) fileStep(messageOf(error)); });
+    }, error => {
+      if (closed || (error as Error)?.name === 'AbortError') return; // closed, or another file was chosen
+      // Busy, failed or offline: the same file again (the same key, so never a second import).
+      const transient = !(error instanceof ImportRequestError) || error.status === 429 || error.status >= 500;
+      if (transient) fileStep(undefined, alert(messageOf(error), button(labels.retry, () => upload(file))));
+      else fileStep(messageOf(error));
+    });
   };
 
   // ---- Step 2: the mapping

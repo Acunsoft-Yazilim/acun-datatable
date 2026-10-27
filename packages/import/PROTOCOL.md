@@ -237,7 +237,7 @@ same shape as the query protocol's errors and as Laravel's validation errors.
 | `413` | The file is larger than the back end takes. |
 | `415` | A file type the back end does not take. |
 | `422` | Anything else wrong with the file or the mapping. |
-| `429` | Too many requests (`Retry-After` is honoured). |
+| `429` | Too many requests: polling waits for `Retry-After` and goes on; an upload is offered again. |
 | `5xx` | The back end failed; the UI offers to try again. |
 
 ## What a back end MUST do
