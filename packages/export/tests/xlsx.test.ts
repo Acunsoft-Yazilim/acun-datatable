@@ -156,6 +156,13 @@ describe('readXlsx safety', () => {
   });
 });
 
+describe('text that looks like an escape', () => {
+  it('reads back exactly, _x0041_ included', async () => {
+    const sheet: Sheet = { headers: ['Note'], rows: [['_x0041_ literal'], ['a_x0041_b_x00'], ['_x005F_']] };
+    expect((await readXlsx(toXlsx(sheet))).rows).toEqual(sheet.rows);
+  });
+});
+
 describe('zip limits', () => {
   it('count every part read, and the real size of a stored entry', async () => {
     const zip = writeZip([{ name: 'a', data: new Uint8Array(1_000) }, { name: 'b', data: new Uint8Array(1_000) }]);

@@ -91,7 +91,8 @@ export function toXlsx(sheet: Sheet, options: ToXlsxOptions = {}): Uint8Array {
     }
     const text = cell.length > MAX_TEXT ? cell.slice(0, MAX_TEXT) : cell;
     note(text);
-    return `<c r="${ref}" t="inlineStr"${header ? ' s="1"' : ''}><is><t xml:space="preserve">${xmlText(text)}</t></is></c>`;
+    // A literal _xHHHH_ would be read as an escaped character: Excel writes its _ as _x005F_.
+    return `<c r="${ref}" t="inlineStr"${header ? ' s="1"' : ''}><is><t xml:space="preserve">${xmlText(text.replace(/_x(?=[0-9a-fA-F]{4}_)/g, '_x005F_x'))}</t></is></c>`;
   };
 
   const rowsXml: string[] = [];
