@@ -168,3 +168,42 @@ describe('openImport', () => {
     expect(importButton({ url: '/x', label: 'Load' }).label).toBe('Load');
   });
 });
+
+describe('openImport, clicked twice', () => {
+  it('starts once while the first start runs', async () => {
+    let finish: (state: ImportState) => void = () => undefined;
+    const client = fakeClient({ start: vi.fn(() => new Promise<ImportState>(resolve => { finish = resolve; })) });
+    const { element: dialog } = openImport({ client, language: 'en' });
+    await flush();
+    await choose(dialog);
+    const button = [...dialog.querySelectorAll<HTMLButtonElement>('.adt-import-actions button')].find(node => node.getAttribute('aria-disabled') === null && /import/i.test(node.textContent ?? ''))!;
+    button.click();
+    button.click(); // a double click
+    expect(client.start).toHaveBeenCalledOnce();
+    finish(done);
+    await flush();
+  });
+
+  it('sends a file again with the same idempotency key, a new file with a new one', async () => {
+    const keys: string[] = [];
+    let fail = true;
+    const client = fakeClient({
+      upload: vi.fn(async (_file: File, options?: { idempotencyKey?: string }) => {
+        keys.push(options?.idempotencyKey ?? '');
+        if (fail) { fail = false; throw new ImportRequestError({ status: 503, message: 'Try again.', errors: {} }); }
+        return mapping;
+      }),
+    });
+    const { element: dialog } = openImport({ client, language: 'en' });
+    await flush();
+    const file = new File(['x'], 'orders.csv', { type: 'text/csv' });
+    await choose(dialog, file); // fails
+    await choose(dialog, file); // the same file again: the same key
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).toBe(keys[0]);
+    const { element: other } = openImport({ client, language: 'en' });
+    await flush();
+    await choose(other, new File(['y'], 'other.csv', { type: 'text/csv' }));
+    expect(keys[2]).not.toBe(keys[0]); // another file: another key
+  });
+});

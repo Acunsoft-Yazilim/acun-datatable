@@ -233,3 +233,44 @@ describe('createImportHandler', () => {
     }
   });
 });
+
+describe('two starts at once (a double click, a retry)', () => {
+  const twoStarts = async (first: typeof globalThis.fetch, second: typeof globalThis.fetch) => {
+    const uploaded = await (await upload(first, csv('Customer\nAyşe\nAli\nCan'))).json() as { id: string };
+    const body = { mapping: ['customer'], mode: 'insert' };
+    const answers = await Promise.all([start(first, uploaded.id, body), start(second, uploaded.id, body)]);
+    return answers.map(answer => answer.status).sort();
+  };
+  const counting = () => {
+    let saved = 0;
+    return {
+      save: async (rows: readonly ImportRow[], context: ImportSaveContext) => { await instant(); saved += rows.length; context.inserted(rows.length); },
+      saved: () => saved,
+    };
+  };
+
+  it('run one import with the memory store', async () => {
+    const rows = counting();
+    const { fetch } = setup({ store: memoryImportStore(), save: rows.save });
+    expect(await twoStarts(fetch, fetch)).toEqual([200, 409]);
+    expect(rows.saved()).toBe(3);
+  });
+
+  it('run one import with a store of your own that cannot claim (one process)', async () => {
+    const rows = counting();
+    const { claim: _claim, ...store } = memoryImportStore();
+    const { fetch } = setup({ store, save: rows.save });
+    expect(await twoStarts(fetch, fetch)).toEqual([200, 409]);
+    expect(rows.saved()).toBe(3);
+  });
+
+  it('run one import across two handlers sharing a folder (two processes)', async () => {
+    const folder = mkdtempSync(`${tmpdir()}/adt-claim-`);
+    folders.push(folder);
+    const rows = counting();
+    const one = setup({ store: directoryImportStore(folder), save: rows.save });
+    const two = setup({ store: directoryImportStore(folder), save: rows.save });
+    expect(await twoStarts(one.fetch, two.fetch)).toEqual([200, 409]);
+    expect(rows.saved()).toBe(3);
+  });
+});

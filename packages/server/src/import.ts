@@ -90,6 +90,13 @@ export interface ImportStore {
   /** The import an idempotency key already gave, if any. */
   getKey(key: string): Promise<string | undefined>;
   putKey(key: string, id: string, keepMs: number): Promise<void>;
+  /**
+   * Take the start of an import: true for the first caller only, false after.
+   * Two starts at once then run one import, not two. A store shared by several
+   * processes makes this atomic across them (the folder store does); without
+   * it the handler only guards its own process.
+   */
+  claim?(id: string, keepMs: number): Promise<boolean>;
 }
 
 /** Texts of refusals (the row checks use `locale`). */
@@ -185,6 +192,7 @@ export function memoryImportStore(): ImportStore {
   const states = new Map<string, { state: StoredImport; until: number }>();
   const files = new Map<string, { bytes: Uint8Array; until: number }>();
   const keys = new Map<string, { id: string; until: number }>();
+  const claims = new Map<string, { until: number }>();
   const alive = <T extends { until: number }>(map: Map<string, T>, key: string): T | undefined => {
     const entry = map.get(key);
     if (entry && entry.until < Date.now()) { map.delete(key); return undefined; }
@@ -198,6 +206,11 @@ export function memoryImportStore(): ImportStore {
     deleteFile: async (id, name) => { files.delete(`${id}/${name}`); },
     getKey: async key => alive(keys, key)?.id,
     putKey: async (key, id, keepMs) => { keys.set(key, { id, until: Date.now() + keepMs }); },
+    claim: async (id, keepMs) => {
+      if (alive(claims, id)) return false;
+      claims.set(id, { until: Date.now() + keepMs });
+      return true;
+    },
   };
 }
 
@@ -235,6 +248,17 @@ export function directoryImportStore(directory: string): ImportStore {
     deleteFile: async (id, name) => { await (await fs).rm(path(id, name), { force: true }); },
     getKey: async key => readJson<string>(path('keys', `${await digest(key)}.json`)),
     putKey: async (key, id, keepMs) => write(path('keys', `${await digest(key)}.json`), JSON.stringify({ until: Date.now() + keepMs, value: id })),
+    // An exclusive create ('wx') is atomic on one machine: one process wins.
+    claim: async id => {
+      const { mkdir, writeFile } = await fs;
+      await mkdir(path(id), { recursive: true });
+      try {
+        await writeFile(path(id, 'start.claim'), '', { flag: 'wx' });
+        return true;
+      } catch {
+        return false;
+      }
+    },
   };
 }
 
@@ -295,6 +319,7 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
   const chunkSize = Math.max(1, options.chunkSize ?? 1_000);
   const store = options.store ?? memoryImportStore();
   const cancelled = new Set<string>();
+  const starting = new Set<string>(); // starts being taken in this process
   const definitions = options.columns.map(column => ({ id: column.id, header: column.title ?? column.id, accessorKey: column.id, ...(column.type ? { type: column.type } : {}) })) as unknown as ColumnDef<Record<string, unknown>>[];
   const titles = new Map(options.columns.map(column => [column.id, column.title ?? column.id]));
   const required = options.columns.filter(column => column.required).map(column => column.id);
@@ -502,19 +527,32 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
       const body: unknown = await request.json().catch(() => undefined);
       const problems = checkStart(body, state.headers);
       if (Object.keys(problems).length > 0) return json(422, { message: Object.values(problems)[0], errors: problems });
-      const start = body as { mapping: (string | null)[]; mode?: ImportMode };
-      state.mapping = start.mapping;
-      state.mode = start.mode ?? modes[0]!;
-      if (options.background?.({ rows: state.rows })) {
-        state.status = 'queued';
+      // One start wins: two at once (a double click, a retry) must not run the import twice. The
+      // claim is the store's (across processes); this process also holds it until the import is
+      // marked as started, for stores without one.
+      if (starting.has(state.id)) return problem(409, text.started);
+      starting.add(state.id);
+      try {
+        if (store.claim && !(await store.claim(state.id, keepMs))) return problem(409, text.started);
+        const latest = await load(state.id);
+        if (!latest || latest.status !== 'mapping') return problem(409, text.started);
+        Object.assign(state, latest);
+        const start = body as { mapping: (string | null)[]; mode?: ImportMode };
+        state.mapping = start.mapping;
+        state.mode = start.mode ?? modes[0]!;
+        if (options.background?.({ rows: state.rows })) {
+          state.status = 'queued';
+          await store.put(state, keepMs);
+          const run = () => process(state.id);
+          if (options.schedule) options.schedule(run, { id: state.id, rows: state.rows });
+          else setTimeout(() => { void run(); }, 0);
+          return json(200, view(state));
+        }
+        state.status = 'running';
         await store.put(state, keepMs);
-        const run = () => process(state.id);
-        if (options.schedule) options.schedule(run, { id: state.id, rows: state.rows });
-        else setTimeout(() => { void run(); }, 0);
-        return json(200, view(state));
+      } finally {
+        starting.delete(state.id);
       }
-      state.status = 'running';
-      await store.put(state, keepMs);
       await process(state.id);
       return json(200, view((await store.get(state.id)) ?? state));
     }

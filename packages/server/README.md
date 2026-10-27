@@ -199,6 +199,10 @@ export const GET = ordersImport.handle, POST = ordersImport.handle, DELETE = ord
   processes on one machine), or your own `ImportStore` (a database, S3,
   Redis …). Imports and files are kept for `keepMs` (a day); the upload is
   deleted when the import ends; the error report is a formula-guarded CSV.
+  Two starts of one import at once (a double click, a retry) run it once:
+  the handler guards its own process, and a store's optional `claim(id)`
+  makes it atomic across processes (the folder store's does; give your own
+  store one, e.g. Redis `SET NX` or a unique row, when several servers share it).
 
 ## Security checklist
 

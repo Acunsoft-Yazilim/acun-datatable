@@ -186,6 +186,13 @@ export function openImport(options: OpenImportOptions): ImportDialog {
   };
 
   // ---- Uploading
+  // One key per file: sending the same file again (after an error, a lost answer) gives the
+  // import the back end already has, not a second one.
+  const keys = new WeakMap<File, string>();
+  const keyOf = (file: File): string => {
+    if (!keys.has(file)) keys.set(file, importKey());
+    return keys.get(file)!;
+  };
   const upload = (file: File): void => {
     running?.abort();
     running = new AbortController();
@@ -193,7 +200,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
     show('uploading', heading(labels.uploading(file.name)), h('p', { class: 'adt-import-file' }, icon('file'), `${file.name} · ${size(file.size)}`), bar);
     live.textContent = labels.uploading(file.name);
     client.upload(file, {
-      idempotencyKey: importKey(), signal: running.signal,
+      idempotencyKey: keyOf(file), signal: running.signal,
       onProgress: (sent, total) => { bar.value = Math.round((sent / Math.max(1, total)) * 100); },
     }).then(state => {
       if (closed) { if (state.status === 'mapping') void client.cancel(state.id).catch(() => undefined); return; }
@@ -241,8 +248,11 @@ export function openImport(options: OpenImportOptions): ImportDialog {
       h('div', { class: 'adt-import-scroll' }, h('table', { class: 'adt-import-table' },
         h('thead', {}, h('tr', {}, ...headers.map((_, index) => h('th', { scope: 'col' }, name(index))))),
         h('tbody', {}, ...state.preview.map(row => h('tr', {}, ...row.cells.map(cell => h('td', {}, cell ?? '')))))))) : null;
+    let starting = false; // a second click while it starts must not start it again
     const begin = (): void => {
+      if (starting) return;
       if (!check()) { message.focus(); return; }
+      starting = true;
       running?.abort();
       running = new AbortController();
       start.setAttribute('aria-disabled', 'true');
