@@ -68,7 +68,7 @@ up for the two new ones afterwards.
 Packagist reads `composer.json` from a repository root, so the
 **Laravel package split** workflow mirrors `packages/adapter-laravel`, with its
 history, to the read-only repository
-[kemaloskan/datatable-laravel](https://github.com/kemaloskan/datatable-laravel)
+[Acunsoft-Yazilim/datatable-laravel](https://github.com/Acunsoft-Yazilim/datatable-laravel)
 on every push to `main` that touches it. Never commit there directly.
 
 To release a Composer version, tag the monorepo and push the tag:
@@ -96,9 +96,13 @@ Packagist reads as the version.
 - [ ] `@acunsoft/datatable` and `@acunsoft/datatable-server`: first publish
       (0.5.0, from a machine), then their trusted publishers and publishing
       access, as for the first six.
-- [x] `SPLIT_TOKEN` repository secret: a fine-grained GitHub token ("Acun
-      DataTable") with "Contents: read and write" on
-      `kemaloskan/datatable-laravel` only; expires 2027-10-23, regenerate then.
-- [x] `acunsoft/datatable-laravel` on Packagist, auto-updated from
-      `kemaloskan/datatable-laravel`; first version v0.2.0 (tag
-      `laravel-v0.2.0`) on 2026-10-23.
+- [ ] `SPLIT_TOKEN` repository secret: a fine-grained GitHub token owned by
+      the `Acunsoft-Yazilim` organization, with "Contents: read and write" on
+      `Acunsoft-Yazilim/datatable-laravel` only. The first token (on
+      `kemaloskan`) stopped working when the repositories moved to the
+      organization; renew it there.
+- [x] `acunsoft/datatable-laravel` on Packagist, auto-updated from the
+      mirror; first version v0.2.0 (tag `laravel-v0.2.0`) on 2026-10-23.
+- [ ] Packagist: after the mirror moved to `Acunsoft-Yazilim/datatable-laravel`,
+      set the package's repository URL to it (and its GitHub hook, if
+      Packagist asks).
