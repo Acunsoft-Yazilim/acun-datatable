@@ -1,4 +1,5 @@
-import { act, createElement } from 'react';
+import { createElement } from 'react';
+import { act } from '../../packages/react/tests/act';
 import { createRoot, type Root } from 'react-dom/client';
 import { createApp, h, nextTick, type App } from 'vue';
 import { renderTable } from '@acunsoft/datatable-dom';

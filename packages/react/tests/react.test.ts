@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, createElement as h, StrictMode, useState, type ReactElement } from 'react';
+import { createElement as h, StrictMode, useState, type ReactElement } from 'react';
+import { act } from './act';
 import { createRoot, type Root } from 'react-dom/client';
 import { createDataTable, type ColumnDef, type Row } from '@acunsoft/datatable-core';
 import {

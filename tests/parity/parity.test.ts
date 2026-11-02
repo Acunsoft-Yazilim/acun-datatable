@@ -2,7 +2,7 @@
 // elements, classes and ARIA, in every layout below. A difference listed in
 // DIFFERENT is known and on its way out: once it is fixed this test fails until
 // the entry is removed, so the three can only come closer.
-import { act } from 'react';
+import { act } from '../../packages/react/tests/act';
 import { describe, expect, it } from 'vitest';
 import { createDataTable, type ColumnDef } from '@acunsoft/datatable-core';
 import { canonical, render, type Renderer } from './markup';
