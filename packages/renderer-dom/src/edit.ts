@@ -1,4 +1,5 @@
 import { isDecimal, normalizeValue, type ColumnDef, type FilterOption, type Row } from '@acunsoft/datatable-core';
+import { cellValue } from './cells';
 import { element } from './dom';
 import { labelsEn, type DataTableLabels } from './labels';
 
@@ -238,5 +239,79 @@ export function cellEditor<TData>(doc: Document, options: CellEditorOptions<TDat
       if (control instanceof HTMLInputElement && control.type === 'text') control.select();
     },
     destroy: () => { state = 'closed'; root.remove(); },
+  };
+}
+
+/** The cell being edited in place, by row and column ID. */
+export interface EditTarget {
+  readonly rowId: string;
+  readonly columnId: string;
+}
+
+/** What `EditSlot.sync` needs after a render. */
+export interface EditSync<TData> {
+  /** The cell being edited, as the renderer keeps it; `undefined` when none is. */
+  readonly target: EditTarget | undefined;
+  /** That cell as drawn (empty, with `data-adt-edit-host`), when it is in the document. */
+  readonly host: Element | null | undefined;
+  /** The rows the edit can be in: the page, or every matching row when scrolled virtually. */
+  readonly rows: readonly Row<TData>[];
+  /** Scrolled virtually: a row only scrolled out of view keeps its editor for when it comes back. */
+  readonly virtual: boolean;
+  readonly columns: readonly ColumnDef<TData>[];
+  readonly labels?: Partial<DataTableLabels>;
+  readonly onEdit: EditHandler<TData> | undefined;
+  /**
+   * The edit is over: clear `target` and draw again. `refocus` (`rowId:columnId`)
+   * when it was closed from the keyboard: focus that cell's edit button once drawn.
+   */
+  readonly end: (refocus?: string) => void;
+}
+
+export interface EditSlot<TData> {
+  /** After every render: open, move or close the editor so it matches `target`. */
+  sync(state: EditSync<TData>): void;
+  destroy(): void;
+}
+
+/**
+ * One in-place editor across re-renders, shared by the DOM, Vue and React
+ * tables. The renderer keeps the target and draws its cell empty; `sync`
+ * then mounts a new editor there, moves the open one into a re-created cell,
+ * or ends the edit when its row left the page. An editor closed by pressing
+ * another control stays in its cell until that click is done.
+ */
+export function editSlot<TData>(): EditSlot<TData> {
+  let editor: (CellEditor & EditTarget) | undefined;
+  const destroy = (): void => { editor?.destroy(); editor = undefined; };
+  return {
+    sync(state) {
+      const { target, host } = state;
+      if (!target) return destroy();
+      if (editor && editor.rowId === target.rowId && editor.columnId === target.columnId) {
+        if (host) { if (!host.contains(editor.element)) host.append(editor.element); return; }
+        if (state.virtual && state.rows.some(row => row.id === target.rowId)) return;
+        destroy();
+        return state.end();
+      }
+      destroy();
+      const row = state.rows.find(candidate => candidate.id === target.rowId);
+      const column = state.columns.find(candidate => candidate.id === target.columnId);
+      if (!row || !column || !host || !state.onEdit) return state.end();
+      const doc = host.ownerDocument;
+      const { end } = state;
+      const created: CellEditor & EditTarget = Object.assign(cellEditor(doc, {
+        row, column, value: cellValue(column, row), ...(state.labels ? { labels: state.labels } : {}), onEdit: state.onEdit,
+        onClose: () => afterPointerRelease(doc, waited => {
+          if (editor !== created) return;
+          destroy();
+          end(waited ? undefined : `${row.id}:${column.id}`);
+        }),
+      }), { rowId: row.id, columnId: column.id });
+      editor = created;
+      host.append(created.element);
+      created.focus();
+    },
+    destroy,
   };
 }

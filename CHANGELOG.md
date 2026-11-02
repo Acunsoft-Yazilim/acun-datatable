@@ -11,6 +11,13 @@ All notable changes to this repository. Each npm package also has its own
   often. They are now built once while the view renders; actions and
   updates still build them on every call, so columns that depend on
   component state see it.
+- **Editing in place: one editor lifecycle for the DOM renderer, React and
+  Vue.** Opening, moving into a re-drawn cell, ending when the row leaves
+  the page and the focus return now come from one shared, tested piece
+  (`editSlot`, internal) instead of three copies. In the DOM renderer an
+  editor closed by pressing another control now stays in its cell until
+  that click is done even when the table redraws meanwhile, as in React
+  and Vue. Bundles: React −86 B, Vue −94 B, DOM +223 B gzip.
 
 ## npm 0.5.0 and `acunsoft/datatable-laravel` 0.6.0
 

@@ -5,6 +5,7 @@
  */
 export { checkActions, closeMenu, closeMenuOnEscape, rowActionsView, type ActionView } from './actions';
 export { toolbarButtonModel } from './dom';
+export { editSlot, type EditSlot, type EditSync, type EditTarget } from './edit';
 export {
   actionsCellClass, cellClass, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels, resizeHandle,
   clickRowCheckbox, measureRowHeight, pagingView, responsiveFlags, selectAllState, showDialog, showSkeleton, skeletonRows, sortView, tableClass, togglePageSelection, totalCells, withoutIds,

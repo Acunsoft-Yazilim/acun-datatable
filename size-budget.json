@@ -17,7 +17,7 @@
   "packages/react/dist/index.js": 10900,
   "//imports": "What an app pays for one import alone (bundled, minified, gzipped; React and Vue not counted, chunks loaded later by import() not counted): tree-shaking must keep these small.",
   "import { createDataTable } from '@acunsoft/datatable-core'": 11500,
-  "import { renderDataTable } from '@acunsoft/datatable-dom'": 24900,
+  "import { renderDataTable } from '@acunsoft/datatable-dom'": 25000,
   "import { connectTable, createHttpDataSource, createQueryRunner } from '@acunsoft/datatable-http'": 4400,
   "import { AcunDataTable } from '@acunsoft/datatable'": 45300,
   "import { useDataTable } from '@acunsoft/datatable-react'": 11900,

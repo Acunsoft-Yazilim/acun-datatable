@@ -5,13 +5,14 @@ import {
 import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import {
   cellValue, checkPageSizes, checkResponsive, checkSize, resolveLabels, filterControls, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
-  afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
-  checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
+  autoResponsive, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
+  checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
 import {
-  actionsCellClass, cellClass, checkActions, clickRowCheckbox, measureRowHeight, closeMenu, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  actionsCellClass, cellClass, checkActions, clickRowCheckbox, editSlot, measureRowHeight, closeMenu, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
   pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, wrapClass,
+  type EditTarget,
 } from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
@@ -181,50 +182,21 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
     return autoResponsive(wrap.current);
   }, [responsive]);
   // Editing in place: the shared editor is mounted into the editing cell, which React leaves empty.
-  const [editing, setEditing] = useState<{ rowId: string; columnId: string } | undefined>();
-  const editor = useRef<(CellEditor & { rowId: string; columnId: string }) | undefined>(undefined);
+  const [editing, setEditing] = useState<EditTarget | undefined>();
+  const [editor] = useState(() => editSlot<TData>());
   const refocus = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (refocus.current) {
       wrap.current?.querySelector<HTMLElement>(`.adt-edit[data-edit-key="${CSS.escape(refocus.current)}"]`)?.focus();
       refocus.current = undefined;
     }
-    const current = editor.current;
-    if (!editing) { current?.destroy(); editor.current = undefined; return; }
-    // The rows an edit can be in: the page, or every matching row when scrolled virtually.
-    const editRows = all ?? page.rows;
-    const host = wrap.current?.querySelector('td[data-adt-edit-host]');
-    if (current && current.rowId === editing.rowId && current.columnId === editing.columnId) {
-      // A re-created cell gets the editor back; a row only scrolled out of view keeps it for when it comes back.
-      if (host) { if (!host.contains(current.element)) host.append(current.element); return; }
-      if (all && editRows.some(row => row.id === editing.rowId)) return;
-      current.destroy();
-      editor.current = undefined;
-      setEditing(undefined);
-      return;
-    }
-    current?.destroy();
-    editor.current = undefined;
-    const row = editRows.find(candidate => candidate.id === editing.rowId);
-    const column = table.getColumns().find(candidate => candidate.id === editing.columnId);
-    if (!row || !column || !host || !props.onEdit) { setEditing(undefined); return; }
-    const mounted = cellEditor(host.ownerDocument, {
-      row, column, value: cellValue(column, row), labels, onEdit: props.onEdit,
-      // Closed by pressing another control: the closed editor stays in its cell until that click is done.
-      onClose: () => afterPointerRelease(host.ownerDocument, waited => {
-        if (editor.current !== created) return;
-        created.destroy();
-        editor.current = undefined;
-        if (!waited) refocus.current = `${row.id}:${column.id}`;
-        setEditing(undefined);
-      }),
+    editor.sync({
+      target: editing, host: wrap.current?.querySelector('td[data-adt-edit-host]'), rows: all ?? page.rows, virtual: all !== undefined,
+      columns: table.getColumns(), labels, onEdit: props.onEdit,
+      end: key => { refocus.current = key; setEditing(undefined); },
     });
-    const created = Object.assign(mounted, { rowId: row.id, columnId: column.id });
-    editor.current = created;
-    host.append(mounted.element);
-    mounted.focus();
   });
-  useEffect(() => () => editor.current?.destroy(), []);
+  useEffect(() => () => editor.destroy(), [editor]);
   // Virtual scrolling: the viewport measured once mounted, and on resize where ResizeObserver exists.
   const isVirtual = virtual !== undefined;
   useMeasureEffect(() => {
