@@ -60,7 +60,7 @@ jobs:
       # still need them on a fresh runner).
       - run: npx playwright install --with-deps chromium firefox webkit
       # The Livewire browser tests run the Laravel package's workbench app (testbench serve).
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite, zip
@@ -126,7 +126,7 @@ jobs:
         working-directory: packages/adapter-laravel
     steps:
       - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: ${{ matrix.php }}
           extensions: intl, mbstring, pdo_sqlite, zip
@@ -168,7 +168,7 @@ jobs:
         options: --health-cmd "healthcheck.sh --connect" --health-interval 5s --health-retries 20
     steps:
       - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite, pdo_pgsql, pdo_mysql, zip
