@@ -316,7 +316,8 @@ test('edit a cell in place: Enter saves, errors keep the editor, Escape cancels,
   await expect(field).toBeFocused();
   await page.keyboard.type('Ali Kaya');
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('cell', { name: 'Ali Kaya' })).toBeVisible();
+  // The customer cell itself: the name alone also matches the row's checkbox and actions cells.
+  await expect(page.locator('td[data-label="Customer"]', { hasText: 'Ali Kaya' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit Customer: Ali Kaya' })).toBeFocused();
 
   await page.getByRole('button', { name: 'Edit Customer: Can' }).click();
