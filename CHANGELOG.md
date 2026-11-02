@@ -18,6 +18,13 @@ All notable changes to this repository. Each npm package also has its own
   editor closed by pressing another control now stays in its cell until
   that click is done even when the table redraws meanwhile, as in React
   and Vue. Bundles: React −86 B, Vue −94 B, DOM +223 B gzip.
+- **Texts (German, French, Spanish).** One wording for "export too large"
+  in the JavaScript and Laravel packages, in the form of address the other
+  texts use (Spanish mixed "tú" into "usted"; German Laravel used "bitte …"
+  once among "Sie" texts); French apostrophes are all typographic (’);
+  Spanish calls a file line "Fila", as the import dialog does; two import
+  dialog fixes (French agreement, a clearer Spanish mapping hint). A native
+  speaker's review is still welcome.
 
 ## npm 0.5.0 and `acunsoft/datatable-laravel` 0.6.0
 
