@@ -52,8 +52,47 @@ describe('virtual scrolling', () => {
     renderDataTable(host, table, { virtual: { rowHeight: 40 }, selectable: true });
     expect(host.querySelector('.adt-paging, .adt-length')).toBeNull();
     expect(host.querySelector('.adt-info')!.textContent).toBe('Showing 1 to 10,000 of 10,000 rows');
+    expect(host.querySelector('thead .adt-select input')!.getAttribute('aria-label')).toBe('Select all rows'); // not "on this page": every row
     host.querySelector<HTMLInputElement>('thead .adt-select input')!.click();
     expect(table.getState().selectedIds).toHaveLength(10_000);
     expect(() => renderTable(host, createDataTable<R>({ mode: 'server', columns }), { virtual: true })).toThrow('virtual scrolling needs a local table');
+  });
+});
+
+describe('aria-rowcount of a virtual table', () => {
+  it('counts the header, the rows and the totals row', () => {
+    type T = R & { total: number };
+    const totals: readonly ColumnDef<T>[] = [...(columns as readonly ColumnDef<T>[]), { id: 'total', header: 'Total', accessorKey: 'total', type: 'number', aggregate: 'sum' }];
+    renderTable(host, createDataTable<T>({ data: data.slice(0, 50).map(row => ({ ...row, total: 1 })), columns: totals }), { virtual: { rowHeight: 40 } });
+    expect(host.querySelector('table')!.getAttribute('aria-rowcount')).toBe('52');
+    expect(host.querySelectorAll('tfoot tr')).toHaveLength(1);
+  });
+});
+
+describe('destroy while a scroll waits for its frame', () => {
+  it('cancels the frame: nothing is drawn after destroy', () => {
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame');
+    const table = createDataTable<R>({ data, columns });
+    const rendered = renderTable(host, table, { virtual: { rowHeight: 40 } });
+    const scroller = host.querySelector<HTMLElement>('.adt-scroll')!;
+    scroller.scrollTop = 4000;
+    scroller.dispatchEvent(new Event('scroll'));
+    rendered.destroy();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+});
+
+describe('the row height of a table whose rows come later', () => {
+  it('is measured from the first real row, not taken as 40 for good (nor from a placeholder)', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const height = this.classList.contains('adt-skeleton-row') ? 20 : this.classList.contains('adt-row') ? 50 : 0;
+      return { height, width: 100, top: 0, left: 0, right: 100, bottom: height, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    });
+    const table = createDataTable<R>({ data: [], columns });
+    renderTable(host, table, { virtual: true });
+    table.setData(data.slice(0, 1000));
+    const after = [...host.querySelectorAll<HTMLElement>('tbody .adt-spacer td')].at(-1)!;
+    const drawn = host.querySelectorAll('tbody .adt-row').length;
+    expect(after.style.height).toBe(`${(1000 - drawn) * 50}px`); // 50 a row, measured once rows were there
   });
 });

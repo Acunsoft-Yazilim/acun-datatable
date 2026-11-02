@@ -39,6 +39,25 @@ describe('connectTable', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('asks again neither for a space after the search words nor for the same query once more', async () => {
+    const { table, calls } = setup();
+    calls[0]!.resolve({ rows: orders(1, 2), totalRows: 9 });
+    await flush();
+    table.setGlobalSearch('ali');
+    calls[1]!.resolve({ rows: orders(1, 2), totalRows: 9 });
+    await flush();
+    table.setPage(3);
+    calls[2]!.resolve({ rows: orders(5, 6), totalRows: 9 });
+    await flush();
+    table.setGlobalSearch('ali '); // the user typed a space: no other rows match
+    await flush();
+    expect(calls).toHaveLength(3);
+    expect(table.getState()).toMatchObject({ page: 3, globalSearch: 'ali ' }); // kept as typed, on the same page
+    table.setGlobalSearch('ali k');
+    expect(calls).toHaveLength(4); // new words: asked, from page 1
+    expect(calls[3]!.query).toMatchObject({ page: 1, globalSearch: 'ali k' });
+  });
+
   it('loads the first page and applies the result', async () => {
     const { table, runner, calls } = setup();
     expect(calls).toHaveLength(1);

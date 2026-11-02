@@ -1,14 +1,18 @@
 import {
-  createElement as h, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
+  createElement as h, Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
   type ChangeEvent, type CSSProperties, type KeyboardEvent, type RefObject, type MouseEvent, type ReactElement, type ReactNode, type SyntheticEvent,
 } from 'react';
-import { COLUMN_WIDTH_LIMITS, getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
+import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import {
-  cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
-  afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
+  cellValue, checkPageSizes, checkResponsive, checkSize, resolveLabels, filterControls, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
+  afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
+import {
+  actionsCellClass, cellClass, checkActions, clickRowCheckbox, measureRowHeight, closeMenu, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, wrapClass,
+} from '@acunsoft/datatable-dom/internal';
 import { useTable } from './hooks.js';
 
 /** Controls that do not touch rows accept a table of any row type. */
@@ -85,7 +89,6 @@ export interface DataTableProps<TData> {
 }
 
 /** Placeholder rows while the first rows load: as many as a page, at most this many. */
-const SKELETON_ROWS = 10;
 
 const noStatus = (): (() => void) => () => undefined;
 
@@ -108,7 +111,8 @@ function useStatus(status: StatusSource | undefined): string {
  * elements, escaped by React unless you use `dangerouslySetInnerHTML`.
  */
 export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
-  const { table, selectable = false, locale = 'en', rowActions = [] } = props;
+  const { table, selectable = false, locale = 'en' } = props;
+  const rowActions = checkActions<RowAction<TData>>(props.rowActions ?? [], 'rowActions', ['hidden', 'disabled']); // as the DOM renderer
   const { state, page, visibleColumns: columns } = useTable(table);
   // Virtual scrolling: the scroll position and the measured row height decide the rows drawn.
   const virtual = checkVirtual(props.virtual);
@@ -118,11 +122,11 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   // The column widths of the first rows drawn, kept while scrolling virtually (otherwise every
   // window of rows sizes the columns anew); measured again when the columns or the width change.
   const [locked, setLocked] = useState<{ key: string; width: number; widths: Readonly<Record<string, number>> } | undefined>(undefined);
-  const frame = useRef(0);
+  const [frames] = useState(() => frameThrottle(globalThis));
+  useEffect(() => () => frames.cancel(), [frames]); // a scroll just before unmounting: no update after
   const onScroll = (event: { currentTarget: HTMLElement }): void => {
     const node = event.currentTarget;
-    if (frame.current) return;
-    frame.current = requestAnimationFrame(() => { frame.current = 0; setScroll(current => ({ top: node.scrollTop, viewport: node.clientHeight || current.viewport })); });
+    frames.schedule(() => setScroll(current => ({ top: node.scrollTop, viewport: node.clientHeight || current.viewport })));
   };
   const all = virtual ? table.getFilteredRows() : undefined;
   const view = all ? virtualWindow(all.length, virtual!.rowHeight || measuredRow, scroll.top, scroll.viewport, virtual!.overscan) : undefined;
@@ -136,17 +140,16 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   const phase = useStatus(props.status);
   // With virtual scrolling "all" is every matching row, not only those drawn.
   const pageIds = (all ?? page.rows).map(row => row.id);
-  const pageStatus = table.getSelectionStatus(pageIds);
+  const pageSelection = selectAllState(table, pageIds);
   const selectAll = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (selectAll.current) selectAll.current.indeterminate = pageStatus === 'some';
+    if (selectAll.current) selectAll.current.indeterminate = pageSelection.indeterminate;
   });
   // Virtual tables scroll sideways on narrow screens unless told otherwise.
   const responsive = checkResponsive(props.responsive ?? (props.virtual ? 'scroll' : undefined));
   const size = checkSize(props.size);
-  const collapsible = responsive === 'collapse' || responsive === 'modal' || responsive === 'auto';
   const detail = props.detail;
-  const expandable = collapsible || detail !== undefined;
+  const { collapsible, inlineDetails, expandable } = responsiveFlags(responsive, detail !== undefined);
   const uid = useId();
   // Responsive collapse: open rows. Modal: the row shown in the dialog.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
@@ -156,15 +159,8 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   const anchor = useRef<string | undefined>(undefined);
   const dialogVisible = dialogRow !== undefined && pageIds.includes(dialogRow);
   useEffect(() => {
-    const node = dialog.current;
-    if (!node) return;
-    if (dialogVisible && !node.open) {
-      if (typeof node.showModal === 'function') node.showModal();
-      else node.setAttribute('open', '');
-    } else if (!dialogVisible && node.open) {
-      if (typeof node.close === 'function') node.close();
-      else node.removeAttribute('open');
-    }
+    if (dialogVisible) showDialog(dialog.current);
+    else if (dialog.current?.open) hideDialog(dialog.current);
   }, [dialogVisible]);
   // Fixed columns: sticky offsets measured after every render.
   const fixed = checkFixedColumns(props.fixedColumns);
@@ -257,67 +253,40 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
   // Virtual scrolling without rowHeight: measure the first drawn row once.
   useEffect(() => {
     if (!virtual || virtual.rowHeight || measuredRow) return;
-    const height = wrap.current?.querySelector<HTMLElement>('tbody .adt-row')?.getBoundingClientRect().height ?? 0;
+    const height = measureRowHeight(wrap.current);
     if (height > 0) setMeasuredRow(height);
   });
-  // One listener closes any open row "⋮" menu on a click outside it.
-  useEffect(() => {
-    const close = (event: Event): void => {
-      wrap.current?.querySelectorAll<HTMLDetailsElement>('.adt-row-menu[open]').forEach(menu => {
-        if (!event.composedPath().includes(menu)) menu.open = false;
-      });
-    };
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
-  }, []);
-  const closeDialog = (): void => {
-    const node = dialog.current;
-    if (node?.open && typeof node.close === 'function') node.close();
-    else node?.removeAttribute('open');
-  };
+  useEffect(() => closeRowMenusOnOutsideClick(document, () => wrap.current), []);
+  const closeDialog = (): void => hideDialog(dialog.current);
   const onDialogClose = (): void => {
     const id = dialogRow;
     setDialogRow(undefined);
     // Back to the row's button (Safari does not focus a clicked button).
     [...(wrap.current?.querySelectorAll<HTMLElement>('.adt-expand') ?? [])].find(button => button.dataset['row'] === id)?.focus();
   };
-  const levels = new Set(columns.map((column, index) => priorityOf(column, index)));
-  if (rowActions.length > 0) levels.add(2);
-  const span = columns.length + (selectable ? 1 : 0) + (rowActions.length > 0 ? 1 : 0) + (expandable ? 1 : 0);
+  const levels = priorityLevels(columns, rowActions.length > 0);
+  const span = columnSpan(columns.length, { selectable, actions: rowActions.length > 0, expandable });
   // Buttons in the row, the rest in a "⋮" menu; icons, danger colour and a confirm question.
   const actionButtons = (row: Row<TData>, name: string, maxInline = props.maxInlineActions ?? Infinity): ReactNode[] => {
-    const { inline, menu } = splitActions(rowActions, row, maxInline);
-    const run = (action: RowAction<TData>, disabled: boolean): void => { if (!disabled && confirmed(action, row)) action.onSelect(row); };
-    const buttons: ReactNode[] = inline.map(action => {
-      const disabled = action.disabled?.(row) === true;
-      const iconOnly = action.iconOnly === true && action.icon !== undefined;
-      return h('button', {
-        type: 'button', key: action.id, 'data-action': action.id,
-        className: ['adt-action', iconOnly ? 'adt-action--icon' : '', action.danger ? 'adt-action--danger' : ''].filter(Boolean).join(' '),
-        'aria-label': labels.rowAction(action.label, name), title: iconOnly ? action.label : undefined,
-        'aria-disabled': disabled ? 'true' : undefined, onClick: () => run(action, disabled),
-      }, action.icon ? icon(action.icon) : null, iconOnly ? null : h('span', null, action.label));
-    });
-    if (menu.length > 0) {
+    const { inline, menu } = rowActionsView(rowActions, row, name, labels, maxInline);
+    const buttons: ReactNode[] = inline.map(view => h('button', {
+      type: 'button', key: view.action.id, 'data-action': view.action.id, className: view.className,
+      'aria-label': view.ariaLabel, title: view.title, 'aria-disabled': view.disabled ? 'true' : undefined, onClick: view.run,
+    }, view.icon ? icon(view.icon) : null, view.text === undefined ? null : h('span', null, view.text)));
+    if (menu) {
       buttons.push(h('details', {
         className: 'adt-row-menu', key: '__menu', onToggle: (event: SyntheticEvent<HTMLDetailsElement>) => placeMenu(event.currentTarget),
-        onKeyDown: (event: KeyboardEvent<HTMLDetailsElement>) => {
-          if (event.key === 'Escape' && event.currentTarget.open) { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); }
-        },
+        onKeyDown: (event: KeyboardEvent<HTMLDetailsElement>) => closeMenuOnEscape(event.nativeEvent),
       },
-      h('summary', { className: 'adt-action adt-action--icon', 'aria-label': labels.moreActions(name), title: labels.moreActions(name) }, icon('more')),
-      h('div', { className: 'adt-menu-list' }, menu.map(action => {
-        const disabled = action.disabled?.(row) === true;
-        return h('button', {
-          type: 'button', key: action.id, 'data-action': action.id, className: action.danger ? 'adt-menu-item adt-menu-item--danger' : 'adt-menu-item',
-          'aria-label': labels.rowAction(action.label, name), 'aria-disabled': disabled ? 'true' : undefined,
-          onClick: (event: MouseEvent) => {
-            const details = (event.currentTarget as HTMLElement).closest('details');
-            if (details) details.open = false;
-            run(action, disabled);
-          },
-        }, action.icon ? icon(action.icon) : null, h('span', null, action.label));
-      }))));
+      h('summary', { className: 'adt-action adt-action--icon', 'aria-label': menu.label, title: menu.label }, icon('more')),
+      h('div', { className: 'adt-menu-list' }, menu.items.map(view => h('button', {
+        type: 'button', key: view.action.id, 'data-action': view.action.id, className: view.className,
+        'aria-label': view.ariaLabel, 'aria-disabled': view.disabled ? 'true' : undefined,
+        onClick: (event: MouseEvent) => {
+          closeMenu((event.currentTarget as HTMLElement).closest('details'));
+          view.run();
+        },
+      }, view.icon ? icon(view.icon) : null, h('span', null, view.text))))));
     }
     return buttons;
   };
@@ -339,47 +308,39 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
       : null);
 
   const head: ReactNode[] = [];
-  const lockKey = virtual ? `${columns.map(column => column.id).join('|')}#${selectable}#${rowActions.length > 0}#${expandable}` : '';
+  const lockKey = virtual ? layoutKey(columns, selectable, rowActions.length > 0, expandable) : '';
   const lock = virtual && locked?.key === lockKey ? locked.widths : undefined;
   const lockedWidth = (key: string): CSSProperties | undefined => (lock?.[key] ? { width: `${lock[key]}px` } : undefined);
-  if (expandable) head.push(h('td', { className: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }));
+  if (expandable) head.push(h('td', { className: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }, h('span', { className: 'adt-sr-only' }, labels.detailsColumn)));
   if (selectable) {
     head.push(h('th', { scope: 'col', className: 'adt-select', key: '__select', 'data-lock': '__select', style: lockedWidth('__select') },
-      table.getSelectionMode() === 'multiple' && pageIds.length > 0
+      pageSelection.show
         ? h('label', { className: 'adt-select-all' }, h('input', {
-          type: 'checkbox', ref: selectAll, 'aria-label': labels.selectAll, checked: pageStatus === 'all',
-          onChange: () => (table.getSelectionStatus(pageIds) === 'all'
-            ? table.setSelectedRows(table.getState().selectedIds.filter(id => !pageIds.includes(id)))
-            : table.selectRows(pageIds)),
-        }), h('span', { className: 'adt-select-all-text', 'aria-hidden': 'true' }, labels.selectAll))
+          type: 'checkbox', ref: selectAll, 'aria-label': all ? labels.selectAllRows : labels.selectAll, checked: pageSelection.checked,
+          onChange: () => togglePageSelection(table, pageIds),
+        }), h('span', { className: 'adt-select-all-text', 'aria-hidden': 'true' }, all ? labels.selectAllRows : labels.selectAll))
         : null));
   }
-  const primary = state.sorting[0];
+  const fixedLayout = Object.keys(state.columnWidths).length > 0 || lock !== undefined;
   for (const column of columns) {
-    const index = state.sorting.findIndex(rule => rule.field === column.id);
-    const rule = state.sorting[index];
+    const sort = column.enableSorting ? sortView(column.id, state.sorting) : undefined;
     const width = state.columnWidths[column.id];
+    const { class: resizeClass, ...resize } = resizeHandle(column.id, labels.resizeColumn(column.header), width);
     head.push(h('th', {
       scope: 'col', key: column.id,
-      className: `adt-th${collapsible ? ` adt-col--p${priorityOf(column, columns.indexOf(column))}` : ''}${numeric(column) ? ' adt-num' : ''}`,
-      'aria-sort': primary?.field === column.id ? (primary.direction === 'asc' ? 'ascending' : 'descending') : undefined,
+      className: headerClass(column, columns.indexOf(column), collapsible, width === undefined && fixedLayout),
+      'aria-sort': sort?.ariaSort,
       'data-column-id': column.id, draggable: props.reorderableColumns ? true : undefined,
       'data-lock': column.id,
       style: width !== undefined ? { width: `${width}px` } : lockedWidth(column.id),
-    }, column.enableSorting
+    }, sort
       ? h('button', {
-        type: 'button', className: rule ? `adt-sort adt-sort--${rule.direction}` : 'adt-sort',
+        type: 'button', className: sort.className,
         onClick: (event: MouseEvent) => table.setSorting(nextSorting(table.getState().sorting, column.id, event.shiftKey && props.multiSort !== false)),
-      }, column.header, h('span', { className: 'adt-sort-mark', 'aria-hidden': 'true' },
-        rule ? `${rule.direction === 'asc' ? '▲' : '▼'}${state.sorting.length > 1 ? index + 1 : ''}` : ''))
+      }, column.header, h('span', { className: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark),
+      sort.order ? h('span', { className: 'adt-sr-only' }, labels.sortOrder(sort.order.position, sort.order.direction)) : null)
       : column.header,
-    props.resizableColumns
-      ? h('span', {
-        className: 'adt-resize', role: 'separator', 'aria-orientation': 'vertical', tabIndex: 0,
-        'aria-label': labels.resizeColumn(column.header), 'data-column-id': column.id,
-        'aria-valuemin': COLUMN_WIDTH_LIMITS.min, 'aria-valuemax': COLUMN_WIDTH_LIMITS.max, 'aria-valuenow': width,
-      })
-      : null));
+    props.resizableColumns ? h('span', { ...resize, className: resizeClass, tabIndex: 0 }) : null));
   }
   if (rowActions.length > 0) {
     head.push(h('th', { scope: 'col', className: collapsible ? 'adt-th adt-actions adt-col--p2' : 'adt-th adt-actions', key: '__actions', 'data-lock': '__actions', style: lockedWidth('__actions') }, labels.actions));
@@ -387,17 +348,17 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
 
   const body: ReactNode[] = [];
   // Placeholder rows while the first rows of a remote table load.
-  const skeleton = props.skeleton !== false && props.status !== undefined && phase === 'loading' && page.rows.length === 0;
+  const skeleton = showSkeleton(props.skeleton, props.status !== undefined, phase, page.rows.length);
   if (skeleton) {
-    for (let index = 0; index < Math.min(state.pageSize, SKELETON_ROWS); index++) {
+    for (let index = 0; index < skeletonRows(state.pageSize); index++) {
       body.push(h('tr', { className: 'adt-row adt-skeleton-row', key: `__skeleton${index}` },
         expandable ? h('td', { className: 'adt-expand-cell' }) : null,
         selectable ? h('td', { className: 'adt-select' }) : null,
         ...columns.map((column, columnIndex) => h('td', {
           'data-label': column.header, key: column.id,
-          className: [collapsible ? `adt-col--p${priorityOf(column, columnIndex)}` : '', numeric(column) ? 'adt-num' : ''].filter(Boolean).join(' ') || undefined,
+          className: cellClass(column, columnIndex, collapsible) || undefined,
         }, h('span', { className: 'adt-skeleton' }))),
-        rowActions.length > 0 ? h('td', { className: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions' }) : null));
+        rowActions.length > 0 ? h('td', { className: actionsCellClass(collapsible) }) : null));
     }
   } else if (rows.length === 0) {
     body.push(h('tr', { className: 'adt-empty', key: '__empty' }, h('td', { colSpan: span }, props.empty ?? labels.empty)));
@@ -431,7 +392,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
         h('div', { className: 'adt-dialog-head', key: 'head' },
           h('h2', { className: 'adt-dialog-title', id: `${uid}-dialog-title` }, labels.details(name)),
           h('button', { type: 'button', className: 'adt-dialog-close', 'aria-label': labels.close, onClick: closeDialog }, icon('close'))),
-        h('div', { key: 'body' }, detailList(row, texts, name, true)),
+        h(Fragment, { key: 'body' }, detailList(row, texts, name, true)), // the <dl> right in the dialog, as the DOM renderer and Vue
         detail ? h('div', { className: 'adt-detail-content', key: 'detail' }, detail(row)) : null,
       ];
     }
@@ -440,15 +401,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
         type: 'checkbox', 'aria-label': labels.selectRow(name), checked: selected, onChange: () => undefined,
         // Shift+click selects (or clears) every row between the last clicked one and this one.
         onClick: (event: MouseEvent<HTMLInputElement>) => {
-          const from = anchor.current;
-          anchor.current = row.id;
-          if (event.shiftKey && from !== undefined && from !== row.id && table.getSelectionMode() === 'multiple') {
-            const ids = rangeOf(pageIds, from, row.id);
-            if (event.currentTarget.checked) table.selectRows(ids);
-            else table.setSelectedRows(table.getState().selectedIds.filter(id => !ids.includes(id)));
-          } else {
-            table.toggleRow(row.id);
-          }
+          anchor.current = clickRowCheckbox(table, pageIds, anchor.current, row.id, event.shiftKey, event.currentTarget.checked);
         },
       })));
     }
@@ -458,8 +411,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
       const start = (): void => setEditing({ rowId: row.id, columnId: column.id });
       cells.push(h('td', {
         'data-label': column.header, key: column.id,
-        className: [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', numeric(column) ? 'adt-num' : '',
-          editable ? 'adt-editable' : '', isEditing ? 'adt-editing' : ''].filter(Boolean).join(' ') || undefined,
+        className: cellClass(column, index, collapsible, editable, isEditing) || undefined,
         'data-adt-edit-host': isEditing ? '' : undefined,
         onDoubleClick: editable && !isEditing
           ? (event: MouseEvent) => { if (!(event.target as Element).closest('a, button, input, select')) start(); }
@@ -471,7 +423,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
     });
     if (rowActions.length > 0) {
       cells.push(h('td', {
-        className: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions', 'data-label': labels.actions, key: '__actions',
+        className: actionsCellClass(collapsible), 'data-label': labels.actions, key: '__actions',
       }, actionButtons(row, name)));
     }
     const rowClass = ['adt-row', selected ? 'adt-row--selected' : '', open ? 'adt-row--expanded' : ''].filter(Boolean).join(' ');
@@ -479,7 +431,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
     if (open) {
       body.push(h('tr', { className: 'adt-detail', id: detailId, key: `${row.id}__detail` },
         h('td', { colSpan: span },
-          responsive === 'collapse' || responsive === 'auto' ? detailList(row, texts, name, false) : null,
+          inlineDetails ? detailList(row, texts, name, false) : null,
           detail ? h('div', { className: 'adt-detail-content' }, detail(row)) : null)));
     }
   });
@@ -492,38 +444,33 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
       ? h('div', { className: 'adt-notice', role: 'alert' },
         h('span', { className: 'adt-notice-text' }, labels.error),
         typeof props.status?.retry === 'function'
-          ? h('button', { type: 'button', className: 'adt-retry', onClick: () => { void props.status!.retry!(); } }, labels.retry)
+          ? h('button', { type: 'button', className: 'adt-retry', onClick: () => { Promise.resolve(props.status!.retry!()).catch(() => undefined); } }, labels.retry)
           : null)
       : h('div', { className: 'adt-notice', role: 'status', 'aria-live': 'polite' });
   const height = scrollHeight(props.scrollY) ?? (virtual ? '480px' : undefined);
-  const wrapClass = ['adt-table-wrap', `adt-responsive--${responsive}`, size === 'md' ? '' : `adt-size--${size}`,
-    props.stickyHeader === true ? 'adt-sticky-header' : '', height ? 'adt-scroll-y' : '', busy ? 'adt-loading' : '', skeleton ? 'adt-skeleton-on' : '', virtual ? 'adt-virtual' : ''].filter(Boolean).join(' ');
-  const tableClass = ['adt-table', collapsible && levels.has(2) ? 'adt-has-p2' : '', collapsible && levels.has(3) ? 'adt-has-p3' : '', detail ? 'adt-has-detail' : '',
-    Object.keys(state.columnWidths).length > 0 || lock ? 'adt-fixed-layout' : '', Object.keys(state.columnWidths).length > 0 ? 'adt-user-widths' : '']
-    .filter(Boolean).join(' ');
+  const wrapClassName = wrapClass({ responsive, size, stickyHeader: props.stickyHeader === true, scrollY: height !== undefined, loading: busy, skeleton, virtual: virtual !== undefined });
+  const tableClassName = tableClass({ collapsible, levels, detail: detail !== undefined, userWidths: Object.keys(state.columnWidths).length > 0, locked: lock !== undefined });
   return h('div', {
-    className: wrapClass, ref: wrap, 'aria-busy': props.status ? busy : undefined,
+    className: wrapClassName, ref: wrap,
     style: height ? ({ '--adt-scroll-y': height } as CSSProperties) : undefined,
   },
     notice,
-    h('div', { className: 'adt-scroll', onScroll: virtual ? onScroll : undefined }, h('table', { className: tableClass, 'aria-rowcount': all ? all.length + 1 : undefined },
+    // aria-busy on the rows' box, not around the notice (a busy region's changes may be held back).
+    h('div', { className: 'adt-scroll', onScroll: virtual ? onScroll : undefined, 'aria-busy': props.status ? busy : undefined }, h('table', { className: tableClassName, 'aria-rowcount': all ? all.length + 1 + (columns.some(column => column.aggregate !== undefined) ? 1 : 0) : undefined },
       props.caption !== undefined ? h('caption', null, props.caption) : null,
       h('thead', null, h('tr', null, head)),
       h('tbody', skeleton ? { 'aria-hidden': true } : null, body),
       // Footer totals of the columns with `aggregate` (every matching row).
       columns.some(column => column.aggregate !== undefined) ? h('tfoot', null, h('tr', { className: 'adt-total' }, ...(() => {
-        const totals = table.getAggregates();
         const cells: ReactNode[] = [];
         if (expandable) cells.push(h('td', { className: 'adt-expand-cell', key: '__expand' }));
         if (selectable) cells.push(h('td', { className: 'adt-select', key: '__select' }));
-        columns.forEach((column, index) => {
-          const result = totals[column.id];
-          const cellClass = [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', result ? 'adt-num' : ''].filter(Boolean).join(' ') || undefined;
-          cells.push(index === 0 && !result
-            ? h('th', { scope: 'row', className: cellClass, 'data-label': column.header, key: column.id }, labels.totals)
-            : h('td', { className: cellClass, key: column.id, 'data-label': result ? `${column.header} · ${labels.aggregate(result.aggregate)}` : column.header, title: result ? labels.aggregate(result.aggregate) : undefined }, text.total(column, result)));
-        });
-        if (rowActions.length > 0) cells.push(h('td', { className: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions', key: '__actions' }));
+        for (const cell of totalCells(columns, table.getAggregates(), collapsible, labels, (column, result) => text.total(column, result))) {
+          cells.push(h(cell.header ? 'th' : 'td', {
+            scope: cell.header ? 'row' : undefined, className: cell.className || undefined, 'data-label': cell.label, title: cell.title, key: cell.columnId,
+          }, cell.text));
+        }
+        if (rowActions.length > 0) cells.push(h('td', { className: actionsCellClass(collapsible), key: '__actions' }));
         return cells;
       })())) : null)),
     responsive === 'modal'
@@ -561,13 +508,11 @@ export interface PaginationProps {
 export function Pagination({
   table, siblings = 1, boundaries = 1, firstLast = false, locale = 'en', labels: custom,
 }: PaginationProps): ReactElement {
-  const { page, totalRows } = useTable(table);
+  useTable(table); // follow the table
   const labels = withLabels(custom);
   const numbers = useMemo(() => new Intl.NumberFormat(locale), [locale]);
-  const known = totalRows !== undefined;
-  const items = getPageItems(page.page, knownPageCount(table), { siblings, boundaries });
-  const atStart = page.page <= 1;
-  const atEnd = page.page >= page.pageCount;
+  const page = pagingView(table, knownPageCount(table), { siblings, boundaries });
+  const { known, items, atStart, atEnd } = page;
   const arrow = (name: 'first' | 'previous' | 'next' | 'last', disabled: boolean, target: number): ReactElement => h('button', {
     type: 'button', className: `adt-page adt-page-arrow adt-${name}`, 'aria-label': labels[name],
     'aria-disabled': disabled ? 'true' : undefined, onClick: () => { if (!disabled) table.setPage(target); },
@@ -669,13 +614,11 @@ export interface ColumnToggleProps {
 
 /** A toolbar button's classes, tooltip and content, as `fillButton` builds them in the DOM. */
 function toolbarButton(custom: ToolbarButton | undefined, label: string, fallback: keyof typeof ICONS): { className?: string; title?: string; children: ReactNode[] } {
-  const text = custom?.label ?? label;
-  const chosen = custom?.icon ?? fallback;
-  const className = [custom?.iconOnly ? 'adt-icon-only' : '', custom?.className ?? ''].filter(Boolean).join(' ');
+  const model = toolbarButtonModel(custom, { label, icon: fallback });
   return {
-    ...(className ? { className } : {}),
-    ...(custom?.iconOnly ? { title: text } : {}),
-    children: [chosen === false ? null : icon(chosen), h('span', { className: 'adt-summary-text' }, text)], // spread as arguments, so no keys
+    ...(model.className ? { className: model.className } : {}),
+    ...(model.title !== undefined ? { title: model.title } : {}),
+    children: [model.icon === false ? null : icon(model.icon), h('span', { className: 'adt-summary-text' }, model.label)], // spread as arguments, so no keys
   };
 }
 
@@ -690,7 +633,9 @@ export function ColumnToggle({ table, labels: custom, reorderable = false, butto
   const columns = table.getColumns();
   const byId = new Map(columns.map(column => [column.id, column]));
   const lastVisible = columns.length - state.hiddenColumns.length === 1;
-  return h('details', { className: 'adt-columns', onToggle: (event: SyntheticEvent<HTMLDetailsElement>) => placeMenu(event.currentTarget) },
+  const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => (menu.current ? closeLikeAMenu(menu.current) : undefined), []); // Escape and a click outside close it
+  return h('details', { className: 'adt-columns', ref: menu, onToggle: (event: SyntheticEvent<HTMLDetailsElement>) => placeMenu(event.currentTarget) },
     (({ children, ...summary }) => h('summary', summary, ...children))(toolbarButton(button, labels.columns, 'columns')),
     h('fieldset', null, h('legend', null, labels.showColumns), state.columnOrder.map((id, index) => {
       const column = byId.get(id)!;
@@ -714,7 +659,7 @@ export function ColumnToggle({ table, labels: custom, reorderable = false, butto
       };
       return h('div', { className: 'adt-column-item', key: id }, checkbox, move('up'), move('down'));
     }), columnsChanged(table)
-      ? h('button', { type: 'button', className: 'adt-columns-reset', onClick: () => resetColumns(table) }, labels.resetColumns)
+      ? h('button', { type: 'button', className: 'adt-columns-reset', onClick: () => { resetColumns(table); menu.current?.querySelector<HTMLElement>(':scope > summary')?.focus(); } }, labels.resetColumns)
       : null));
 }
 
@@ -854,7 +799,9 @@ export function DataTableLayout<TData>(props: DataTableLayoutProps<TData>): Reac
     pageSizes, search = true, searchPlaceholder, debounceMs, filters = true, columnToggle = true, tools = [], bulkActions = [], filterPanel, toolbarButtons,
     paging = {}, topStart, topEnd, bottomStart, bottomEnd, size = 'md', ...tableProps
   } = props;
-  const { table, labels, locale = 'en' } = props;
+  const { table, locale = 'en' } = props;
+  // The texts of `locale` (tr, de, fr, es), with `labels` over them, as renderDataTable does.
+  const labels = resolveLabels(locale, props.labels);
   const hasFilters = filters && filterControls(table.getColumns()).length > 0;
   const bar = (position: 'top' | 'bottom', start: ReactNode[], end: ReactNode[]): ReactElement =>
     h('div', { className: `adt-bar adt-${position}` }, h('div', { className: 'adt-bar-start' }, ...start), h('div', { className: 'adt-bar-end' }, ...end));
@@ -873,7 +820,7 @@ export function DataTableLayout<TData>(props: DataTableLayoutProps<TData>): Reac
     hasFilters ? h(FilterChips, { table, locale, ...(labels ? { labels } : {}) }) : null,
     // The selection bar (count, "select all N matching", clear, bulk actions) with any selectable table.
     props.selectable || bulkActions.length > 0 ? h(BulkActions<TData>, { table, actions: bulkActions, ...(labels ? { labels } : {}) }) : null,
-    h(DataTable<TData>, tableProps as DataTableProps<TData>),
+    h(DataTable<TData>, { ...tableProps, labels } as DataTableProps<TData>),
     bar('bottom', [h(PageInfo, { key: 'info', table, all: Boolean(props.virtual), ...(labels ? { labels } : {}) }), bottomStart ?? null],
       [bottomEnd ?? null, props.virtual ? null : h(Pagination, { key: 'paging', table, locale, ...paging, ...(labels ? { labels } : {}) })]));
 }

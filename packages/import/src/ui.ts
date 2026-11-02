@@ -59,7 +59,6 @@ const ICONS = {
   alert: 'M12 9v4M12 17h.01M10.3 3.9 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
 } as const;
 
-const CLOSE_STATES = new Set(['done', 'failed', 'cancelled', 'expired']);
 
 /**
  * Open the import dialog. Needs `url` (or a `client`); the back end decides
@@ -182,25 +181,38 @@ export function openImport(options: OpenImportOptions): ImportDialog {
       notice,
       zone,
       hints || templateUrl ? h('p', { class: 'adt-import-hint' }, hints, hints && templateUrl ? ' · ' : '',
-        templateUrl ? h('a', { href: templateUrl, download: '' }, labels.template) : '') : null);
+        templateUrl ? downloadLink(templateUrl, template!, templateUrl.split(/[?#]/)[0]!.split('/').pop() || 'template', labels.template) : '') : null);
   };
 
   // ---- Uploading
+  // One key per file: sending the same file again (after an error, a lost answer) gives the
+  // import the back end already has, not a second one.
+  const keys = new WeakMap<File, string>();
+  const keyOf = (file: File): string => {
+    if (!keys.has(file)) keys.set(file, importKey());
+    return keys.get(file)!;
+  };
   const upload = (file: File): void => {
     running?.abort();
     running = new AbortController();
-    const bar = h('progress', { class: 'adt-import-progress', max: '100' }) as HTMLProgressElement;
+    const bar = h('progress', { class: 'adt-import-progress', max: '100', 'aria-label': labels.uploading(file.name) }) as HTMLProgressElement;
     show('uploading', heading(labels.uploading(file.name)), h('p', { class: 'adt-import-file' }, icon('file'), `${file.name} · ${size(file.size)}`), bar);
     live.textContent = labels.uploading(file.name);
     client.upload(file, {
-      idempotencyKey: importKey(), signal: running.signal,
+      idempotencyKey: keyOf(file), signal: running.signal,
       onProgress: (sent, total) => { bar.value = Math.round((sent / Math.max(1, total)) * 100); },
     }).then(state => {
       if (closed) { if (state.status === 'mapping') void client.cancel(state.id).catch(() => undefined); return; }
       current = state;
       if (state.status === 'mapping') mappingStep(state);
       else follow(state);
-    }, error => { if (!closed) fileStep(messageOf(error)); });
+    }, error => {
+      if (closed || (error as Error)?.name === 'AbortError') return; // closed, or another file was chosen
+      // Busy, failed or offline: the same file again (the same key, so never a second import).
+      const transient = !(error instanceof ImportRequestError) || error.status === 429 || error.status >= 500;
+      if (transient) fileStep(undefined, alert(messageOf(error), button(labels.retry, () => upload(file))));
+      else fileStep(messageOf(error));
+    });
   };
 
   // ---- Step 2: the mapping
@@ -210,7 +222,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
     const chosen = [...(state.mapping ?? headers.map(() => null))];
     const offered = state.modes ?? [];
     let mode: ImportMode | undefined = state.mode ?? offered[0];
-    const message = h('div', { class: 'adt-import-check', 'aria-live': 'polite' });
+    const message = h('div', { class: 'adt-import-check', 'aria-live': 'polite', tabindex: '-1' }); // focused when Start is refused
     const start = button(labels.start, () => begin(), 'primary');
     const check = (): boolean => {
       const missing = columns.filter(column => column.required && !chosen.includes(column.id)).map(column => column.title ?? column.id);
@@ -241,8 +253,11 @@ export function openImport(options: OpenImportOptions): ImportDialog {
       h('div', { class: 'adt-import-scroll' }, h('table', { class: 'adt-import-table' },
         h('thead', {}, h('tr', {}, ...headers.map((_, index) => h('th', { scope: 'col' }, name(index))))),
         h('tbody', {}, ...state.preview.map(row => h('tr', {}, ...row.cells.map(cell => h('td', {}, cell ?? '')))))))) : null;
+    let starting = false; // a second click while it starts must not start it again
     const begin = (): void => {
+      if (starting) return;
       if (!check()) { message.focus(); return; }
+      starting = true;
       running?.abort();
       running = new AbortController();
       start.setAttribute('aria-disabled', 'true');
@@ -270,7 +285,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
   const follow = (state: ImportState): void => {
     current = state;
     if (FINAL_STATUSES.includes(state.status)) { result(state); return; }
-    const bar = h('progress', { class: 'adt-import-progress' }) as HTMLProgressElement;
+    const bar = h('progress', { class: 'adt-import-progress', 'aria-label': labels.working }) as HTMLProgressElement;
     const text = h('p', { class: 'adt-import-count' });
     const counts = h('p', { class: 'adt-import-hint' });
     const problemBox = h('div');
@@ -302,15 +317,15 @@ export function openImport(options: OpenImportOptions): ImportDialog {
     poll();
   };
 
-  // The error report through the client: it carries the configured headers (a bearer token)
-  // and a custom fetch, which a plain link would not; the href is the fallback.
-  const downloadLink = (href: string, source: string): HTMLElement => {
-    const link = h('a', { href, download: 'import-errors.csv', class: 'adt-import-report' }, labels.report) as HTMLAnchorElement;
+  // The error report and the template through the client: it carries the configured headers (a
+  // bearer token) and a custom fetch, which a plain link would not; the href is the fallback.
+  function downloadLink(href: string, source: string, name: string, text: string, className?: string): HTMLElement {
+    const link = h('a', { href, download: name, ...(className ? { class: className } : {}) }, text) as HTMLAnchorElement;
     link.addEventListener('click', event => {
       event.preventDefault();
       client.file(source).then(blob => {
         const url = URL.createObjectURL(blob);
-        const save = h('a', { href: url, download: 'import-errors.csv', hidden: true }) as HTMLAnchorElement;
+        const save = h('a', { href: url, download: name, hidden: true }) as HTMLAnchorElement;
         doc.body.append(save);
         save.click();
         save.remove();
@@ -318,7 +333,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
       }, error => { link.after(alert(messageOf(error))); });
     });
     return link;
-  };
+  }
 
   // ---- Step 4: the result
   const result = (state: ImportState): void => {
@@ -335,7 +350,7 @@ export function openImport(options: OpenImportOptions): ImportDialog {
       shown.length > 0 ? h('div', { class: 'adt-import-problems' }, h('h4', {}, labels.problems),
         h('ul', {}, ...shown.map(error => h('li', {}, `${labels.line(numbers.format(error.line))}${error.column ? ` · ${error.column}` : ''}${error.value ? ` · “${error.value}”` : ''}: ${error.message}`))),
         state.errorsTruncated || state.errors.length > shown.length ? h('p', { class: 'adt-import-hint' }, labels.moreProblems) : null) : null,
-      report ? h('p', {}, downloadLink(report, state.errorReport!)) : null,
+      report ? h('p', {}, downloadLink(report, state.errorReport!, 'import-errors.csv', labels.report, 'adt-import-report')) : null,
       h('div', { class: 'adt-import-actions' }, button(labels.another, () => fileStep()), button(labels.close, () => dialog.close(), 'primary', { 'data-focus': 'true' })));
     live.textContent = title;
     completed(state);
@@ -343,6 +358,8 @@ export function openImport(options: OpenImportOptions): ImportDialog {
 
   // ---- Closing
   closeButton.addEventListener('click', () => dialog.close());
+  // A file dropped beside the drop zone must not make the browser open it (and lose the dialog).
+  for (const type of ['dragover', 'drop']) dialog.addEventListener(type, event => event.preventDefault());
   dialog.addEventListener('click', event => {
     if (event.target !== dialog) return;
     const box = dialog.getBoundingClientRect();
@@ -351,10 +368,10 @@ export function openImport(options: OpenImportOptions): ImportDialog {
   dialog.addEventListener('close', () => {
     closed = true;
     // A running import goes on in the back end: keep following it quietly, to refresh the table when it ends.
-    const following = current && !CLOSE_STATES.has(current.status) && current.status !== 'mapping' && body.dataset['step'] === 'progress';
+    const following = current && !FINAL_STATUSES.includes(current.status) && current.status !== 'mapping' && body.dataset['step'] === 'progress';
     if (!following) running?.abort();
     if (current?.status === 'mapping') void client.cancel(current.id).catch(() => undefined);
-    if (!following && (!current || !CLOSE_STATES.has(current.status))) finish(null);
+    if (!following && (!current || !FINAL_STATUSES.includes(current.status))) finish(null);
     dialog.remove();
   });
 

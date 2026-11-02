@@ -1,5 +1,5 @@
 import {
-  foldText, isDecimal, normalizeValue, type ColumnDef, type ColumnType,
+  foldText, formatLocalDate, isDecimal, normalizeValue, type ColumnDef, type ColumnType,
 } from '@acunsoft/datatable-core';
 import { resolveImportMessages, type ImportIssueCode, type ImportMessages } from './messages';
 import { checkSheet, type Sheet, type SheetCell } from './sheet';
@@ -131,7 +131,7 @@ function convert(cell: SheetCell, type: ColumnType | undefined, options: ImportO
 }
 
 const describe = (cell: SheetCell): string => (cell === null ? '' : isDecimal(cell) ? cell.text
-  : cell instanceof Date ? cell.toISOString() : String(cell)).slice(0, 200);
+  : cell instanceof Date ? (Number.isNaN(cell.getTime()) ? '' : formatLocalDate(cell)) : String(cell)).slice(0, 200); // the user's day, not UTC's
 
 /**
  * Read a sheet (from `parseCsv` or `readXlsx`) into typed values for the

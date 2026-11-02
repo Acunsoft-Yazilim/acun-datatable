@@ -3,8 +3,63 @@
 All notable changes to this repository. Each npm package also has its own
 `CHANGELOG.md`, written by Changesets.
 
-## Unreleased
+## npm 0.5.0 and `acunsoft/datatable-laravel` 0.6.0
 
+npm 0.4.0 was prepared but never published: 0.5.0 carries it (see below).
+
+- **Breaking (both back ends): DataTables "All" and oversized pages are
+  refused.** `length=-1` or a length past the endpoint's largest page got a
+  page cut short, with the other rows silently missing; now DataTables shows
+  the error (see UPGRADING.md).
+- **Breaking (Laravel): editing in place needs a policy.** Without a model
+  policy anyone who saw a Livewire table could edit every `editable()` cell;
+  now such an edit is refused unless the table's `editableWithoutPolicy()`
+  returns `true` (see UPGRADING.md).
+- **React render loop fixed:** `useDataTable` with a new `data` array on every
+  render (`orders.filter(…)`) no longer renders without end.
+- **Server-side exports fixed:** `@acunsoft/datatable` fetched 1,000 rows a
+  request, which the Node back end refused (422) and Laravel's DataTables
+  answer cut to 100 rows. It now asks for `exportPageSize` rows (new, default
+  100) and pages by what a back end answers.
+- **Laravel counts of `distinct()`, `having()` and union queries fixed:** a
+  distinct join counted 1 row (and Laravel's own exact count counted
+  duplicates); they are counted as a subquery with their columns. Export size
+  checks stop after limit + 1 rows instead of counting every row.
+- **Smaller bundles, measured:** the Vue components tree-shake (`useDataTable`
+  alone 11.2 KB gzip instead of 33 KB; `AcunPagination` 5.5 KB instead of
+  23 KB); `@acunsoft/datatable` loads the Excel and CSV writers at the first
+  export (first load 42.0 KB instead of 46.0 KB). `npm run size` now also
+  checks what one import alone costs, and `npm run size:ssr` measures the
+  JavaScript of the Next.js and Nuxt test apps: the table adds about 31 KB
+  gzip to either (`bench/results/ssr-size.json`).
+- **Documentation in four groups:** HTML / JavaScript (with the Web
+  Component), React · Next.js, Vue · Nuxt and Laravel · Livewire (with
+  Inertia); the Node.js back end is a section of the server guide. The old
+  addresses (`#/nextjs`, `#/nuxt`, `#/inertia`, `#/webcomponent`) lead to the
+  new sections. Framework examples that were never tested (Angular, Svelte,
+  Astro, Alpine) are gone; Nuxt needs no `<ClientOnly>`; the Edge runtime is
+  no longer claimed for the Node package (only the Node.js runtime is tested).
+- **`<acun-datatable>`, a fuller custom element:** every attribute is also a
+  property; properties set before the element is defined are taken over; a
+  new page size changes in place and the view attributes (language,
+  responsive, size, …) keep the user's page, sorting, filters, search,
+  selection and columns (they started over before); `adt-change` and
+  `adt-ready` bubble, `adt-error` is new; `scroll-y="480"` works; two
+  `state-save` tables without an id keep separate states; typed for
+  TypeScript. `AcunDataTable` takes `initialState`.
+- **Vue in Nuxt (server rendering):** no listener is left on a table or status
+  shared between requests (13 per request before); on Vue 3.4 an opened row's
+  `aria-controls` names its details again after hydration. Vue 3.4 stays
+  supported.
+- **SSR tests:** server rendering without a DOM and hydration in eight layouts
+  for React and Vue, and real Next.js (16.4) and Nuxt (4.6) test apps in
+  `e2e/ssr` (`npm run e2e:ssr`, a CI job of its own): server HTML, no
+  hydration mismatch, the server's elements kept, the table working after.
+- **Filter days in the user's time zone:** with a day among the filters,
+  `datatable-http` sends `tz` (the browser's zone); the Node server and
+  Laravel take the day there, so a server in UTC no longer shifts Istanbul's
+  days by three hours. `timeZone` (Node) and `TableResponse::timeZone()`
+  (Laravel) let the server decide. Without `tz` nothing changes.
 - **Import protocol (not released yet):** `acun-import/1`
   ([packages/import/PROTOCOL.md](packages/import/PROTOCOL.md)) and its test kit
   in the private `@acunsoft/datatable-import` package: answer readers, the
@@ -45,8 +100,103 @@ All notable changes to this repository. Each npm package also has its own
   inflates to 200 MB and claims 1 KB) is refused by both back ends; the error
   report downloads through the client, so bearer-token APIs work; an import
   guide on the docs site and an import scenario in the live demo.
+- **DataTables requests filtered once:** this package's client sends each
+  filter both as `filters[i]` and as its column's search; the Node and
+  Laravel back ends applied both, so a boolean, number or date filter also
+  became a text `contains` (422 or no rows). With `filters[i]` in a request
+  the column searches are now ignored; a DataTables front end without them
+  works as before.
+- **Row "⋮" menus open whole:** the menu of the last rows was cut off by the
+  table's scroll box, and on phones by the cards. Open, it now sits over the
+  page below its button (above when there is no room), inside the window, and
+  follows the button while the page or the table scrolls; in the DOM
+  renderer, React, Vue, the Web Component and Livewire.
+- **Cursor paging over PostgreSQL timestamps with microseconds:** the Node
+  back end's cursor took node-postgres' `Date`, which keeps milliseconds, so
+  an ascending sort served the same rows again without end and a descending
+  one skipped rows (10 rows in one millisecond: 7 skipped, measured). The page
+  now also reads each date-time sort column as text for the cursor.
+- **Cursor paging is set once, on the table:** `paging: 'cursor'` had to be
+  given to the table and to `createHttpDataSource`; with only the table set,
+  the server answered page numbers and the table stayed on page 1. A cursor
+  table's queries now say `paging: 'cursor'` and the source follows them; its
+  own option stays for calling `getPage` yourself.
+- **Saved date filters stay dates:** `persistState` (and `stateSave`) wrote a
+  date filter as UTC text and gave it back as a string, so a day filter on a
+  date-time column matched almost nothing after a reload. Dates are saved as
+  their local wall time and restored as dates.
+- **`in` on a date-time column reads days as whole days on the Node back
+  end too** (it matched only rows at midnight), as the browser and Laravel do.
+- **DataTables `start` is used as it is:** after the page length changed
+  (10 → 25 on row 11) DataTables sends a `start` that is no whole number of
+  pages; both back ends rounded it down, so the rows did not match the
+  "Showing 11 to 35" DataTables printed.
+- **CSV opens in columns in German, French and Spanish Excel:** the CSV
+  button (`@acunsoft/datatable`) and Livewire's `exportDelimiter()` wrote `;`
+  only for exactly `tr`; now for `tr`, `de`, `fr` and `es`, regional tags
+  included.
+- **Editing rows without an ID field:** after a save the row got a new ID,
+  so its selection and open details were lost and the focus fell to the
+  page; it now keeps its ID.
+- **Exports and print take the same selected rows:** an export of the
+  selection (`tableToSheet(table, { rows: 'selected' })`, the Excel and CSV
+  buttons) wrote them in data order, with selected rows the search hid; print
+  showed them sorted and filtered. Both now take the selected rows among the
+  matching ones, in the table's order, as DataTables does.
+- **Accessibility of menus and live regions:** choosing an item of a row's
+  "⋮" menu or the tools menu puts the focus back on the menu's button (it
+  fell to the page), in every renderer and Livewire; the tools menu's
+  groups are named for screen readers; `aria-busy` marks the rows, not the
+  "Loading…" notice; the page info and the selection count are written only
+  when their words change.
+- **Less layout work on a checkbox click:** with `responsive: 'auto'` or
+  `fixedColumns`, selecting a row measured every column again (a forced
+  layout per column); the two observers now skip a row's own state and the
+  pin classes.
+- **`acunsoft/datatable-laravel` requires `laravel/framework`:** it asked for
+  four `illuminate/*` packages but uses queued jobs
+  (`Illuminate\Foundation\Bus\Dispatchable`), console, validation, routing,
+  cache and auth, which only the framework brings.
+- **Laravel xlsx exports leave no temporary file when they fail:** an
+  export refused as too large (the usual way to the queue) or failing
+  half-way left an `adt-sheet-*` file in the system's temporary folder.
+- **xlsx text that looks like an escape reads back exactly:** both xlsx
+  writers (`toXlsx`, Laravel's `TableExport`) wrote `_x0041_` as it is, and
+  every reader (Excel too) turned it into `A`; it is written as `_x005F_x0041_`.
+- **Import fixes (not released yet):** the client sends its headers and
+  cookies only to its own origin (an error report on another host got the
+  bearer token); a chunked upload is counted while it is read (413 past the
+  limit); the xlsx readers stay linear on elements that never close, and a
+  date-styled number past any date stays a number; `streamCsv` stops at a
+  field longer than a million characters (an open quote held the whole
+  file: 30 s for 24 MB, now 34 ms); two
+  starts of one import at once run it once (Node `ImportStore.claim`, Laravel
+  cache lock), and the dialog ignores a second click while it starts.
+  While polling, a `429` or `503` waits for `Retry-After` and goes on; an
+  upload that failed (`429`, `5xx`, network) is offered again with the same
+  file and key. The dialog names its progress bars, focuses the reason a start
+  is refused, and a file dropped beside the drop zone no longer makes the
+  browser open it.
+  Both back ends: update and upsert need the import key column matched.
+  Node: a run again goes on after the rows saved before, a failing store in
+  the background is reported instead of ending the process, and `save()`
+  gets the owner as `owner()` gave it. Laravel: columns named with their
+  table (`->column('orders.code')`) find and fill their records, and a
+  queued import whose user was deleted fails instead of running as a guest.
+- **Laravel queued table tasks keep the table's own properties:** a large
+  export or a queued bulk action rebuilt the table from its scalar
+  properties only, so a model property (`public ?Team $team`) was dropped
+  and a `query()` scoped by it exported every row (measured: 8 rows instead
+  of 3). The properties now travel through Livewire's synthesizers.
+  While a task runs, the table's 2-second check no longer renders the table
+  again (its page, count and totals were read every 2 seconds).
+- **Laravel query-builder tables page in a stable order:** the key
+  tie-breaker was added for Eloquent only, so `DB::table()` pages and export
+  chunks sorted by a column with equal values could repeat or skip rows.
+  `TableResponse` and `TableExport` take `->key('id')`; Livewire tables use
+  `keyName()`.
 
-## npm 0.4.0 and `acunsoft/datatable-laravel` 0.5.0 (2026-10-25)
+## `acunsoft/datatable-laravel` 0.5.0 (2026-10-25) · npm 0.4.0 (not published, in 0.5.0)
 
 The first stable release candidate: the npm packages skip 0.3.0, which was
 prepared but never published. Read [UPGRADING.md](UPGRADING.md) first; each

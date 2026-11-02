@@ -406,8 +406,12 @@ Counts use the language's singular and plural forms and digit grouping
 (`Showing 1 to 1 of 1 row`, `Showing 1 to 25 of 16,000 rows`,
 `Toplam: 1.600 kaydın 1 ile 25 arasını gösteriyor`, `Affichage de 1 à 25 sur 1 600 lignes`).
 
+`renderTable`, `renderPagination`, `renderFilters` and `renderFilterPanel`
+take their texts from `locale` too, as `renderDataTable` does; `labels`
+overrides them.
+
 ```ts
-renderTable(el, table, { locale: 'de', labels: resolveLabels('de-AT') }); // de-AT → German, unknown → English
+renderTable(el, table, { locale: 'de-AT' }); // de-AT → German texts and numbers, unknown → English
 renderSearch(el, table, { labels: resolveLabels(navigator.language, { search: 'Filtern' }) });
 ```
 

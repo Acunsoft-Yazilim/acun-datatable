@@ -1,6 +1,7 @@
 import { getPageItems, type DataTable } from '@acunsoft/datatable-core';
-import { ariaDisabled, checkTarget, element, icon, keepFocus, type RenderedComponent } from './dom';
-import { labelsEn, type DataTableLabels } from './labels';
+import { ariaDisabled, checkTarget, element, icon, keepFocus, setText, type RenderedComponent } from './dom';
+import { labelsEn, resolveLabels, type DataTableLabels } from './labels';
+import { pagingView } from './table-model';
 
 export interface RenderPaginationOptions {
   /** Pages shown on each side of the current page. Default 1. */
@@ -29,7 +30,7 @@ export function renderPagination<TData>(
   const itemOptions = { siblings: options.siblings ?? 1, boundaries: options.boundaries ?? 1 };
   getPageItems(1, 1, itemOptions); // validates the options before anything is rendered
   const doc = container.ownerDocument;
-  const labels: DataTableLabels = { ...labelsEn, ...options.labels };
+  const labels: DataTableLabels = resolveLabels(options.locale, options.labels); // locale also picks the texts, as in renderDataTable
   const numberFormat = new Intl.NumberFormat(options.locale ?? 'en');
 
   const root = element(doc, 'nav', { class: 'adt-paging', 'aria-label': labels.pagination });
@@ -50,10 +51,7 @@ export function renderPagination<TData>(
   container.replaceChildren(root);
 
   const update = (): void => {
-    const page = table.getPage();
-    const known = table.getTotalRows() !== undefined;
-    const atStart = page.page <= 1;
-    const atEnd = page.page >= page.pageCount;
+    const { page: current, atStart, atEnd, known, items } = pagingView(table, knownPageCount(table), itemOptions);
     if (first) ariaDisabled(first, atStart);
     ariaDisabled(previous, atStart);
     ariaDisabled(next, atEnd);
@@ -62,12 +60,11 @@ export function renderPagination<TData>(
       last.hidden = !known; // the last page of an unknown total is not known
     }
     // Unknown total: number only the pages that are known to exist.
-    const items = getPageItems(page.page, knownPageCount(table), itemOptions);
     keepFocus(numbers, () => numbers.replaceChildren(...items.map(item => {
       if (item === 'gap') return element(doc, 'span', { class: 'adt-page-gap', 'aria-hidden': 'true' }, '…');
       const button = element(doc, 'button', {
         type: 'button', class: 'adt-page', 'aria-label': labels.page(item), 'data-adt-focus': `page:${item}`,
-        'aria-current': item === page.page ? 'page' : undefined,
+        'aria-current': item === current ? 'page' : undefined,
       }, numberFormat.format(item));
       button.addEventListener('click', () => table.setPage(item));
       return button;
@@ -184,7 +181,7 @@ export function renderPageInfo<TData>(
   const root = element(doc, 'div', { class: 'adt-info', 'aria-live': 'polite', 'aria-atomic': 'true' });
   container.replaceChildren(root);
   const update = (): void => {
-    root.textContent = pageInfoText(table, labels, options.all === true);
+    setText(root, pageInfoText(table, labels, options.all === true)); // not again on every selection change
   };
   update();
   const unsubscribe = table.subscribe(() => update());

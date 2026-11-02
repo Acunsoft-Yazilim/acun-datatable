@@ -5,6 +5,7 @@
     "noEmit": true,
     "paths": {
       "@acunsoft/datatable-core": ["../core/src/index.ts"],
+      "@acunsoft/datatable-dom/internal": ["../renderer-dom/src/internal.ts"],
       "@acunsoft/datatable-dom": ["../renderer-dom/src/index.ts"]
     }
   },

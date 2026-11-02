@@ -6,7 +6,6 @@ namespace Acunsoft\DataTable\Laravel;
 
 use Acunsoft\DataTable\Laravel\Support\Text;
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
@@ -25,8 +24,10 @@ use Throwable;
  *   `Column::searchUsing()` names a stored folded copy, faster on large tables.
  * - Smart search: every word must match in some searchable column.
  * - `date` columns compare days; in `datetime` columns a date-only value means
- *   the whole day (`whereDate`), a value with a time an exact instant.
- * - Sorting adds the primary key as a tie-breaker so pages are stable.
+ *   the whole day (a `[day, next day)` range the column's index serves), a
+ *   value with a time an exact instant.
+ * - Sorting adds the key as a tie-breaker so pages are stable: the model key
+ *   of an Eloquent query, the `$key` given for a query builder.
  */
 final class QueryApplier
 {
@@ -34,10 +35,11 @@ final class QueryApplier
 
     /**
      * @param iterable<Column> $columns
+     * @param string|null $key a query builder's unique key, the last sort tie-breaker (Eloquent uses the model key)
      *
      * @throws InvalidTableQuery
      */
-    public static function apply(EloquentBuilder|QueryBuilder $builder, TableQuery $query, iterable $columns): EloquentBuilder|QueryBuilder
+    public static function apply(EloquentBuilder|QueryBuilder $builder, TableQuery $query, iterable $columns, ?string $key = null): EloquentBuilder|QueryBuilder
     {
         $byId = self::index($columns);
 
@@ -46,7 +48,7 @@ final class QueryApplier
             if (! $column->isFilterable()) {
                 throw InvalidTableQuery::at("filters.{$index}.field", "Column [{$filter['field']}] cannot be filtered.");
             }
-            self::filter($builder, $column, $filter['operator'], $filter['value'], "filters.{$index}.value");
+            self::filter($builder, $column, $filter['operator'], $filter['value'], "filters.{$index}.value", $query->timeZone);
         }
 
         $terms = $query->searchTerms();
@@ -109,30 +111,24 @@ final class QueryApplier
                 // (sorted column, key) serves the whole ORDER BY (deep pages 27× faster, measured on 5M PostgreSQL rows).
                 $builder->orderBy($model->getQualifiedKeyName(), $query->sorting === [] ? 'asc' : $query->sorting[array_key_last($query->sorting)]['direction']);
             }
+        } elseif ($key !== null) {
+            self::tieBreak($builder, $key);
         }
 
         return $builder;
     }
 
-    /**
-     * Apply the query and fetch one page.
-     *
-     * - `$countLimit` (default 10,000) and `$countTimeout` (default 250 ms): up
-     *   to the limit the count is exact (it stops after `$countLimit` + 1
-     *   matches; rare matches no index serves can still read the whole
-     *   table, so its cost depends on the query and the database). Beyond it an exact
-     *   COUNT(*) runs with a time limit (PostgreSQL, MySQL, MariaDB); only when
-     *   it would take longer, TablePage::totalIsExact() is false and the UI
-     *   shows "10,000+". `$countLimit = null` always counts everything without
-     *   a time limit; `$countTimeout = null` never counts past the limit.
-     * - `$maxResultWindow` (default 100,000): refuse pages that start past this
-     *   many rows (deep OFFSETs are slow and an easy way to load the database).
-     *   `null` allows any page.
-     *
-     * @param iterable<Column> $columns
-     *
-     * @throws InvalidTableQuery
-     */
+    /** Order a query builder by its key last (unless it is sorted by it), in the direction of the last order. */
+    private static function tieBreak(QueryBuilder $base, string $key): void
+    {
+        $table = is_string($base->from) ? $base->from : null;
+        $sorted = array_map(fn (array $order) => $order['column'] ?? null, $base->orders ?? []);
+        if (! in_array($key, $sorted, true) && ($table === null || ! in_array("{$table}.{$key}", $sorted, true))) {
+            $last = $base->orders === null || $base->orders === [] ? 'asc' : strtolower((string) ($base->orders[array_key_last($base->orders)]['direction'] ?? 'asc'));
+            $base->orderBy($key, $last === 'desc' ? 'desc' : 'asc');
+        }
+    }
+
     /**
      * Keyset paging: the page after `$query->cursor`, continuing after the
      * last row of the page before by its sort values and key, through an index
@@ -151,17 +147,8 @@ final class QueryApplier
      */
     public static function cursorPage(EloquentBuilder|QueryBuilder $builder, TableQuery $query, iterable $columns, ?int $countLimit = 10_000, ?int $countTimeout = 250, ?string $key = null): TablePage
     {
-        $applied = self::apply($builder, $query, $columns);
+        $applied = self::apply($builder, $query, $columns, $key ?? 'id');
         $base = $applied instanceof EloquentBuilder ? $applied->getQuery() : $applied;
-        if (! $applied instanceof EloquentBuilder) {
-            $key ??= 'id';
-            $table = is_string($base->from) ? $base->from : null;
-            $sorted = array_map(fn (array $order) => $order['column'] ?? null, $base->orders ?? []);
-            if (! in_array($key, $sorted, true) && ($table === null || ! in_array("{$table}.{$key}", $sorted, true))) {
-                $last = $base->orders === null || $base->orders === [] ? 'asc' : strtolower((string) ($base->orders[array_key_last($base->orders)]['direction'] ?? 'asc'));
-                $base->orderBy($key, $last === 'desc' ? 'desc' : 'asc');
-            }
-        }
         $nullable = [];
         foreach ($columns as $column) {
             if ($column->isNullable()) {
@@ -266,16 +253,35 @@ final class QueryApplier
         return $value instanceof \DateTimeInterface ? $value->format('Y-m-d H:i:s') : $value;
     }
 
+    /**
+     * Apply the query and fetch one page.
+     *
+     * - `$countLimit` (default 10,000) and `$countTimeout` (default 250 ms): up
+     *   to the limit the count is exact (it stops after `$countLimit` + 1
+     *   matches; rare matches no index serves can still read the whole
+     *   table, so its cost depends on the query and the database). Beyond it an exact
+     *   COUNT(*) runs with a time limit (PostgreSQL, MySQL, MariaDB); only when
+     *   it would take longer, TablePage::totalIsExact() is false and the UI
+     *   shows "10,000+". `$countLimit = null` always counts everything without
+     *   a time limit; `$countTimeout = null` never counts past the limit.
+     * - `$maxResultWindow` (default 100,000): refuse pages that start past this
+     *   many rows (deep OFFSETs are slow and an easy way to load the database).
+     *   `null` allows any page.
+     *
+     * @param iterable<Column> $columns
+     *
+     * @throws InvalidTableQuery
+     */
     public static function paginate(EloquentBuilder|QueryBuilder $builder, TableQuery $query, iterable $columns, ?int $countLimit = 10_000, ?int $maxResultWindow = 100_000, ?int $countTimeout = 250, ?string $key = null): TablePage
     {
         if ($query->cursorPaging) {
             return self::cursorPage($builder, $query, $columns, $countLimit, $countTimeout, $key);
         }
-        $offset = ($query->page - 1) * $query->pageSize;
+        $offset = $query->offset ?? ($query->page - 1) * $query->pageSize;
         if ($maxResultWindow !== null && $offset >= $maxResultWindow) {
             throw InvalidTableQuery::at('page', "Pages past the first {$maxResultWindow} results are not available; narrow the filters or sort the other way.");
         }
-        $applied = self::apply($builder, $query, $columns);
+        $applied = self::apply($builder, $query, $columns, $key);
         [$total, $exact] = self::count($applied, $countLimit, $countTimeout);
         if ($exact) {
             $items = $offset < $total ? (clone $applied)->offset($offset)->limit($query->pageSize)->get() : [];
@@ -302,7 +308,7 @@ final class QueryApplier
     {
         $base = $builder instanceof EloquentBuilder ? $builder->toBase() : $builder;
         if ($limit === null) {
-            return [(clone $base)->getCountForPagination(), true];
+            return [self::exactCount($base), true];
         }
         if ($limit < 1) {
             throw new \InvalidArgumentException('The count limit must be at least 1, or null.');
@@ -310,9 +316,12 @@ final class QueryApplier
         if ($timeoutMs !== null && $timeoutMs < 1) {
             throw new \InvalidArgumentException('The count timeout must be at least 1 ms, or null.');
         }
-        $probe = (clone $base)->reorder()->limit($limit + 1)->offset(0);
-        $probe->columns = null;
-        $counted = $base->newQuery()->fromSub($probe->selectRaw('1 as adt_match'), 'adt_matches')->count();
+        $probe = self::countable($base)->limit($limit + 1)->offset(0);
+        if (! self::rowsFollowColumns($base)) {
+            $probe->columns = null;
+            $probe->selectRaw('1 as adt_match');
+        }
+        $counted = $base->newQuery()->fromSub($probe, 'adt_matches')->count();
         if ($counted <= $limit) {
             return [$counted, true];
         }
@@ -371,6 +380,43 @@ final class QueryApplier
         return $totals;
     }
 
+    /**
+     * Whether the rows a query returns depend on its select list: `distinct`,
+     * `having` and unions. Those are counted with their columns, as a subquery;
+     * others as `count(*)`. (Laravel's own getCountForPagination() counts a
+     * `distinct()` query as `count(*)`, duplicates included.)
+     */
+    private static function rowsFollowColumns(QueryBuilder $base): bool
+    {
+        return (bool) $base->distinct || ! empty($base->havings) || ! empty($base->unions);
+    }
+
+    /**
+     * The query without its order (a count needs none). Its columns stay as
+     * they are, so the count matches the rows the table shows; select the
+     * columns of a joined `distinct()` query (`->select('orders.*')`), as MySQL
+     * and SQL Server refuse a subquery with two columns of the same name.
+     */
+    private static function countable(QueryBuilder $base): QueryBuilder
+    {
+        $query = (clone $base)->reorder();
+        if ($query->unions) {
+            $query->unionOrders = [];
+            $query->bindings['unionOrder'] = [];
+        }
+
+        return $query;
+    }
+
+    private static function exactCount(QueryBuilder $base): int
+    {
+        if (! self::rowsFollowColumns($base)) {
+            return (clone $base)->getCountForPagination();
+        }
+
+        return $base->newQuery()->fromSub(self::countable($base), 'adt_matches')->count();
+    }
+
     /** An exact count, or null when the database cannot finish it within `$ms`. */
     private static function countWithin(QueryBuilder $base, int $ms): ?int
     {
@@ -384,7 +430,7 @@ final class QueryApplier
         if ($cache?->has($slow)) {
             return null;
         }
-        $count = fn (): int => (clone $base)->getCountForPagination();
+        $count = fn (): int => self::exactCount($base);
         try {
             if ($driver === 'pgsql') {
                 // In a (nested) transaction, so a cancelled statement only rolls back its own savepoint.
@@ -466,7 +512,7 @@ final class QueryApplier
         return $byId;
     }
 
-    private static function filter(EloquentBuilder|QueryBuilder $builder, Column $column, string $operator, mixed $value, string $at): void
+    private static function filter(EloquentBuilder|QueryBuilder $builder, Column $column, string $operator, mixed $value, string $at, ?string $zone = null): void
     {
         $name = $column->databaseColumn();
         $textual = in_array($column->valueType(), [null, 'text'], true);
@@ -477,18 +523,18 @@ final class QueryApplier
         match ($operator) {
             'contains' => self::like($builder, $column, trim($value), false, 'and'),
             'startsWith' => self::like($builder, $column, trim($value), true, 'and'),
-            'eq' => self::compare($builder, $column, '=', $value, $at),
-            'gt' => self::compare($builder, $column, '>', $value, $at),
-            'lt' => self::compare($builder, $column, '<', $value, $at),
-            'gte' => self::compare($builder, $column, '>=', $value, $at),
-            'lte' => self::compare($builder, $column, '<=', $value, $at),
-            'between' => $builder->where(function ($group) use ($column, $value, $at): void {
-                self::compare($group, $column, '>=', $value[0], $at);
-                self::compare($group, $column, '<=', $value[1], $at);
+            'eq' => self::compare($builder, $column, '=', $value, $at, $zone),
+            'gt' => self::compare($builder, $column, '>', $value, $at, $zone),
+            'lt' => self::compare($builder, $column, '<', $value, $at, $zone),
+            'gte' => self::compare($builder, $column, '>=', $value, $at, $zone),
+            'lte' => self::compare($builder, $column, '<=', $value, $at, $zone),
+            'between' => $builder->where(function ($group) use ($column, $value, $at, $zone): void {
+                self::compare($group, $column, '>=', $value[0], $at, $zone);
+                self::compare($group, $column, '<=', $value[1], $at, $zone);
             }),
-            'in' => $builder->where(function ($group) use ($column, $value, $at): void {
+            'in' => $builder->where(function ($group) use ($column, $value, $at, $zone): void {
                 foreach ($value as $item) {
-                    $group->orWhere(fn ($one) => self::compare($one, $column, '=', $item, $at));
+                    $group->orWhere(fn ($one) => self::compare($one, $column, '=', $item, $at, $zone));
                 }
             }),
             'empty' => $builder->where(function ($group) use ($name, $textual): void {
@@ -501,7 +547,7 @@ final class QueryApplier
         };
     }
 
-    private static function compare(EloquentBuilder|QueryBuilder $builder, Column $column, string $operator, string $value, string $at): void
+    private static function compare(EloquentBuilder|QueryBuilder $builder, Column $column, string $operator, string $value, string $at, ?string $zone = null): void
     {
         $name = $column->databaseColumn();
         switch ($column->valueType()) {
@@ -529,7 +575,7 @@ final class QueryApplier
             case 'datetime':
                 if (preg_match(self::DATE_ONLY, trim($value)) === 1) {
                     // A calendar day in a datetime column means the whole day.
-                    self::dayRange($builder, $name, $operator, self::day($value, $at), 'Y-m-d H:i:s');
+                    self::dayRange($builder, $name, $operator, self::day($value, $at), 'Y-m-d H:i:s', $zone);
                 } else {
                     $builder->where($name, $operator, self::instant($value, $at));
                 }
@@ -540,19 +586,21 @@ final class QueryApplier
         }
     }
 
-    /** The calendar day as written by the client (it sends local dates), e.g. 2026-10-23. */
     /**
      * Compare with a whole calendar day as a half-open range, never as
      * `DATE(column)`: the column stays bare, so its index is used (22× faster,
      * measured on 5M PostgreSQL rows), and no database session timezone is involved.
      * `=` is [day, next day), `>` is ≥ next day, `<` is < day, `>=` is ≥ day,
-     * `<=` is < next day (also the bounds of `between`).
+     * `<=` is < next day (also the bounds of `between`). With `$zone` (the
+     * user's), the day is the one there, written in the application's zone as
+     * datetime columns are stored.
      */
-    private static function dayRange(EloquentBuilder|QueryBuilder $builder, string $name, string $operator, string $day, string $format): void
+    private static function dayRange(EloquentBuilder|QueryBuilder $builder, string $name, string $operator, string $day, string $format, ?string $zone = null): void
     {
-        $start = CarbonImmutable::createFromFormat('!Y-m-d', $day);
-        $from = $start->format($format);
-        $next = $start->addDay()->format($format);
+        $start = CarbonImmutable::createFromFormat('!Y-m-d', $day, $zone);
+        $app = $zone === null ? null : self::appZone();
+        $from = ($app === null ? $start : $start->setTimezone($app))->format($format);
+        $next = ($app === null ? $start->addDay() : $start->addDay()->setTimezone($app))->format($format);
         match ($operator) {
             '=' => $builder->where($name, '>=', $from)->where($name, '<', $next),
             '>' => $builder->where($name, '>=', $next),
@@ -562,6 +610,7 @@ final class QueryApplier
         };
     }
 
+    /** The calendar day as written by the client (it sends local dates), e.g. 2026-10-23. */
     private static function day(string $value, string $at): string
     {
         $value = trim($value);
@@ -580,9 +629,13 @@ final class QueryApplier
         } catch (Throwable) {
             throw InvalidTableQuery::at($at, "[{$value}] is not a date and time.");
         }
-        $zone = function_exists('config') ? (string) config('app.timezone', 'UTC') : 'UTC';
+        return $parsed->setTimezone(self::appZone())->format('Y-m-d H:i:s');
+    }
 
-        return $parsed->setTimezone($zone)->format('Y-m-d H:i:s');
+    /** The application's time zone, in which datetime columns are stored. */
+    private static function appZone(): string
+    {
+        return function_exists('config') ? (string) config('app.timezone', 'UTC') : 'UTC';
     }
 
     /**

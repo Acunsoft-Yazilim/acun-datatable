@@ -1,13 +1,19 @@
-import { COLUMN_WIDTH_LIMITS, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
+import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import { actionCell, checkActions, type RowAction } from './actions';
 import { cellValue, createCellText, nextSorting, rowName, type CellFormatter } from './cells';
 import { checkTarget, element, icon, keepFocus, type RenderedComponent } from './dom';
-import { labelsEn, type DataTableLabels } from './labels';
+import { resolveLabels, type DataTableLabels } from './labels';
 import { checkFixedColumns, pinColumns, type FixedColumns } from './pin';
 import { columnTools } from './column-tools';
 import { autoResponsive } from './auto-responsive';
 import { checkVirtual, virtualWindow } from './virtual';
 import { afterPointerRelease, cellEditor, isEditable, type CellEditor, type EditHandler } from './edit';
+import {
+  actionsCellClass, cellClass, clickRowCheckbox, measureRowHeight, closeRowMenusOnOutsideClick, rangeOf, selectAllState, togglePageSelection, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, numeric, priorityLevels, priorityOf, resizeHandle,
+  responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, wrapClass,
+} from './table-model';
+
+export { numeric, priorityOf, rangeOf }; // defined with the other shared table logic in table-model.ts
 
 export type { CellFormatter } from './cells';
 
@@ -132,7 +138,6 @@ export interface RenderTableOptions<TData> {
 }
 
 /** Placeholder rows while the first rows load: as many as a page, at most this many. */
-const SKELETON_ROWS = 10;
 
 /** The content of a row's child row (`detail`). */
 export type DetailRenderer<TData> = (row: Row<TData>) => Node | string | null | undefined | Promise<Node | string | null | undefined>;
@@ -187,7 +192,7 @@ export function renderTable<TData>(
 ): RenderedComponent {
   checkTarget(container, table);
   const doc = container.ownerDocument;
-  const labels: DataTableLabels = { ...labelsEn, ...options.labels };
+  const labels: DataTableLabels = resolveLabels(options.locale, options.labels); // locale also picks the texts, as in renderDataTable
   const locale = options.locale ?? 'en';
   const text = createCellText(table.getColumns(), { locale, labels, ...(options.format ? { format: options.format } : {}) });
   if (options.rowLabel !== undefined && typeof options.rowLabel !== 'function') {
@@ -205,11 +210,8 @@ export function renderTable<TData>(
   const responsive = checkResponsive(options.responsive ?? (options.virtual ? 'scroll' : undefined));
   if (options.detail !== undefined && typeof options.detail !== 'function') throw new TypeError('detail must be a function');
   const detailOf = options.detail;
-  // The expand column: hidden columns (collapse, modal) or a child row (detail).
-  const collapsible = responsive === 'collapse' || responsive === 'modal' || responsive === 'auto';
-  // Hidden columns open below the row (collapse, auto) or in a dialog (modal).
-  const inlineDetails = responsive === 'collapse' || responsive === 'auto';
-  const expandable = collapsible || detailOf !== undefined;
+  // The expand column: hidden columns (collapse, modal, auto: below the row or in a dialog) or a child row (detail).
+  const { collapsible, inlineDetails, expandable } = responsiveFlags(responsive, detailOf !== undefined);
   const uid = `adt-${++tables}`;
 
   const nameOf = (row: Row<TData>, cells: readonly string[]): string => rowName(row, cells[0] ?? '', options.rowLabel);
@@ -236,23 +238,15 @@ export function renderTable<TData>(
   const virtual = checkVirtual(options.virtual);
   if (virtual && table.getMode() === 'server') throw new TypeError('virtual scrolling needs a local table; use cursor paging for server tables');
   const height = scrollHeight(options.scrollY) ?? (virtual ? '480px' : undefined);
-  const root = element(doc, 'div', {
-    class: ['adt-table-wrap', `adt-responsive--${responsive}`, size === 'md' ? '' : `adt-size--${size}`,
-      options.stickyHeader === true ? 'adt-sticky-header' : '', height ? 'adt-scroll-y' : '', virtual ? 'adt-virtual' : ''].filter(Boolean).join(' '),
-  });
+  const root = element(doc, 'div', { class: wrapClass({ responsive, size, stickyHeader: options.stickyHeader === true, scrollY: height !== undefined, virtual: virtual !== undefined }) });
   if (height) root.style.setProperty('--adt-scroll-y', height);
   const scroller = element(doc, 'div', { class: 'adt-scroll' });
   const notice = element(doc, 'div', { class: 'adt-notice', role: 'status', 'aria-live': 'polite' });
   root.append(notice, scroller);
   container.replaceChildren(root);
-  // One listener closes any open row "⋮" menu on a click outside it.
-  const closeMenus = (event: Event): void => {
-    root.querySelectorAll<HTMLDetailsElement>('.adt-row-menu[open]').forEach(menu => {
-      if (!event.composedPath().includes(menu)) menu.open = false;
-    });
-  };
-  doc.addEventListener('click', closeMenus);
+  const stopMenus = closeRowMenusOnOutsideClick(doc, () => root);
 
+  let destroyed = false;
   // Rows whose details are open (kept across re-renders).
   const expanded = new Set<string>();
   // Child row content per row ID, kept while the row's data stays the same.
@@ -302,11 +296,7 @@ export function renderTable<TData>(
   // Responsive modal: one dialog, filled for the row whose button was pressed.
   let dialog: HTMLDialogElement | undefined;
   let dialogRow: string | undefined;
-  const closeDialog = (): void => {
-    if (!dialog) return;
-    if (typeof dialog.close === 'function' && dialog.open) dialog.close();
-    else dialog.removeAttribute('open');
-  };
+  const closeDialog = (): void => hideDialog(dialog);
   const detailList = (row: Row<TData>, cells: readonly string[], columns: readonly ColumnDef<TData>[], all: boolean): HTMLDListElement => {
     const list = element(doc, 'dl', { class: 'adt-detail-list' });
     columns.forEach((column, index) => {
@@ -329,8 +319,12 @@ export function renderTable<TData>(
   const openDialog = (row: Row<TData>, cells: readonly string[], columns: readonly ColumnDef<TData>[]): void => {
     if (!dialog) {
       dialog = element(doc, 'dialog', { class: 'adt-dialog', 'aria-labelledby': `${uid}-dialog-title` });
-      // A click on the backdrop lands on the dialog itself.
-      dialog.addEventListener('click', event => { if (event.target === dialog) closeDialog(); });
+      // A click on the backdrop lands on the dialog itself; so does one on its own scrollbar, inside its box.
+      dialog.addEventListener('click', event => {
+        if (event.target !== dialog) return;
+        const box = dialog!.getBoundingClientRect();
+        if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeDialog();
+      });
       dialog.addEventListener('close', () => {
         // Back to the row's button (Safari does not focus a clicked button, so the browser cannot restore it).
         const opener = [...root.querySelectorAll<HTMLElement>('.adt-expand')].find(node => node.dataset['adtFocus'] === `expand:${dialogRow}`);
@@ -346,10 +340,7 @@ export function renderTable<TData>(
     head.append(element(doc, 'h2', { class: 'adt-dialog-title', id: `${uid}-dialog-title` }, labels.details(nameOf(row, cells))), close);
     dialog.replaceChildren(head, detailList(row, cells, columns, true), ...(detailOf ? [detailContent(row)] : []));
     dialogRow = row.id;
-    if (!dialog.open) {
-      if (typeof dialog.showModal === 'function') dialog.showModal();
-      else dialog.setAttribute('open', '');
-    }
+    showDialog(dialog);
   };
 
   // The cell being edited in place (the editor element moves into each re-render).
@@ -395,19 +386,19 @@ export function renderTable<TData>(
       if (box) box.checked = selected;
     }
     if (selectAll) {
-      const state = table.getSelectionStatus(pageIds);
-      selectAll.checked = state === 'all';
-      selectAll.indeterminate = state === 'some';
+      const state = selectAllState(table, pageIds);
+      selectAll.checked = state.checked;
+      selectAll.indeterminate = state.indeterminate;
     }
   };
 
   // Placeholder rows while the first rows of a remote table load.
   let skeletonShown = false;
-  const wantsSkeleton = (): boolean => options.skeleton !== false && status !== undefined
-    && status.getState().status === 'loading' && table.getPage().rows.length === 0;
+  const wantsSkeleton = (): boolean => showSkeleton(options.skeleton, status !== undefined, status?.getState().status, table.getPage().rows.length);
 
   // Virtual scrolling: the rows in view, re-drawn when the scroll position moves past them.
-  let rowHeight = virtual?.rowHeight ?? 0;
+  let rowHeight = virtual?.rowHeight ?? 0; // 0: 40 until a row is drawn and measured
+  let rowMeasured = Boolean(virtual?.rowHeight);
   // The column widths of the first rows drawn, kept while scrolling: otherwise every window of
   // rows would size the columns anew and they would jump. Measured again when the columns or
   // the width of the table change.
@@ -415,7 +406,7 @@ export function renderTable<TData>(
   let drawn: { start: number; end: number } | undefined;
   const windowOf = (total: number) => virtualWindow(total, rowHeight, scroller.scrollTop, scroller.clientHeight, virtual!.overscan);
 
-  const render = (): void => keepFocus(root, () => {
+  const draw = (): void => keepFocus(root, () => {
     const state = table.getState();
     const page = virtual
       ? (() => {
@@ -435,63 +426,48 @@ export function renderTable<TData>(
     rowParts = [];
 
     const widths = state.columnWidths;
-    const layoutKey = virtual ? `${columns.map(column => column.id).join('|')}#${selectable}#${rowActions.length > 0}#${expandable}` : '';
-    const lock = virtual && locked?.key === layoutKey && locked.width === scroller.clientWidth ? locked : undefined;
+    const lockKey = virtual ? layoutKey(columns, selectable, rowActions.length > 0, expandable) : '';
+    const lock = virtual && locked?.key === lockKey && locked.width === scroller.clientWidth ? locked : undefined;
     const userWidths = Object.keys(widths).length > 0;
-    const tableEl = element(doc, 'table', { class: `adt-table${userWidths || lock ? ' adt-fixed-layout' : ''}${userWidths ? ' adt-user-widths' : ''}` });
-    if (page.all) tableEl.setAttribute('aria-rowcount', String(page.all.length + 1));
+    const levels = priorityLevels(columns, rowActions.length > 0);
+    const tableEl = element(doc, 'table', { class: tableClass({ collapsible, levels, detail: detailOf !== undefined, userWidths, locked: lock !== undefined }) });
+    // Every row of a virtual table: the header row, the rows, and the totals row when there is one.
+    if (page.all) tableEl.setAttribute('aria-rowcount', String(page.all.length + 1 + (columns.some(column => column.aggregate !== undefined) ? 1 : 0)));
     if (options.caption !== undefined) tableEl.append(element(doc, 'caption', {}, options.caption));
 
     const headRow = element(doc, 'tr');
-    const levels = new Set(columns.map((column, index) => priorityOf(column, index)));
-    if (rowActions.length > 0) levels.add(2);
-    if (collapsible) {
-      if (levels.has(2)) tableEl.classList.add('adt-has-p2');
-      if (levels.has(3)) tableEl.classList.add('adt-has-p3');
+    if (expandable) {
+      const cell = element(doc, 'td', { class: 'adt-expand-cell' });
+      cell.append(element(doc, 'span', { class: 'adt-sr-only' }, labels.detailsColumn)); // the ⊕ column's name
+      headRow.append(cell);
     }
-    if (detailOf) tableEl.classList.add('adt-has-detail');
-    if (expandable) headRow.append(element(doc, 'td', { class: 'adt-expand-cell' }));
     if (selectable) {
       const th = element(doc, 'th', { scope: 'col', class: 'adt-select' });
-      if (table.getSelectionMode() === 'multiple' && pageIds.length > 0) {
-        const box = element(doc, 'input', { type: 'checkbox', 'aria-label': labels.selectAll, 'data-adt-focus': 'select-all' });
-        box.addEventListener('change', () => {
-          if (table.getSelectionStatus(pageIds) === 'all') {
-            const page = new Set(pageIds);
-            table.setSelectedRows(table.getState().selectedIds.filter(id => !page.has(id)));
-          } else {
-            table.selectRows(pageIds);
-          }
-        });
+      if (selectAllState(table, pageIds).show) {
+        const box = element(doc, 'input', { type: 'checkbox', 'aria-label': page.all ? labels.selectAllRows : labels.selectAll, 'data-adt-focus': 'select-all' });
+        box.addEventListener('change', () => togglePageSelection(table, pageIds));
         selectAll = box;
         // The text shows only in cards (phones), where the header row is gone; the box keeps its aria-label.
         const label = element(doc, 'label', { class: 'adt-select-all' });
-        label.append(box, element(doc, 'span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, labels.selectAll));
+        label.append(box, element(doc, 'span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, page.all ? labels.selectAllRows : labels.selectAll));
         th.append(label);
       }
       headRow.append(th);
     }
-    const primary = state.sorting[0];
     for (const column of columns) {
+      const width = widths[column.id];
       const th = element(doc, 'th', {
-        scope: 'col', class: `adt-th${collapsible ? ` adt-col--p${priorityOf(column, columns.indexOf(column))}` : ''}${numeric(column) ? ' adt-num' : ''}`,
+        scope: 'col', class: headerClass(column, columns.indexOf(column), collapsible, width === undefined && (userWidths || lock !== undefined)),
         'data-column-id': column.id,
         ...(options.reorderableColumns ? { draggable: 'true' } : {}),
       });
-      const width = widths[column.id];
       if (width !== undefined) th.style.width = `${width}px`;
-      else if (tableEl.classList.contains('adt-fixed-layout')) th.classList.add('adt-th--auto'); // e.g. shown again by the responsive layout
       if (column.enableSorting) {
-        const index = state.sorting.findIndex(rule => rule.field === column.id);
-        const rule = state.sorting[index];
-        if (primary?.field === column.id) th.setAttribute('aria-sort', primary.direction === 'asc' ? 'ascending' : 'descending');
-        const button = element(doc, 'button', {
-          type: 'button',
-          class: rule ? `adt-sort adt-sort--${rule.direction}` : 'adt-sort',
-          'data-adt-focus': `sort:${column.id}`,
-        }, column.header);
-        const mark = rule ? `${rule.direction === 'asc' ? '▲' : '▼'}${state.sorting.length > 1 ? index + 1 : ''}` : '';
-        button.append(element(doc, 'span', { class: 'adt-sort-mark', 'aria-hidden': 'true' }, mark));
+        const sort = sortView(column.id, state.sorting);
+        if (sort.ariaSort) th.setAttribute('aria-sort', sort.ariaSort);
+        const button = element(doc, 'button', { type: 'button', class: sort.className, 'data-adt-focus': `sort:${column.id}` }, column.header);
+        button.append(element(doc, 'span', { class: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark));
+        if (sort.order) button.append(element(doc, 'span', { class: 'adt-sr-only' }, labels.sortOrder(sort.order.position, sort.order.direction)));
         button.addEventListener('click', event => {
           table.setSorting(nextSorting(table.getState().sorting, column.id, event.shiftKey && options.multiSort !== false));
         });
@@ -500,12 +476,7 @@ export function renderTable<TData>(
         th.textContent = column.header;
       }
       if (options.resizableColumns) {
-        th.append(element(doc, 'span', {
-          class: 'adt-resize', role: 'separator', 'aria-orientation': 'vertical', tabindex: '0',
-          'aria-label': labels.resizeColumn(column.header), 'data-column-id': column.id, 'data-adt-focus': `resize:${column.id}`,
-          'aria-valuemin': String(COLUMN_WIDTH_LIMITS.min), 'aria-valuemax': String(COLUMN_WIDTH_LIMITS.max),
-          ...(width !== undefined ? { 'aria-valuenow': String(width) } : {}),
-        }));
+        th.append(element(doc, 'span', { ...resizeHandle(column.id, labels.resizeColumn(column.header), width), tabindex: '0', 'data-adt-focus': `resize:${column.id}` }));
       }
       headRow.append(th);
     }
@@ -517,21 +488,21 @@ export function renderTable<TData>(
 
     const body = element(doc, 'tbody');
     let placed = false;
-    const span = columns.length + (selectable ? 1 : 0) + (rowActions.length > 0 ? 1 : 0) + (expandable ? 1 : 0);
+    const span = columnSpan(columns.length, { selectable, actions: rowActions.length > 0, expandable });
     if (skeletonShown) {
       // Same cells as a row, so the layout does not jump when the rows arrive.
       body.setAttribute('aria-hidden', 'true');
-      for (let index = 0; index < Math.min(state.pageSize, SKELETON_ROWS); index++) {
+      for (let index = 0; index < skeletonRows(state.pageSize); index++) {
         const tr = element(doc, 'tr', { class: 'adt-row adt-skeleton-row' });
         if (expandable) tr.append(element(doc, 'td', { class: 'adt-expand-cell' }));
         if (selectable) tr.append(element(doc, 'td', { class: 'adt-select' }));
         columns.forEach((column, columnIndex) => {
-          const cellClass = [collapsible ? `adt-col--p${priorityOf(column, columnIndex)}` : '', numeric(column) ? 'adt-num' : ''].filter(Boolean).join(' ');
-          const td = element(doc, 'td', { 'data-label': column.header, ...(cellClass ? { class: cellClass } : {}) });
+          const className = cellClass(column, columnIndex, collapsible);
+          const td = element(doc, 'td', { 'data-label': column.header, ...(className ? { class: className } : {}) });
           td.append(element(doc, 'span', { class: 'adt-skeleton' }));
           tr.append(td);
         });
-        if (rowActions.length > 0) tr.append(element(doc, 'td', { class: `adt-actions${collapsible ? ' adt-col--p2' : ''}` }));
+        if (rowActions.length > 0) tr.append(element(doc, 'td', { class: actionsCellClass(collapsible) }));
         body.append(tr);
       }
     } else if (page.rows.length === 0) {
@@ -582,27 +553,15 @@ export function renderTable<TData>(
         });
         box = input;
         // Shift+click selects (or clears) every row between the last clicked one and this one.
-        box.addEventListener('click', event => {
-          const from = anchor;
-          anchor = row.id;
-          if (event.shiftKey && from !== undefined && from !== row.id && table.getSelectionMode() === 'multiple') {
-            const ids = rangeOf(pageIds, from, row.id);
-            const range = new Set(ids);
-            if (input.checked) table.selectRows(ids);
-            else table.setSelectedRows(table.getState().selectedIds.filter(id => !range.has(id)));
-            return;
-          }
-          table.toggleRow(row.id);
-        });
+        box.addEventListener('click', event => { anchor = clickRowCheckbox(table, pageIds, anchor, row.id, event.shiftKey, input.checked); });
         td.append(input);
         tr.append(td);
       }
       columns.forEach((column, index) => {
         const editable = onEdit !== undefined && isEditable(column);
         const isEditing = editable && editing?.rowId === row.id && editing.columnId === column.id;
-        const cellClass = [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', numeric(column) ? 'adt-num' : '',
-          editable ? 'adt-editable' : '', isEditing ? 'adt-editing' : ''].filter(Boolean).join(' ');
-        const td = element(doc, 'td', { 'data-label': column.header, ...(cellClass ? { class: cellClass } : {}) });
+        const className = cellClass(column, index, collapsible, editable, isEditing);
+        const td = element(doc, 'td', { 'data-label': column.header, ...(className ? { class: className } : {}) });
         if (isEditing) {
           td.append(editing!.editor.element);
           placed = true;
@@ -648,22 +607,16 @@ export function renderTable<TData>(
     tableEl.append(head, body);
     // Footer totals of the columns with `aggregate` (every matching row, not just the page).
     if (columns.some(column => column.aggregate !== undefined)) {
-      const totals = table.getAggregates();
       const tr = element(doc, 'tr', { class: 'adt-total' });
       if (expandable) tr.append(element(doc, 'td', { class: 'adt-expand-cell' }));
       if (selectable) tr.append(element(doc, 'td', { class: 'adt-select' }));
-      columns.forEach((column, index) => {
-        const result = totals[column.id];
-        const cellClass = [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', result ? 'adt-num' : ''].filter(Boolean).join(' ');
-        const td = element(doc, index === 0 && !result ? 'th' : 'td', {
-          ...(cellClass ? { class: cellClass } : {}),
-          ...(index === 0 && !result ? { scope: 'row' } : {}),
-          'data-label': result ? `${column.header} · ${labels.aggregate(result.aggregate)}` : column.header,
-          ...(result ? { title: labels.aggregate(result.aggregate) } : {}),
-        }, index === 0 && !result ? labels.totals : text.total(column, result));
-        tr.append(td);
-      });
-      if (rowActions.length > 0) tr.append(element(doc, 'td', { class: `adt-actions${collapsible ? ' adt-col--p2' : ''}` }));
+      for (const cell of totalCells(columns, table.getAggregates(), collapsible, labels, (column, result) => text.total(column, result))) {
+        tr.append(element(doc, cell.header ? 'th' : 'td', {
+          ...(cell.className ? { class: cell.className } : {}), ...(cell.header ? { scope: 'row' } : {}),
+          'data-label': cell.label, ...(cell.title ? { title: cell.title } : {}),
+        }, cell.text));
+      }
+      if (rowActions.length > 0) tr.append(element(doc, 'td', { class: actionsCellClass(collapsible) }));
       const foot = element(doc, 'tfoot');
       foot.append(tr);
       tableEl.append(foot);
@@ -677,7 +630,7 @@ export function renderTable<TData>(
         // Hidden cells (the responsive layout's) measure 0 and get no width of their own.
         const measured = cells.map(cell => cell.getBoundingClientRect().width);
         if (measured.some(width => width > 0)) {
-          locked = { key: layoutKey, width: scroller.clientWidth, widths: measured };
+          locked = { key: lockKey, width: scroller.clientWidth, widths: measured };
           tableEl.classList.add('adt-fixed-layout');
           cells.forEach((cell, index) => { if (!cell.style.width && measured[index]) cell.style.width = `${measured[index]}px`; });
         }
@@ -688,48 +641,60 @@ export function renderTable<TData>(
 
   const showStatus = (): void => {
     if (!status) return;
+    // role="alert" is assertive by itself: aria-live="polite" next to it would make an error wait.
+    const announce = (role: 'status' | 'alert'): void => {
+      notice.setAttribute('role', role);
+      if (role === 'alert') notice.removeAttribute('aria-live');
+      else notice.setAttribute('aria-live', 'polite');
+    };
     const { status: phase } = status.getState();
-    root.setAttribute('aria-busy', phase === 'loading' ? 'true' : 'false');
+    // On the rows' box, not around the notice: a busy region's changes may be held back, "Loading…" too.
+    scroller.setAttribute('aria-busy', phase === 'loading' ? 'true' : 'false');
     root.classList.toggle('adt-loading', phase === 'loading');
     if (phase === 'loading') {
-      notice.setAttribute('role', 'status');
+      announce('status');
       notice.replaceChildren(element(doc, 'span', { class: 'adt-notice-text' }, labels.loading));
     } else if (phase === 'error') {
-      notice.setAttribute('role', 'alert');
+      announce('alert');
       const parts: HTMLElement[] = [element(doc, 'span', { class: 'adt-notice-text' }, labels.error)];
       if (typeof status.retry === 'function') {
         const retry = element(doc, 'button', { type: 'button', class: 'adt-retry' }, labels.retry);
-        retry.addEventListener('click', () => { void status.retry!(); });
+        // A retry that fails shows as the error state again; its rejection is no unhandled error.
+        retry.addEventListener('click', () => { Promise.resolve(status.retry!()).catch(() => undefined); });
         parts.push(retry);
       }
       notice.replaceChildren(...parts);
     } else {
-      notice.setAttribute('role', 'status');
+      announce('status');
       notice.replaceChildren();
+    }
+  };
+
+  // Without a rowHeight, the first real row drawn gives it: a table that loads its rows has
+  // none at first (or only placeholders), so it is measured again until one is there.
+  const render = (): void => {
+    if (destroyed) return; // a detail that arrives, or an editor closed, after destroy
+    draw();
+    if (!virtual || rowMeasured) return;
+    const height = measureRowHeight(root);
+    if (height <= 0) return;
+    rowMeasured = true;
+    if (height !== rowHeight) {
+      rowHeight = height;
+      draw();
     }
   };
 
   render();
   showStatus();
-  // Virtual scrolling: measure the row height once, then re-draw when the rows in view change.
-  let frame = 0;
-  const onScroll = (): void => {
-    if (frame) return;
-    frame = (doc.defaultView?.requestAnimationFrame ?? ((callback: FrameRequestCallback) => setTimeout(callback, 16) as unknown as number))(() => {
-      frame = 0;
-      const rows = table.getFilteredRows().length;
-      const view = windowOf(rows);
-      if (!drawn || view.start !== drawn.start || view.end !== drawn.end) render();
-    });
-  };
-  if (virtual) {
-    if (!rowHeight) {
-      const measured = root.querySelector<HTMLElement>('tbody .adt-row')?.getBoundingClientRect().height ?? 0;
-      rowHeight = measured > 0 ? measured : 40;
-      render();
-    }
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-  }
+  // Virtual scrolling: re-draw when the rows in view change.
+  const frames = frameThrottle(doc.defaultView);
+  const onScroll = (): void => frames.schedule(() => {
+    const rows = table.getFilteredRows().length;
+    const view = windowOf(rows);
+    if (!drawn || view.start !== drawn.start || view.end !== drawn.end) render();
+  });
+  if (virtual) scroller.addEventListener('scroll', onScroll, { passive: true });
   // A new width for the table (window, sidebar): measure the column widths again.
   const View = doc.defaultView as (Window & typeof globalThis) | null;
   const resized = virtual && typeof View?.ResizeObserver === 'function'
@@ -753,35 +718,20 @@ export function renderTable<TData>(
     : () => undefined;
   return {
     destroy: () => {
+      destroyed = true;
       unsubscribe();
       unsubscribeStatus();
       closeDialog();
       editing?.editor.destroy();
       scroller.removeEventListener('scroll', onScroll);
+      frames.cancel(); // a scroll just before: no drawing after destroy
       resized?.disconnect();
       unpin();
       stopAuto();
       stopTools();
-      doc.removeEventListener('click', closeMenus);
+      stopMenus();
       root.remove();
     },
   };
 }
 
-/** The responsive priority of a visible column: its own, else 1 for the first column and 2 for the rest. */
-export function priorityOf(column: { readonly priority?: 1 | 2 | 3 }, index: number): 1 | 2 | 3 {
-  return column.priority ?? (index === 0 ? 1 : 2);
-}
-
-/** Numbers and decimals are right-aligned (`adt-num`). */
-export function numeric(column: { readonly type?: string }): boolean {
-  return column.type === 'number' || column.type === 'decimal';
-}
-
-/** The IDs from `a` to `b` (both included) in page order; just `[b]` when `a` is not on the page. */
-export function rangeOf(pageIds: readonly string[], a: string, b: string): string[] {
-  const start = pageIds.indexOf(a);
-  const end = pageIds.indexOf(b);
-  if (start === -1 || end === -1) return [b];
-  return pageIds.slice(Math.min(start, end), Math.max(start, end) + 1);
-}

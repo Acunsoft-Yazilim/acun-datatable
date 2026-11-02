@@ -7,12 +7,22 @@ import {
 export class ImportRequestError extends Error {
   readonly status: number;
   readonly problem: ImportProblem;
-  constructor(problem: ImportProblem) {
+  /** The back end's `Retry-After` in milliseconds (a 429 or 503), when it sent one. */
+  readonly retryAfter: number | undefined;
+  constructor(problem: ImportProblem, retryAfter?: number) {
     super(problem.message);
     this.name = 'ImportRequestError';
     this.status = problem.status;
     this.problem = problem;
+    this.retryAfter = retryAfter;
   }
+}
+
+/** `Retry-After` (seconds, or an HTTP date) in milliseconds; `undefined` when missing or unreadable. */
+export function retryAfterMs(value: string | null, now = Date.now()): number | undefined {
+  if (value === null || value.trim() === '') return undefined;
+  const ms = /^\d+$/.test(value.trim()) ? Number(value.trim()) * 1000 : Date.parse(value) - now;
+  return Number.isFinite(ms) ? Math.max(0, ms) : undefined;
 }
 
 /** A file to upload: a browser `File`, or a `Blob` with a name. */
@@ -98,17 +108,17 @@ export function createImportClient(options: ImportClientOptions): ImportClient {
     headers.set('Accept', 'application/json');
     return headers;
   };
-  const parse = (status: number, textBody: string): unknown => {
+  const parse = (status: number, textBody: string, retryAfter?: string | null): unknown => {
     let body: unknown;
     if (textBody !== '') {
       try { body = JSON.parse(textBody) as unknown; } catch { body = textBody; }
     }
-    if (status < 200 || status >= 300) throw new ImportRequestError(readImportProblem(status, body));
+    if (status < 200 || status >= 300) throw new ImportRequestError(readImportProblem(status, body), retryAfterMs(retryAfter ?? null));
     return body;
   };
   const request = async (url: string, init: RequestInit = {}): Promise<unknown> => {
     const response = await send(url, { ...init, headers: await headersFor(init.headers), credentials: options.credentials ?? 'same-origin' });
-    return parse(response.status, await response.text());
+    return parse(response.status, await response.text(), response.headers?.get('Retry-After'));
   };
   // Upload progress needs XMLHttpRequest; fetch does not report it.
   const xhr = async (url: string, body: FormData, more: HeadersInit, signal: AbortSignal | undefined, onProgress: (sent: number, total: number) => void): Promise<unknown> => {
@@ -119,9 +129,10 @@ export function createImportClient(options: ImportClientOptions): ImportClient {
       headers.forEach((value, name) => http.setRequestHeader(name, value));
       http.withCredentials = options.credentials === 'include';
       http.upload.addEventListener('progress', event => { if (event.lengthComputable) onProgress(event.loaded, event.total); });
-      http.addEventListener('load', () => { try { resolve(parse(http.status, http.responseText)); } catch (error) { reject(error); } });
+      http.addEventListener('load', () => { try { resolve(parse(http.status, http.responseText, http.getResponseHeader('Retry-After'))); } catch (error) { reject(error); } });
       http.addEventListener('error', () => reject(new TypeError('The upload failed (network).')));
       http.addEventListener('abort', () => reject(signal?.reason ?? new DOMException('Aborted', 'AbortError')));
+      if (signal?.aborted) { reject(signal.reason ?? new DOMException('Aborted', 'AbortError')); return; } // aborted before it began
       signal?.addEventListener('abort', () => http.abort(), { once: true });
       http.send(body);
     });
@@ -140,7 +151,8 @@ export function createImportClient(options: ImportClientOptions): ImportClient {
       const form = new FormData();
       form.append('file', file, file.name ?? 'import');
       const key = { 'Idempotency-Key': uploadOptions.idempotencyKey ?? importKey() };
-      const body = uploadOptions.onProgress && !options.fetch && typeof XMLHttpRequest === 'function'
+      // XMLHttpRequest reports progress but cannot leave cookies out of a same-origin request.
+      const body = uploadOptions.onProgress && !options.fetch && options.credentials !== 'omit' && typeof XMLHttpRequest === 'function'
         ? await xhr(base, form, key, uploadOptions.signal, uploadOptions.onProgress)
         : await request(base, { method: 'POST', body: form, headers: key, ...(uploadOptions.signal ? { signal: uploadOptions.signal } : {}) });
       return readImportState(body, { requireProtocol: true });
@@ -161,11 +173,20 @@ export function createImportClient(options: ImportClientOptions): ImportClient {
       const started = Date.now();
       let state = await client.state(id, pollOptions.signal);
       pollOptions.onState?.(state);
+      let pause = nextPoll(state, 0);
       while (!FINAL_STATUSES.includes(state.status)) {
         if (state.status === 'mapping') throw new Error('The import waits for its mapping; start it first.');
-        await wait(nextPoll(state, Date.now() - started), pollOptions.signal);
-        state = await client.state(id, pollOptions.signal);
+        await wait(pause, pollOptions.signal);
+        try {
+          state = await client.state(id, pollOptions.signal);
+        } catch (error) {
+          // Too many requests, or the back end busy for a moment: ask again after its Retry-After.
+          if (!(error instanceof ImportRequestError) || (error.status !== 429 && error.status !== 503)) throw error;
+          pause = Math.min(60_000, error.retryAfter ?? nextPoll(state, Date.now() - started));
+          continue;
+        }
         pollOptions.onState?.(state);
+        pause = nextPoll(state, Date.now() - started);
       }
       return state;
     },
@@ -173,8 +194,11 @@ export function createImportClient(options: ImportClientOptions): ImportClient {
     async file(url, signal) {
       const target = safeImportUrl(url, base);
       if (!target) throw new TypeError('Not an http(s) URL.');
-      const headers = new Headers(typeof options.headers === 'function' ? await options.headers() : options.headers);
-      const response = await send(target, { headers, credentials: options.credentials ?? 'same-origin', ...(signal ? { signal } : {}) });
+      // The client's headers (a bearer token) and credentials go to the import endpoint's origin
+      // only: a report on another host (a signed storage link) gets neither.
+      const own = new URL(target).origin === new URL(safeImportUrl('.', base) ?? target).origin;
+      const headers = own ? new Headers(typeof options.headers === 'function' ? await options.headers() : options.headers) : new Headers();
+      const response = await send(target, { headers, credentials: own ? options.credentials ?? 'same-origin' : 'omit', ...(signal ? { signal } : {}) });
       if (!response.ok) throw new ImportRequestError(readImportProblem(response.status, await response.text().catch(() => '')));
       return response.blob();
     },

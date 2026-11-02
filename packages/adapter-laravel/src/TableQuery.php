@@ -43,6 +43,13 @@ final class TableQuery
         public readonly string $searchKeyColumn = 'id',
         /** DataTables' request counter when the request used its protocol (see fromDataTables()). */
         public readonly ?int $draw = null,
+        /**
+         * The time zone of a day given for a datetime column (`tz`, the browser's
+         * zone; see withTimeZone()). Null: the application's, as before.
+         */
+        public readonly ?string $timeZone = null,
+        /** Rows to skip: DataTables' `start`, which need not be a whole number of pages. Null: `(page - 1) × pageSize`. */
+        public readonly ?int $offset = null,
     ) {
     }
 
@@ -51,8 +58,10 @@ final class TableQuery
      * `order[i][column|dir]`, `columns[i][data|search][value]`,
      * `search[value]`), so an existing DataTables front end can use this
      * endpoint as it is. A column's `search[value]` becomes a `contains`
-     * filter; `length=-1` asks for the largest page allowed. `filters[i]` in
-     * this package's format are read too.
+     * filter. `length=-1` ("All") and a length past `$maxPageSize` are refused
+     * (a shorter page would leave rows out unseen). `filters[i]` in
+     * this package's format are read too, and then the column searches are
+     * not: this package's client sends each filter both ways.
      *
      * @param array<string, mixed> $input
      *
@@ -76,8 +85,12 @@ final class TableQuery
             $columns[$index] = ['field' => $field, 'search' => is_array($column['search'] ?? null) ? ($column['search']['value'] ?? '') : ''];
         }
         $length = $input['length'] ?? $defaultPageSize;
-        $length = self::integer($length === '-1' ? -1 : $length, 'length', -1, 1_000_000); // -1: "all
-        $pageSize = $length < 1 ? $maxPageSize : min($length, $maxPageSize);
+        // "All" (-1), or more rows than a page may hold, is refused: a page cut short would leave
+        // rows out with no sign (DataTables shows no pager and counts them as shown).
+        if ($length === '-1' || $length === -1) {
+            throw InvalidTableQuery::at('length', "length -1 (all rows) is not allowed: at most {$maxPageSize} rows a page.");
+        }
+        $pageSize = self::integer($length, 'length', 1, $maxPageSize);
         $start = self::integer($input['start'] ?? 0, 'start', 0, self::MAX_PAGE * $maxPageSize);
         $sort = [];
         foreach (is_array($input['order'] ?? null) ? array_values($input['order']) : [] as $index => $rule) {
@@ -91,10 +104,15 @@ final class TableQuery
             }
             $sort[$columns[$column]['field']] = $columns[$column]['field'].':'.(($rule['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc');
         }
+        // This package's client sends each filter twice: in `filters[i]` and, for DataTables back
+        // ends, as its column's search. With `filters[i]` the column searches are those copies;
+        // without them (DataTables itself) a column's search is a `contains` filter.
         $filters = is_array($input['filters'] ?? null) ? array_values($input['filters']) : [];
-        foreach (array_filter($columns) as $column) {
-            if (is_string($column['search']) && trim($column['search']) !== '') {
-                $filters[] = ['field' => $column['field'], 'op' => 'contains', 'value' => $column['search']];
+        if ($filters === []) {
+            foreach (array_filter($columns) as $column) {
+                if (is_string($column['search']) && trim($column['search']) !== '') {
+                    $filters[] = ['field' => $column['field'], 'op' => 'contains', 'value' => $column['search']];
+                }
             }
         }
         $search = $input['search'] ?? '';
@@ -107,7 +125,7 @@ final class TableQuery
         ], $maxPageSize, min($defaultPageSize, $maxPageSize));
 
         return new self($query->page, $query->pageSize, $query->sorting, $query->filters, $query->search,
-            draw: self::integer($input['draw'] ?? 0, 'draw', 0, 999_999_999));
+            draw: self::integer($input['draw'] ?? 0, 'draw', 0, 999_999_999), timeZone: self::timeZone($input['tz'] ?? null), offset: $start);
     }
 
     /**
@@ -128,7 +146,21 @@ final class TableQuery
             }
         }
 
-        return new self($this->page, $this->pageSize, $this->sorting, $this->filters, $this->search, $this->cursorPaging, $this->cursor, array_values(array_unique($list)), $column, $this->draw);
+        return new self($this->page, $this->pageSize, $this->sorting, $this->filters, $this->search, $this->cursorPaging, $this->cursor, array_values(array_unique($list)), $column, $this->draw, $this->timeZone, $this->offset);
+    }
+
+    /**
+     * The same query with days of datetime filters in `$zone` (e.g. the user's
+     * zone from your session), whatever the browser sent; null: the
+     * application's zone.
+     */
+    public function withTimeZone(?string $zone): self
+    {
+        if ($zone !== null && self::timeZone($zone) === null) {
+            throw new \InvalidArgumentException("Unknown time zone [{$zone}].");
+        }
+
+        return new self($this->page, $this->pageSize, $this->sorting, $this->filters, $this->search, $this->cursorPaging, $this->cursor, $this->searchKeys, $this->searchKeyColumn, $this->draw, $zone, $this->offset);
     }
 
     public static function fromRequest(Request $request, int $maxPageSize = 100, int $defaultPageSize = 25): self
@@ -163,7 +195,21 @@ final class TableQuery
             self::search($input['search'] ?? ''),
             ($input['paging'] ?? null) === 'cursor' || isset($input['cursor']),
             self::cursor($input['cursor'] ?? null),
+            timeZone: self::timeZone($input['tz'] ?? null),
         );
+    }
+
+    /** A time zone PHP knows (`Europe/Istanbul`, `UTC`), else null: the browser's zone is a hint, not a rule. */
+    private static function timeZone(mixed $value): ?string
+    {
+        if (! is_string($value) || $value === '' || strlen($value) > 64) {
+            return null;
+        }
+
+        static $known = null;
+        $known ??= array_flip(\DateTimeZone::listIdentifiers(\DateTimeZone::ALL_WITH_BC)); // with old names such as Asia/Calcutta
+
+        return isset($known[$value]) ? $value : null;
     }
 
     private static function cursor(mixed $value): ?string

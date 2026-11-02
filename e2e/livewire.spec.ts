@@ -143,3 +143,26 @@ test.describe('import (TableImport, the import protocol, the import dialog)', ()
     await expect.poll(() => names(page)).toEqual(['New Customer']);
   });
 });
+
+test('the row "⋮" menu opens whole over the table\'s box and follows its row', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await open(page, '/tables/layout');
+  const menu = page.locator('tbody .adt-row-menu').last();
+  await menu.locator('summary').click();
+  const reachable = () => page.locator('.adt-row-menu[open] .adt-menu-item').evaluateAll(items => items.length > 0 && items.every(item => {
+    const box = item.getBoundingClientRect();
+    return item.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+  }));
+  await expect.poll(reachable).toBe(true);
+  await expect.poll(() => menu.evaluate(element => (element as HTMLElement).style.getPropertyValue('--adt-menu-y'))).not.toBe(''); // placed
+  const gap = () => page.evaluate(() => {
+    const open = document.querySelector('.adt-row-menu[open]')!;
+    return Math.round(open.querySelector('.adt-menu-list')!.getBoundingClientRect().top - open.querySelector('summary')!.getBoundingClientRect().bottom);
+  });
+  const before = await gap();
+  await page.evaluate(() => { document.body.style.minHeight = '2000px'; window.scrollBy(0, 40); });
+  await expect.poll(gap).toBe(before);
+  await page.keyboard.press('Escape');
+  await expect(menu).not.toHaveAttribute('open');
+  await expect(menu.locator('.adt-menu-list')).toHaveCSS('position', 'absolute');
+});

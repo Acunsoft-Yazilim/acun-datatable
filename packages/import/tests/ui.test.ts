@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { importButton, ImportRequestError, openImport, type ImportClient, type ImportState } from '../src/index';
+import { createImportClient, importButton, ImportRequestError, openImport, type ImportClient, type ImportState } from '../src/index';
 
 HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', ''); };
 HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) { this.removeAttribute('open'); this.dispatchEvent(new Event('close')); };
@@ -166,5 +166,121 @@ describe('openImport', () => {
     const item = importButton({ url: '/api/import', language: 'de', group: 'Daten' });
     expect(item).toMatchObject({ id: 'import', label: 'Importieren…', group: 'Daten' });
     expect(importButton({ url: '/x', label: 'Load' }).label).toBe('Load');
+  });
+});
+
+describe('createImportClient in a browser', () => {
+  it('uploads with fetch when cookies must be left out (XMLHttpRequest cannot), progress or not', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ ...mapping }), { status: 201, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      const client = createImportClient({ url: 'http://app.test/api/import', credentials: 'omit' });
+      await client.upload(new File(['x'], 'orders.csv'), { onProgress: () => undefined });
+      expect(fetch).toHaveBeenCalledOnce();
+      expect((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].credentials).toBe('omit');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('openImport, the template', () => {
+  it('downloads through the client, with its headers, as the error report does', async () => {
+    const client = fakeClient();
+    URL.createObjectURL ??= () => 'blob:x';
+    URL.revokeObjectURL ??= () => undefined;
+    const { element: dialog } = openImport({ client, language: 'en' });
+    await flush();
+    const link = dialog.querySelector<HTMLAnchorElement>('.adt-import-hint a')!;
+    expect(link.getAttribute('download')).toBe('template.xlsx');
+    link.click();
+    await flush();
+    expect(client.file).toHaveBeenCalledWith('/template.xlsx');
+  });
+});
+
+describe('openImport, accessibility', () => {
+  it('names its progress bars, focuses a refused start and keeps a file dropped beside the zone', async () => {
+    let finish: (state: ImportState) => void = () => undefined;
+    const client = fakeClient({ upload: vi.fn(() => new Promise<ImportState>(resolve => { finish = resolve; })) });
+    const { element: dialog } = openImport({ client, language: 'en' });
+    await flush();
+    const drop = new Event('drop', { cancelable: true, bubbles: true });
+    dialog.querySelector('.adt-import-hint, .adt-dialog-head')!.dispatchEvent(drop);
+    expect(drop.defaultPrevented).toBe(true); // the browser does not open the file instead
+    await choose(dialog);
+    expect(dialog.querySelector('progress')!.getAttribute('aria-label')).toBe('Uploading orders.csv…');
+    finish({ ...mapping, mapping: [null, null, null] }); // nothing matched yet
+    await flush();
+    const start = [...dialog.querySelectorAll<HTMLButtonElement>('.adt-import-actions button')].find(node => /import/i.test(node.textContent ?? ''))!;
+    start.click();
+    expect(document.activeElement).toBe(dialog.querySelector('.adt-import-check')); // the reason gets the focus
+    expect(dialog.querySelector('.adt-import-check')!.textContent).not.toBe('');
+  });
+});
+
+describe('openImport, clicked twice', () => {
+  it('starts once while the first start runs', async () => {
+    let finish: (state: ImportState) => void = () => undefined;
+    const client = fakeClient({ start: vi.fn(() => new Promise<ImportState>(resolve => { finish = resolve; })) });
+    const { element: dialog } = openImport({ client, language: 'en' });
+    await flush();
+    await choose(dialog);
+    const button = [...dialog.querySelectorAll<HTMLButtonElement>('.adt-import-actions button')].find(node => node.getAttribute('aria-disabled') === null && /import/i.test(node.textContent ?? ''))!;
+    button.click();
+    button.click(); // a double click
+    expect(client.start).toHaveBeenCalledOnce();
+    finish(done);
+    await flush();
+  });
+
+  it('sends a file again with the same idempotency key, a new file with a new one', async () => {
+    const keys: string[] = [];
+    let fail = true;
+    const client = fakeClient({
+      upload: vi.fn(async (_file: File, options?: { idempotencyKey?: string }) => {
+        keys.push(options?.idempotencyKey ?? '');
+        if (fail) { fail = false; throw new ImportRequestError({ status: 503, message: 'Try again.', errors: {} }); }
+        return mapping;
+      }),
+    });
+    const { element: dialog } = openImport({ client, language: 'en' });
+    await flush();
+    const file = new File(['x'], 'orders.csv', { type: 'text/csv' });
+    await choose(dialog, file); // fails
+    await choose(dialog, file); // the same file again: the same key
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).toBe(keys[0]);
+    const { element: other } = openImport({ client, language: 'en' });
+    await flush();
+    await choose(other, new File(['y'], 'other.csv', { type: 'text/csv' }));
+    expect(keys[2]).not.toBe(keys[0]); // another file: another key
+  });
+
+  it('offers to send the file again after a 5xx, a 429 or a network error, not after a 422', async () => {
+    const keys: string[] = [];
+    const failures: unknown[] = [new ImportRequestError({ status: 503, message: 'Busy.', errors: {} }), new TypeError('The upload failed (network).'), new ImportRequestError({ status: 422, message: 'No header row.', errors: {} })];
+    const client = fakeClient({
+      upload: vi.fn(async (_file: File, options?: { idempotencyKey?: string }) => {
+        keys.push(options?.idempotencyKey ?? '');
+        const failure = failures.shift();
+        if (failure) throw failure;
+        return mapping;
+      }),
+    });
+    const { element: dialog } = openImport({ client, language: 'en' });
+    await flush();
+    await choose(dialog);
+    const retry = () => [...dialog.querySelectorAll<HTMLButtonElement>('[role="alert"] button')].find(node => /try again/i.test(node.textContent ?? ''));
+    expect(dialog.querySelector('[role="alert"]')!.textContent).toContain('Busy.');
+    retry()!.click(); // the same file, the same key
+    await flush();
+    expect(dialog.querySelector('[role="alert"]')!.textContent).toContain('could not be reached');
+    retry()!.click();
+    await flush();
+    expect(dialog.querySelector('[role="alert"]')!.textContent).toContain('No header row.');
+    expect(retry()).toBeUndefined(); // the file itself is wrong: choose another
+    expect(new Set(keys).size).toBe(1);
+    expect(keys).toHaveLength(3);
   });
 });

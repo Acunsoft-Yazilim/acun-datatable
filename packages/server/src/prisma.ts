@@ -1,6 +1,7 @@
 import { foldText } from '@acunsoft/datatable-core';
 import type { ServerColumn } from './columns';
 import { decodeCursor, encodeCursor, sortSignature } from './cursor';
+import { isDay, nextDay } from './day';
 import type { ServerFilter, ServerTableQuery } from './query';
 
 type Where = Record<string, unknown>;
@@ -23,8 +24,6 @@ export interface PrismaTableQuery {
   cursorOf(row: Readonly<Record<string, unknown>>): string;
 }
 
-const isMidnight = (date: Date): boolean => date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0 && date.getMilliseconds() === 0;
-const nextDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 
 /**
  * Prisma arguments for a checked query (`readTableQuery`): `prisma.order.findMany(q.findMany)`
@@ -51,7 +50,7 @@ export function prismaQuery(query: ServerTableQuery, columns: readonly ServerCol
     const field = column.field;
     const value = column.type === 'date' && typeof filter.value === 'string' ? new Date(`${filter.value}T00:00:00.000Z`)
       : column.type === 'date' && Array.isArray(filter.value) ? filter.value.map(item => new Date(`${String(item)}T00:00:00.000Z`)) : filter.value;
-    const day = column.type === 'datetime' && value instanceof Date && isMidnight(value);
+    const day = column.type === 'datetime' && isDay(value);
     switch (operator) {
       case 'contains':
         return column.search ? { [column.search]: { contains: foldText(String(value)) } } : { [field]: { contains: String(value), ...mode } };
@@ -69,12 +68,17 @@ export function prismaQuery(query: ServerTableQuery, columns: readonly ServerCol
         return day ? { [field]: { lt: nextDay(value as Date) } } : { [field]: { lte: value } };
       case 'between': {
         const [low, high] = value as [unknown, unknown];
-        return column.type === 'datetime' && high instanceof Date && isMidnight(high)
+        return column.type === 'datetime' && isDay(high)
           ? { [field]: { gte: low, lt: nextDay(high) } }
           : { [field]: { gte: low, lte: high } };
       }
-      case 'in':
-        return { [field]: { in: value } };
+      case 'in': {
+        // A day among the values means the whole day, as eq reads it.
+        const days = column.type === 'datetime' ? (value as unknown[]).filter(isDay) : [];
+        if (days.length === 0) return { [field]: { in: value } };
+        const exact = (value as unknown[]).filter(item => !days.includes(item as Date));
+        return { OR: [...days.map(item => ({ [field]: { gte: item, lt: nextDay(item) } })), ...(exact.length > 0 ? [{ [field]: { in: exact } }] : [])] };
+      }
       case 'empty':
         return column.type === 'text' ? { OR: [{ [field]: null }, { [field]: '' }] } : { [field]: null };
       case 'notEmpty':
@@ -113,7 +117,7 @@ export function prismaQuery(query: ServerTableQuery, columns: readonly ServerCol
       where: pageWhere,
       orderBy: orders.map(order => ({ [order.column]: order.nullable ? { sort: order.direction, nulls: order.direction === 'asc' ? 'last' as const : 'first' as const } : order.direction })),
       take: query.cursorPaging ? query.pageSize + 1 : query.pageSize,
-      ...(query.cursorPaging ? {} : { skip: (query.page - 1) * query.pageSize }),
+      ...(query.cursorPaging ? {} : { skip: query.offset ?? (query.page - 1) * query.pageSize }),
     },
     count: { where: base },
     cursorOf: (row: Readonly<Record<string, unknown>>) => encodeCursor(signature, orders.map(order => {

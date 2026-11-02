@@ -104,7 +104,8 @@ describe('AcunDataTable', () => {
     const retry = vi.fn();
     const status = { getState: () => ({ status: current as 'loading' }), subscribe: (fn: typeof listener) => { listener = fn; return () => undefined; }, retry };
     await mount(() => h(AcunDataTable, { table: make(), status }));
-    expect(host.querySelector('.adt-table-wrap')!.getAttribute('aria-busy')).toBe('true');
+    expect(host.querySelector('.adt-scroll')!.getAttribute('aria-busy')).toBe('true');
+    expect(host.querySelector('.adt-notice')!.closest('[aria-busy="true"]')).toBeNull(); // "Loading…" is not held back
     expect(host.querySelector('[role="status"]')!.textContent).toBe('Loading…');
     current = 'error';
     listener({ status: 'error' });
@@ -689,5 +690,103 @@ describe('filter panel modes and toolbar buttons', () => {
     await mount(() => h(AcunFilterPanel, { table, labels: labelsTr }));
     expect(host.querySelector('summary, .adt-filter-open')).toBeNull();
     expect([...host.querySelectorAll('.adt-filter legend')].map(node => node.textContent)).toEqual(['Müşteri', 'Tutar']);
+  });
+});
+
+describe('selection speed', () => {
+  it('clears a large selection quickly (virtual: every row is on the page)', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+    const many = Array.from({ length: 30_000 }, (_, i) => ({ id: i + 1, customer: `Row ${i + 1}`, total: '1.00' }));
+    const table = createDataTable<Order>({ data: many, columns });
+    await mount(() => h(AcunDataTable, { table, virtual: { rowHeight: 40 }, selectable: true }));
+    host.querySelector<HTMLInputElement>('thead .adt-select input')!.click();
+    await nextTick();
+    expect(table.getState().selectedIds).toHaveLength(30_000);
+    const started = performance.now();
+    host.querySelector<HTMLInputElement>('thead .adt-select input')!.click();
+    expect(table.getState().selectedIds).toHaveLength(0);
+    expect(performance.now() - started).toBeLessThan(300);
+  });
+});
+
+describe('unmount while a scroll waits for its frame', () => {
+  it('cancels the frame', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame');
+    const many = Array.from({ length: 1000 }, (_, i) => ({ id: i + 1, customer: `Row ${i + 1}`, total: '1.00' }));
+    await mount(() => h(AcunDataTable, { table: createDataTable<Order>({ data: many, columns }), virtual: { rowHeight: 40 } }));
+    host.querySelector('.adt-scroll')!.dispatchEvent(new Event('scroll'));
+    app!.unmount();
+    app = undefined;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+});
+
+describe('AcunColumnToggle closes like a menu', () => {
+  it('Escape closes it with the focus back on its button; a click outside closes it; reset keeps the focus there', async () => {
+    const table = make();
+    await mount(() => h(AcunColumnToggle, { table }));
+    const menu = host.querySelector<HTMLDetailsElement>('details.adt-columns')!;
+    const summary = menu.querySelector('summary')!;
+    menu.open = true;
+    menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(menu.open).toBe(false);
+    expect(document.activeElement).toBe(summary);
+    menu.open = true;
+    document.body.click();
+    expect(menu.open).toBe(false);
+    table.setColumnWidth('total', 200);
+    await nextTick();
+    host.querySelector<HTMLButtonElement>('.adt-columns-reset')!.click();
+    expect(table.getState().columnWidths).toEqual({});
+    expect(document.activeElement).toBe(summary);
+  });
+});
+
+describe('option checks, as the DOM renderer and React', () => {
+  /** Mount with an error handler: Vue reports an error thrown while rendering there. */
+  const failure = async (props: Record<string, unknown>): Promise<unknown> => {
+    let caught: unknown;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined); // the prop validators' warnings
+    app = createApp(defineComponent({ setup: () => () => h(AcunDataTable, { table: make(), ...props }) }) as Component);
+    app.config.errorHandler = error => { caught = error; };
+    app.mount(host);
+    await nextTick();
+    warn.mockRestore();
+    return caught;
+  };
+
+  it('refuses a size, fixed columns or row actions the others refuse, instead of only warning', async () => {
+    expect(String(await failure({ size: 'xl' }))).toContain('size must be sm, md or lg');
+    expect(host.querySelector('.adt-size--xl')).toBeNull();
+    app!.unmount();
+    expect(String(await failure({ fixedColumns: { start: -1 } }))).toContain('fixedColumns');
+    app!.unmount();
+    expect(String(await failure({ rowActions: [{ id: 'edit', label: 'Edit' }] }))).toContain('needs onSelect');
+    app!.unmount();
+    expect(String(await failure({ rowActions: [{ id: 'a', label: 'A', onSelect: () => undefined }, { id: 'a', label: 'B', onSelect: () => undefined }] }))).toContain('duplicate action id "a"');
+  });
+});
+
+describe('AcunDataTableLayout locale', () => {
+  it('shows the texts of its locale, as renderDataTable does; labels still win', async () => {
+    await mount(() => h(AcunDataTableLayout, { table: make(), locale: 'tr' }));
+    expect(host.querySelector('.adt-columns summary')!.textContent).toBe('Kolonlar');
+    expect(host.querySelector('.adt-search .adt-sr-only')!.textContent).toBe('Ara');
+    app!.unmount();
+    await mount(() => h(AcunDataTableLayout, { table: make(), locale: 'de-DE', labels: { columns: 'Felder' } }));
+    expect(host.querySelector('.adt-columns summary')!.textContent).toBe('Felder');
+    expect(host.querySelector('.adt-search .adt-sr-only')!.textContent).toBe('Suchen');
+  });
+});
+
+describe('toolbar buttons, as the DOM renderer', () => {
+  it('refuses an icon that is not one of ICONS or { path }', async () => {
+    let caught: unknown;
+    app = createApp(defineComponent({ setup: () => () => h(AcunColumnToggle, { table: make(), button: { icon: 'rocket' as never } }) }) as Component);
+    app.config.errorHandler = error => { caught = error; };
+    app.mount(host);
+    await nextTick();
+    expect(String(caught)).toContain('Unknown icon "rocket"');
   });
 });

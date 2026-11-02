@@ -10,7 +10,7 @@ describe('cursor paging', () => {
   it('sends the cursor of the page before and only reaches known pages', () => {
     const t = make();
     expect(t.getPaging()).toBe('cursor');
-    expect(t.getQuery()).toEqual({ page: 1, pageSize: 2, sorting: [], filters: [] }); // page 1: no cursor
+    expect(t.getQuery()).toEqual({ page: 1, pageSize: 2, sorting: [], filters: [], paging: 'cursor' }); // page 1: no cursor, but the mode
     t.setPageResult({ rows: rows(1, 2), nextCursor: 'c2' });
     expect(t.getPage().pageCount).toBe(2);
     t.setPage(5);
@@ -41,5 +41,7 @@ describe('cursor paging', () => {
     expect(() => createDataTable<R>({ columns, paging: 'cursor' })).toThrow('cursor paging needs mode: "server"');
     expect(() => createTableQuery({ page: 2, pageSize: 2, cursor: '' })).toThrow('cursor must be');
     expect(createDataTable<R>({ mode: 'server', columns }).getPaging()).toBe('pages');
+    expect(createDataTable<R>({ mode: 'server', columns }).getQuery()).not.toHaveProperty('paging');
+    expect(() => createTableQuery({ page: 1, pageSize: 2, paging: 'keyset' as never })).toThrow('paging must be');
   });
 });

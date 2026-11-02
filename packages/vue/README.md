@@ -109,6 +109,17 @@ Everything is rendered as text by Vue; nothing uses `v-html`.
 Server mode: pass the HTTP runner as `status` to show loading and error
 states, as with the DOM renderer.
 
+## Nuxt and server rendering
+
+The same package works in Nuxt; there is no separate Nuxt package. Tested with
+Nuxt 4.6 (`e2e/ssr` in the repository): the table renders on the server and
+hydrates without a mismatch, with no `<ClientOnly>`. A server render leaves no
+listener on the table or the status source, so a table shared between
+requests does not leak. Vue 3.4 and 3.5 are supported: on 3.5 Vue's `useId`,
+on 3.4 a counter per app keeps element ids the same on the server and in the
+browser. Ask your server-mode endpoint in `onMounted` (`connectTable`), which
+runs only in the browser.
+
 ## License
 
 [MIT](LICENSE). Provided “as is”, without warranty of any kind; the authors and Acunsoft accept no liability for any damage or data loss arising from its use (see LICENSE).

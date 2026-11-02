@@ -141,7 +141,6 @@ trait WithDataTable
         return 250;
     }
 
-    /** Pages start at most this many rows deep (default 100,000; `null`: no limit). */
     /**
      * Answer the search with a search engine instead of `LIKE` over the
      * columns: return the matching keys, e.g. with Laravel Scout
@@ -187,6 +186,7 @@ trait WithDataTable
         return false;
     }
 
+    /** Pages start at most this many rows deep (default 100,000; `null`: no limit). */
     protected function maxResultWindow(): ?int
     {
         return 100_000;
@@ -440,10 +440,11 @@ trait WithDataTable
         return 100_000;
     }
 
-    /** CSV delimiter: `;` opens directly in Turkish Excel. */
+    /** CSV delimiter: `;` for Turkish, German, French and Spanish, which Excel there opens directly; else `,`. */
     protected function exportDelimiter(): string
     {
-        return app()->getLocale() === 'tr' ? ';' : ',';
+        // Excel in Turkish, German, French and Spanish (decimal comma) splits CSV at ';' (also tr_TR, de-AT …).
+        return in_array(strtolower(preg_split('/[-_]/', app()->getLocale())[0]), ['tr', 'de', 'fr', 'es'], true) ? ';' : ',';
     }
 
     /** @return list<Action> buttons in each row; handlers receive the row */
@@ -854,8 +855,8 @@ trait WithDataTable
 
     /**
      * Save a cell edited in place (columns with `editable()`). The row is
-     * looked up inside `query()`; the model's policy must allow `update` when
-     * there is one (`authorizeEdit()`); the value is validated against the
+     * looked up inside `query()`; the model's policy must allow `update`
+     * (`authorizeEdit()`; without one, `editableWithoutPolicy()`); the value is validated against the
      * column (`Column::editRules()`), and a failure shows next to the field.
      * Returns whether it was saved.
      */
@@ -918,12 +919,30 @@ trait WithDataTable
         $row->save();
     }
 
-    /** Throws when the user may not edit this row: the model's policy `update` ability, when one exists. */
+    /**
+     * Throws when the user may not edit this row: the model's policy must
+     * allow `update`. Without a policy nobody may edit (anyone who can see
+     * the table could otherwise change every editable cell), unless
+     * `editableWithoutPolicy()` says so. Override for other checks.
+     */
     protected function authorizeEdit(mixed $row, Column $column): void
     {
         if (is_object($row) && \Illuminate\Support\Facades\Gate::getPolicyFor($row) !== null) {
             \Illuminate\Support\Facades\Gate::authorize('update', $row);
+
+            return;
         }
+        if (! $this->editableWithoutPolicy()) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(
+                'Editing needs a policy with update() for '.(is_object($row) ? $row::class : 'these rows').', or editableWithoutPolicy() returning true.'
+            );
+        }
+    }
+
+    /** Whether rows without a model policy may be edited by whoever sees the table. Default `false`. */
+    protected function editableWithoutPolicy(): bool
+    {
+        return false;
     }
 
     /** The text an editor starts with: decimals as written, dates as `Y-m-d`, date-times as `Y-m-d\TH:i`. */
@@ -985,9 +1004,10 @@ trait WithDataTable
     {
         $key = (string) $key;
         if ($this->allMatching) {
+            // Any key the browser sends: kept short and at most maxSelected(), as the selection is.
             $this->excluded = in_array($key, $this->excluded, true)
                 ? array_values(array_diff($this->excluded, [$key]))
-                : [...$this->excluded, $key];
+                : self::distinctKeys([...$this->excluded, $key], $this->maxSelected());
 
             return;
         }
@@ -1015,7 +1035,7 @@ trait WithDataTable
         if ($this->allMatching) {
             $this->excluded = $select
                 ? array_values(array_diff($this->excluded, $range))
-                : array_values(array_unique([...$this->excluded, ...$range]));
+                : self::distinctKeys([...$this->excluded, ...$range], $this->maxSelected());
 
             return;
         }
@@ -1032,7 +1052,7 @@ trait WithDataTable
         $all = $keys !== [] && array_reduce($keys, fn (bool $carry, string $key) => $carry && $this->isSelected($key), true);
         if ($this->allMatching) {
             $this->excluded = $all
-                ? array_values(array_unique([...$this->excluded, ...$keys]))
+                ? self::distinctKeys([...$this->excluded, ...$keys], $this->maxSelected())
                 : array_values(array_diff($this->excluded, $keys));
 
             return;
@@ -1120,6 +1140,7 @@ trait WithDataTable
         $selected = $this->selectable() && $this->selectedCount() > 0;
         $export = TableExport::for($selected ? $this->selectedQuery() : $this->query())
             ->columns($this->dataTableVisibleColumns())
+            ->key($this->keyName())
             ->limit($this->exportLimit())
             ->query($selected
                 ? TableQuery::fromArray(['sort' => implode(',', array_map(fn (array $rule) => "{$rule['field']}:{$rule['direction']}", $query->sorting))])
@@ -1209,8 +1230,15 @@ trait WithDataTable
         $id = (string) \Illuminate\Support\Str::uuid();
         $user = \Illuminate\Support\Facades\Auth::guard($guard)->id();
         TableTasks::put($id, ['status' => 'queued', 'task' => $task, 'user' => $user, 'guard' => $guard, 'owner' => $owner]);
-        $state = array_filter($this->all(), fn ($value) => $value === null || is_scalar($value) || is_array($value));
-        unset($state['tableTask']);
+        // Through Livewire's synthesizers: models, enums, dates and forms travel as they do between requests.
+        $synths = app(\Livewire\Mechanisms\HandleSynths\HandleSynths::class);
+        $context = new \Livewire\Mechanisms\HandleComponents\ComponentContext($this);
+        $state = [];
+        foreach ($this->all() as $name => $value) {
+            if ($name !== 'tableTask') {
+                $state[$name] = $synths->dehydrate($value, $context, $name);
+            }
+        }
         $this->tableTask = $id;
         dispatch(new \Acunsoft\DataTable\Laravel\Jobs\RunTableTask(static::class, $state, $task, $argument, $id, $user, $guard, app()->getLocale()));
 
@@ -1235,6 +1263,7 @@ trait WithDataTable
         $selected = $this->selectable() && $this->selectedCount() > 0;
         $export = TableExport::for($selected ? $this->selectedQuery() : $this->query())
             ->columns($this->dataTableVisibleColumns())
+            ->key($this->keyName())
             ->limit(min($this->queuedExportLimit(), \Acunsoft\DataTable\Laravel\Export\XlsxWriter::MAX_ROWS))
             ->query($selected
                 ? TableQuery::fromArray(['sort' => implode(',', array_map(fn (array $rule) => "{$rule['field']}:{$rule['direction']}", $query->sorting))])
@@ -1258,6 +1287,12 @@ trait WithDataTable
         $state = $this->tableTask === null ? null : TableTasks::get($this->tableTask);
         if ($state === null || ! TableTasks::belongsTo($state)) {
             $this->tableTask = null;
+
+            return;
+        }
+        if (in_array($state['status'] ?? null, ['queued', 'running'], true)) {
+            // Polled every 2 s: nothing to show yet, so the table (its counts and page) is not read again.
+            $this->skipRender();
 
             return;
         }

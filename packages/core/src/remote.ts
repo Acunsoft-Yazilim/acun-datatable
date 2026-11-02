@@ -15,6 +15,12 @@ export interface TableQuery {
    * Omitted for the first page and in page mode.
    */
   readonly cursor?: string;
+  /**
+   * `'cursor'` on every query of a table created with `paging: 'cursor'`,
+   * the first page included, so a data source asks for keyset pages without
+   * being configured again. Omitted in page mode.
+   */
+  readonly paging?: 'cursor';
 }
 
 /** One page of records returned by a data source. */
@@ -60,6 +66,7 @@ export interface TableQueryInput {
   readonly filters?: readonly FilterRule[];
   readonly globalSearch?: string;
   readonly cursor?: string;
+  readonly paging?: 'pages' | 'cursor';
 }
 
 /**
@@ -93,10 +100,12 @@ export function createTableQuery(input: TableQueryInput): TableQuery {
   if (cursor !== undefined && (typeof cursor !== 'string' || cursor === '' || cursor.length > 4096)) {
     throw new TypeError('cursor must be a non-empty string of at most 4096 characters');
   }
+  if (input.paging !== undefined && input.paging !== 'pages' && input.paging !== 'cursor') throw new TypeError('paging must be "pages" or "cursor"');
   return Object.freeze({
     page, pageSize, sorting, filters: copied,
     ...(trimmed === '' ? {} : { globalSearch: trimmed }),
     ...(cursor !== undefined ? { cursor } : {}),
+    ...(input.paging === 'cursor' ? { paging: 'cursor' as const } : {}),
   });
 }
 
@@ -111,6 +120,15 @@ export interface PageResultValidation {
  * being objects: treat them as untrusted and render them as text.
  */
 export function validatePageResult(value: unknown, options: PageResultValidation = {}): PageResult<Record<string, unknown>> {
+  // A result this function made is frozen and checked: the source, the runner and the table all
+  // pass it here, and only the page size can differ between them.
+  if (checked.has(value as object)) {
+    const known = value as PageResult<Record<string, unknown>>;
+    if (options.pageSize !== undefined && known.rows.length > options.pageSize) {
+      throw new RangeError(`page result has ${known.rows.length} rows, more than the requested page size ${options.pageSize}`);
+    }
+    return known;
+  }
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError('page result must be an object');
   }
@@ -142,11 +160,16 @@ export function validatePageResult(value: unknown, options: PageResultValidation
       !Object.values(totals).every(item => item === null || typeof item === 'string' || (typeof item === 'number' && Number.isFinite(item))))) {
     throw new TypeError('page result totals must be an object of numbers, strings or null');
   }
-  return Object.freeze({
+  const result = Object.freeze({
     rows: Object.freeze([...rows]) as readonly Record<string, unknown>[],
     ...(totalRows !== undefined ? { totalRows } : {}),
     ...(atLeast !== undefined ? { totalRowsAtLeast: atLeast } : {}),
     ...(nextCursor !== undefined ? { nextCursor } : {}),
     ...(totals !== undefined ? { totals: Object.freeze({ ...(totals as Record<string, string | number | null>) }) } : {}),
   });
+  checked.add(result);
+  return result;
 }
+
+/** Results validatePageResult made (frozen, so they stay as checked). */
+const checked = new WeakSet<object>();

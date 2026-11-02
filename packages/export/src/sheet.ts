@@ -21,7 +21,8 @@ export interface TableToSheetOptions<TData> {
    * `'all'` (default): every row matching the current filters and search, in
    * the current order (in server mode only the loaded page; export on the
    * server for everything). `'page'`: the current page. `'selected'`: the
-   * selected rows the table holds.
+   * selected rows among the matching ones, in the current order (as printed,
+   * and as DataTables exports them).
    */
   readonly rows?: ExportRows;
   /** `'visible'` (default) or `'all'` columns, in column order. */
@@ -63,7 +64,7 @@ export function tableToSheet<TData>(table: DataTable<TData>, options: TableToShe
     if (!known.has(id)) throw new Error(`unknown value column ID: ${id}`);
     if (typeof fn !== 'function') throw new TypeError(`value for column "${id}" must be a function`);
   }
-  const rows = which === 'page' ? table.getPage().rows : which === 'selected' ? table.getSelectedRows() : table.getFilteredRows();
+  const rows = which === 'page' ? table.getPage().rows : which === 'selected' ? table.getFilteredRows().filter(row => table.isSelected(row.id)) : table.getFilteredRows();
   return Object.freeze({
     headers: Object.freeze(columns.map(column => column.header)),
     types: Object.freeze(columns.map(column => column.type)),

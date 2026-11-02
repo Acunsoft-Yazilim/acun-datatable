@@ -71,6 +71,18 @@ describe('detail (child rows)', () => {
     await vi.waitFor(() => expect(host.querySelector('.adt-detail-content[role="alert"]')).not.toBeNull());
   });
 
+  it('draws nothing when a detail arrives after destroy', async () => {
+    let resolve!: (node: Node) => void;
+    const table = make();
+    const rendered = renderTable(host, table, { detail: () => new Promise<Node>(done => { resolve = done; }), labels: labelsTr });
+    host.querySelector<HTMLButtonElement>('.adt-expand')!.click();
+    rendered.destroy();
+    const drawn = vi.spyOn(table, 'getPage');
+    resolve(el('strong', {}, 'late'));
+    await new Promise(done => setTimeout(done, 0));
+    expect(drawn).not.toHaveBeenCalled(); // the removed table is not drawn again
+  });
+
   it('collapse: hidden columns first, then the detail', () => {
     renderTable(host, make(), { responsive: 'collapse', detail: row => `#${row.id}` });
     expand('Ayşe').click();

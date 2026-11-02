@@ -77,6 +77,27 @@ final class TableExportTest extends TestCase
         $zip->close();
     }
 
+    public function test_sheet_names_lose_an_apostrophe_at_either_end(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'adt-test-');
+        TableExport::for(Order::query())->columns($this->columns())->saveXlsx($path, "'Siparişler'");
+        $zip = new \ZipArchive();
+        $zip->open($path);
+        self::assertStringContainsString('<sheet name="Siparişler"', $zip->getFromName('xl/workbook.xml'));
+        $zip->close();
+        @unlink($path);
+    }
+
+    public function test_text_that_looks_like_an_escape_reads_back_exactly(): void
+    {
+        Order::query()->whereKey(1)->update(['note' => '_x0041_ literal']);
+        $path = tempnam(sys_get_temp_dir(), 'adt-test-');
+        TableExport::for(Order::query()->whereKey(1))->columns([Column::make('note')->header('Not')])->saveXlsx($path);
+        $sheet = (new SheetReader())->read($path, 'xlsx');
+        @unlink($path);
+        self::assertSame('_x0041_ literal', $sheet->rows[0][0]); // not "A literal"
+    }
+
     public function test_the_query_is_checked_and_large_exports_are_refused_with_422(): void
     {
         Route::get('/export', fn () => TableExport::for(Order::query())->columns($this->columns())->limit(3)->csv());
@@ -84,6 +105,26 @@ final class TableExportTest extends TestCase
             ->query(TableQuery::fromArray(['sort' => 'secret:asc']))->csv());
         $this->getJson('/export')->assertStatus(422)->assertJsonPath('errors.export', 'The export has more than 3 rows; narrow the filters.');
         $this->getJson('/export-bad')->assertStatus(422)->assertJsonPath('errors.sort', 'Unknown column [secret].');
+    }
+
+    public function test_a_failed_xlsx_leaves_no_temporary_file(): void
+    {
+        $sheets = fn () => count(glob(sys_get_temp_dir().'/adt-sheet-*') ?: []);
+        $before = $sheets();
+        $path = tempnam(sys_get_temp_dir(), 'adt-test-');
+        try {
+            TableExport::for(Order::query())->columns($this->columns())->limit(3)->saveXlsx($path); // too large: refused first
+        } catch (\Acunsoft\DataTable\Laravel\InvalidTableQuery) {
+        }
+        $boom = [Column::make('customer')->format(fn () => throw new \RuntimeException('a formatter failed'))];
+        try {
+            TableExport::for(Order::query())->columns($boom)->saveXlsx($path); // fails half-way
+            self::fail('no exception');
+        } catch (\RuntimeException $error) {
+            self::assertSame('a formatter failed', $error->getMessage());
+        }
+        @unlink($path);
+        self::assertSame($before, $sheets());
     }
 
     public function test_options_are_validated(): void

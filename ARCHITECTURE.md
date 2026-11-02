@@ -9,7 +9,7 @@ Design priority: correctness and maintainability first; prove performance with m
 ## 2. Architectural boundaries
 
 ```text
-Consumer (HTML / Laravel / Livewire / React / Vue / Next.js)
+Consumer (HTML / Web Component / React · Next.js / Vue · Nuxt / Laravel · Livewire)
                   |
         Optional integration adapter
                   |
@@ -51,11 +51,13 @@ Consumer (HTML / Laravel / Livewire / React / Vue / Next.js)
 - Default wire format: `page`, `pageSize`, `sort=field:dir,...`,
   `filters[i][field|op|value]`, `search`. Responses: `{ rows, totalRows? }`.
 
-### Framework adapters (future)
+### Framework adapters
 - `adapter-react`: hooks/component; React peer dependency.
 - `adapter-vue`: composables/component; Vue peer dependency.
 - `adapter-laravel` (`acunsoft/datatable-laravel`): one Composer package for Laravel and Livewire. A shared server-side query layer (allowlisted columns, Eloquent operators, Turkish-aware smart search, page-size limit) serves both the JSON endpoint used by `@acunsoft/datatable-http` and the Livewire integration (`WithDataTable`), which only needs Livewire when it is used (decided 2026-10-23). The Livewire view is neutral Blade with the `adt-*` class names of the DOM renderer, so one optional stylesheet serves both; it does not depend on any UI kit (general-purpose, decided 2026-10-23).
-- Next.js uses the React adapter with client boundaries; it is not a separate engine.
+- Next.js uses the React adapter with client boundaries, Nuxt the Vue adapter; neither is a separate engine or package. Both are tested in real apps (`e2e/ssr`).
+- Inertia is Laravel's JSON endpoint with the React or Vue adapter on the page; it has no adapter of its own.
+- The documentation has four groups: HTML / JavaScript (with the Web Component), React (with Next.js), Vue (with Nuxt), Laravel / Livewire (with Inertia).
 - Alpine.js integration is optional and must not duplicate Livewire-managed Alpine runtime.
 
 ### Plugins (future)
@@ -197,6 +199,7 @@ Request (GET query, POST form or JSON), validated on the server:
 | `filters[i][field\|op\|value]` | `contains startsWith eq gt gte lt lte between in empty notEmpty` |
 | `search` | smart search text (words, `"quoted phrases"`) |
 | `paging`, `cursor` | `paging=cursor`; `cursor` is the previous answer's `nextCursor` |
+| `tz` | the browser's time zone (`Europe/Istanbul`), sent with a day among the filters: a day on a date-time column is that whole day there; optional, unknown zones are ignored, the server may set its own |
 | DataTables protocol | `draw`, `start`, `length`, `order[i]`, `columns[i]`, `search[value]` — answered in DataTables' format |
 
 Response:

@@ -1,15 +1,18 @@
 import {
-  createDataTable, persistState, type Aggregate, type ColumnDef, type PageResult, type TableQuery, type ColumnType, type DataTable, type DataTableListener, type FilterOption, type Row, type SortRule,
+  createDataTable, persistState, type Aggregate, type ColumnDef, type DataTableInitialState, type PageResult, type TableQuery, type ColumnType, type DataTable, type DataTableListener, type FilterOption, type Row, type SortRule,
 } from '@acunsoft/datatable-core';
 import {
   DEFAULT_LAYOUT, cellValue, createCellText, downloadFile, el, numeric, printRows, renderDataTable, renderFilterPanel, resolveLabels,
   type BulkAction, type FilterPanelMode, type ToolbarButtons, type CellFormatter, type CellRenderer, type DataTableLabels, type DataTableLayout, type LayoutSlot,
   type CellEdit, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type RowAction, type StatusSource, type TableSize,
 } from '@acunsoft/datatable-dom';
-import { tableToSheet, toCsv, toXlsx, type Sheet } from '@acunsoft/datatable-export';
+import type { Sheet } from '@acunsoft/datatable-export';
 import { connectTable, createHttpDataSource, createQueryRunner, fromDataTablesResponse, serializeDataTablesQuery, type QueryRunner } from '@acunsoft/datatable-http';
 
 type Data = Record<string, unknown>;
+
+/** The Excel and CSV writers, loaded at the first export: a bundle whose tables never export leaves them out. */
+const exportKit = () => import('./export-kit');
 
 /** A column in the DataTables style: the field of a row and its title. */
 export interface ColumnOptions {
@@ -164,7 +167,7 @@ export interface AcunDataTableOptions {
    * `{ rowHeight, overscan }`; the height is `scrollY` (default 480px).
    */
   readonly virtual?: boolean | { readonly rowHeight?: number; readonly overscan?: number };
-  /** Narrow screens: `cards` (default), `scroll`, `collapse` or `modal`. */
+  /** Narrow screens: `cards` (default), `scroll`, `collapse`, `modal`, or `auto` (hide the columns that do not fit). */
   readonly responsive?: ResponsiveMode;
   readonly size?: TableSize;
   readonly caption?: string;
@@ -172,12 +175,6 @@ export interface AcunDataTableOptions {
   readonly selectable?: boolean;
   readonly rowActions?: readonly RowAction<Data>[];
   readonly bulkActions?: readonly BulkAction<Data>[];
-  /**
-   * A child row under each row (DataTables child rows), opened by a ⊕
-   * button: return a DOM node (`el()`), text, or a promise of either, e.g.
-   * `row => fetch('/orders/' + row.id + '/lines').then(…)` (shows "Loading…"
-   * meanwhile). With `responsive: 'modal'` it opens in the dialog.
-   */
   /**
    * Save a cell edited in place (columns with `editable`), e.g. with
    * `fetch(…, { method: 'PATCH' })`. Throw (or reject) to keep the editor
@@ -187,6 +184,12 @@ export interface AcunDataTableOptions {
    * that is not `ok` counts as a failure.
    */
   readonly onEdit?: (edit: EditEvent) => unknown;
+  /**
+   * A child row under each row (DataTables child rows), opened by a ⊕
+   * button: return a DOM node (`el()`), text, or a promise of either, e.g.
+   * `row => fetch('/orders/' + row.id + '/lines').then(…)` (shows "Loading…"
+   * meanwhile). With `responsive: 'modal'` it opens in the dialog.
+   */
   readonly detail?: (row: Data) => Node | string | null | undefined | Promise<Node | string | null | undefined>;
   /** Show the column menu. Default `true`. */
   readonly columnToggle?: boolean;
@@ -209,6 +212,12 @@ export interface AcunDataTableOptions {
   /** Server side: the most rows an export fetches. Default 10,000. */
   readonly exportLimit?: number;
   /**
+   * Server side: rows per request while an export fetches its rows. Default
+   * 100, the default most rows per page of `@acunsoft/datatable-server` and
+   * Laravel's `TableResponse`; raise it with their `maxPageSize`.
+   */
+  readonly exportPageSize?: number;
+  /**
    * Remember page, page size, sorting, filters, search and hidden columns
    * across reloads (DataTables `stateSave`). `true` keys it by the page path
    * and the element's ID; `{ key, storage: 'session' }` to choose.
@@ -216,6 +225,13 @@ export interface AcunDataTableOptions {
   readonly stateSave?: boolean | { readonly key?: string; readonly storage?: 'local' | 'session' };
   /** Place the controls yourself; merged over the layout the options above give. */
   readonly layout?: DataTableLayout;
+  /**
+   * The table's state at the start — page, page size, sorting, filters,
+   * search, selection, hidden columns, column order and widths — e.g. from
+   * your own storage. Wins over `pagination.pageSize`, `sorting.initial` and
+   * `searching.initial`; a saved state (`stateSave`) wins over it.
+   */
+  readonly initialState?: DataTableInitialState;
   /**
    * Where the filter fields open: `'dropdown'` under the button (default),
    * `'drawer'` from the side, `'modal'` centred. For your own drawer or modal,
@@ -262,6 +278,10 @@ export class AcunDataTable {
   /** The columns' `render` and `cell` options, as the renderer gets them (for printing). */
   #format: Record<string, CellFormatter<Data>> = {};
   #cells: Record<string, CellRenderer<Data>> = {};
+  /** Load from the start again: what reload() does while no table could be made yet. */
+  #begin: (() => Promise<void>) | undefined;
+  /** Rows without an ID field: an ID per row object (selection then lasts while the rows do). */
+  #rowIds = new WeakMap<object, string>();
 
   constructor(target: string | HTMLElement, options: AcunDataTableOptions = {}) {
     const node = typeof target === 'string' ? document.querySelector<HTMLElement>(target) : target;
@@ -269,6 +289,10 @@ export class AcunDataTable {
     if (options.serverSide && !options.ajax) throw new TypeError('AcunDataTable: serverSide needs ajax');
     if (options.serverSide && enabled(options.pagination) === false) {
       throw new RangeError('AcunDataTable: pagination cannot be turned off with serverSide');
+    }
+    const { exportPageSize } = options;
+    if (exportPageSize !== undefined && (!Number.isInteger(exportPageSize) || exportPageSize < 1 || exportPageSize > 1000)) {
+      throw new RangeError('AcunDataTable: exportPageSize must be a whole number from 1 to 1000');
     }
     this.#options = options;
 
@@ -287,13 +311,14 @@ export class AcunDataTable {
       this.element = node;
     }
 
-    this.ready = this.#start(columns, rows).catch(error => {
+    this.#begin = () => this.#start(columns, rows).catch(error => {
       if (!this.#destroyed) {
         this.#loader?.fail(error);
         if (!this.table) this.#pending(true); // failed before the columns were known
       }
       throw error;
     });
+    this.ready = this.#begin();
     this.ready.catch(() => undefined); // reported through the loading state; callers may still await it
   }
 
@@ -317,8 +342,7 @@ export class AcunDataTable {
         headers: requestHeaders(ajax),
         // DataTables answers a refused query with 200 and `error`: shown as the error it is.
         parseResponse: body => serverRows(datatables && typeof ajax.dataSrc !== 'function' && body && typeof body === 'object' && 'error' in body ? fromDataTablesResponse(body) : body, ajax.dataSrc),
-        maxPageSize: 1000,
-        ...(cursorPaging(options) ? { paging: 'cursor' as const } : {}),
+        maxPageSize: 1000, // cursor paging: the table's queries say so
         ...(ajax.credentials ? { credentials: ajax.credentials } : {}),
       });
       let primed: PageResult<Data> | undefined;
@@ -393,7 +417,6 @@ export class AcunDataTable {
       .filter((column): column is ColumnOptions => 'data' in column && column.visible === false)
       .map(column => column.data);
     const rowId = options.rowId ?? (columns.some(column => column.id === 'id') ? 'id' : undefined);
-    const fallback = new WeakMap<object, string>();
     let next = 0;
     const table = createDataTable<Data>({
       mode,
@@ -405,9 +428,8 @@ export class AcunDataTable {
         if (typeof rowId === 'function') return rowId(row);
         const value = rowId === undefined ? undefined : row[rowId];
         if (typeof value === 'string' || typeof value === 'number') return value;
-        // No ID field: a stable ID per row object (selection then lasts while the rows do).
-        let id = fallback.get(row);
-        if (id === undefined) fallback.set(row, id = `row-${++next}`);
+        let id = this.#rowIds.get(row);
+        if (id === undefined) this.#rowIds.set(row, id = `row-${++next}`);
         return id;
       },
       initialState: {
@@ -415,6 +437,7 @@ export class AcunDataTable {
         ...(sorting.initial ? { sorting: sorting.initial } : {}),
         ...(searching.initial ? { globalSearch: searching.initial } : {}),
         ...(hidden.length > 0 ? { hiddenColumns: hidden } : {}),
+        ...options.initialState,
       },
     } as Parameters<typeof createDataTable<Data>>[0]);
     this.table = table;
@@ -441,10 +464,15 @@ export class AcunDataTable {
     if (options.processing === false) return;
     const labels = resolveLabels(options.language, options.labels);
     const notice = el('div', { class: 'adt-notice', role: failed ? 'alert' : 'status' }, el('span', { class: 'adt-notice-text' }, failed ? labels.error : labels.loading));
+    if (failed) {
+      const retry = el('button', { type: 'button', class: 'adt-retry' }, labels.retry);
+      retry.addEventListener('click', () => { this.reload().catch(() => undefined); }); // shown again if it fails
+      notice.append(retry);
+    }
     const rows = failed || options.skeleton === false ? [] : Array.from({ length: Math.min(pageSizeOf(options), 10) }, () =>
       el('tr', { class: 'adt-row adt-skeleton-row' }, ...Array.from({ length: 4 }, () => el('td', {}, el('span', { class: 'adt-skeleton' })))));
-    const wrap = el('div', { class: `adt-table-wrap${rows.length > 0 ? ' adt-skeleton-on' : ''}`, 'aria-busy': failed ? 'false' : 'true' },
-      notice, ...(rows.length > 0 ? [el('div', { class: 'adt-scroll' }, el('table', { class: 'adt-table' }, el('tbody', { 'aria-hidden': 'true' }, ...rows)))] : []));
+    const wrap = el('div', { class: `adt-table-wrap${rows.length > 0 ? ' adt-skeleton-on' : ''}` },
+      notice, ...(rows.length > 0 ? [el('div', { class: 'adt-scroll', 'aria-busy': 'true' }, el('table', { class: 'adt-table' }, el('tbody', { 'aria-hidden': 'true' }, ...rows)))] : []));
     this.element.replaceChildren(el('div', { class: 'adt' }, wrap));
   }
 
@@ -532,18 +560,22 @@ export class AcunDataTable {
       if (typeof button !== 'string') return button;
       switch (button) {
         case 'excel':
-          return { id: 'excel', label: labels.exportExcel, group: labels.export, onSelect: async () => { downloadFile(toXlsx(await this.#sheet()), `${name}.xlsx`); } };
+          return { id: 'excel', label: labels.exportExcel, group: labels.export, onSelect: async () => { const sheet = await this.#sheet(); downloadFile((await exportKit()).toXlsx(sheet), `${name}.xlsx`); } };
         case 'csv':
           return {
             id: 'csv', label: labels.exportCsv, group: labels.export,
-            onSelect: async () => { downloadFile(toCsv(await this.#sheet(), { delimiter: this.#options.language === 'tr' ? ';' : ',' }), `${name}.csv`); },
+            onSelect: async () => {
+              const sheet = await this.#sheet();
+              // Excel in Turkish, German, French and Spanish (decimal comma) splits CSV at ';'.
+              downloadFile((await exportKit()).toCsv(sheet, { delimiter: /^(tr|de|fr|es)\b/i.test(this.#options.language ?? '') ? ';' : ',' }), `${name}.csv`);
+            },
           };
         case 'copy':
           return {
             id: 'copy', label: labels.copy, group: labels.export,
             onSelect: async () => {
               const sheet = await this.#sheet();
-              await navigator.clipboard.writeText(toCsv(sheet, { delimiter: '\t', bom: false, newline: '\n' }));
+              await navigator.clipboard.writeText((await exportKit()).toCsv(sheet, { delimiter: '\t', bom: false, newline: '\n' }));
               return labels.copied(sheet.rows.length);
             },
           };
@@ -560,6 +592,7 @@ export class AcunDataTable {
    * by page). "Every matching row" chosen in the selection bar counts as no choice of rows.
    */
   async #sheet(): Promise<Sheet> {
+    const { tableToSheet } = await exportKit();
     return this.#exported((table, rows) => tableToSheet(table, { rows }));
   }
 
@@ -604,14 +637,18 @@ export class AcunDataTable {
     const labels = resolveLabels(this.#options.language, this.#options.labels);
     const { cursor: _current, ...query } = table.getQuery();
     const byCursor = cursorPaging(this.#options);
+    let pageSize = this.#options.exportPageSize ?? 100;
     const rows: Data[] = [];
     let cursor: string | undefined; // with cursor paging: from the first row on, each answer's nextCursor
     for (let page = 1; ; page++) {
-      const result = await this.#source.getPage({ ...query, page, pageSize: 1000, ...(cursor === undefined ? {} : { cursor }) });
+      const result = await this.#source.getPage({ ...query, page, pageSize, ...(cursor === undefined ? {} : { cursor }) });
       if (result.totalRows !== undefined && result.totalRows > limit) throw new Error(labels.exportTooLarge(limit));
+      // A server that answers fewer rows than asked while more remain caps the page size: page by its size.
+      if (page === 1 && result.totalRows !== undefined && result.rows.length > 0 && result.rows.length < pageSize && result.rows.length < result.totalRows) pageSize = result.rows.length;
       rows.push(...result.rows);
       if (rows.length > limit) throw new Error(labels.exportTooLarge(limit));
-      if (byCursor ? result.nextCursor === undefined || result.rows.length === 0 : result.rows.length < 1000) break;
+      if (result.rows.length === 0) break;
+      if (byCursor ? result.nextCursor === undefined : result.rows.length < pageSize || (result.totalRows !== undefined && rows.length >= result.totalRows)) break;
       cursor = result.nextCursor;
     }
     // A local copy in the server's order, with the same visible columns.
@@ -639,6 +676,10 @@ export class AcunDataTable {
       return;
     }
     const updated = isPlainObject(result) ? result as Data : { ...edit.row.original, [field]: edit.value };
+    // The edited row is a new object: without an ID field it keeps the old one, and with it its
+    // selection, its open details and the focus the editor gives back.
+    const id = this.#rowIds.get(edit.row.original as object);
+    if (id !== undefined && !this.#rowIds.has(updated as object)) this.#rowIds.set(updated as object, id);
     this.#setData(this.table.getCoreRows().map(row => (row.id === edit.row.id ? updated : row.original)));
   }
 
@@ -652,6 +693,8 @@ export class AcunDataTable {
   /** Load the rows again: the current page from the server, or every row from `ajax`. */
   async reload(): Promise<void> {
     if (this.#runner) return this.#runner.retry();
+    // The first load failed before the columns were known: no table yet, so start over.
+    if (!this.table && this.#begin) return this.#begin();
     const ajax = typeof this.#options.ajax === 'string' ? { url: this.#options.ajax } : this.#options.ajax;
     if (!ajax) return;
     try {
@@ -715,6 +758,7 @@ export class AcunDataTable {
     this.table?.destroy();
     this.#listeners.clear();
     if (this.#original) this.element.replaceWith(this.#original);
+    else if (!this.#rendered) this.element.replaceChildren(); // the loading or error placeholder
   }
 }
 

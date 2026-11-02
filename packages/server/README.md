@@ -1,6 +1,6 @@
 # @acunsoft/datatable-server
 
-The Node back end of [Acun DataTable](https://kemaloskan.github.io/acun-datatable/):
+The Node back end of [Acun DataTable](https://acunsoft-yazilim.github.io/acun-datatable/):
 for Next.js route handlers, Express, Fastify or any server that has a
 `Request` or its query string. It reads the table's request, checks it
 against a column allowlist, builds **bound-parameter SQL** for PostgreSQL,
@@ -65,12 +65,16 @@ or `createHttpDataSource({ url: '/api/orders' })` with the React or Vue package.
   (`$1` for PostgreSQL, `?` for MySQL, MariaDB and SQLite, `@p1` for SQL
   Server): filters (`contains`,
   `startsWith`, `eq`, `gt`, `gte`, `lt`, `lte`, `between`, `in`, `empty`,
-  `notEmpty`; a day on a date-time column means the whole day), the smart
+  `notEmpty`; a day on a date-time column means the whole day, in the time
+  zone the browser sends as `tz`, or `readTableQuery`'s `timeZone` option
+  when you set it, else the server's), the smart
   search (every word must match some searchable column; letters are never
   looked for in numbers or dates), sorting with the key as the last
   tie-breaker, and `LIMIT`/`OFFSET` (`OFFSET … FETCH` on SQL Server). `scope`
   is your own condition (tenant, owner) with `?` placeholders, whatever the
-  dialect; every query stays inside it. Filter operators must suit the
+  dialect; every query stays inside it. Every `?` in it is a placeholder,
+  also inside quotes: write literals as values, and PostgreSQL's jsonb `?`
+  operator as `jsonb_exists(…)`. Filter operators must suit the
   column type (`contains` is for text, `gt` not for yes/no), and `LIKE`
   patterns are escaped with `!`, which means the same in every SQL mode.
 - **Cursor paging** (`paging=cursor`): the page continues after the last row
@@ -84,9 +88,11 @@ or `createHttpDataSource({ url: '/api/orders' })` with the React or Vue package.
   are tied to their sort. Mark sort columns that may hold `NULL` with
   `nullable: true`, so later pages also reach the `NULL` rows (in the
   database's own `NULL` order). Big integers (`bigint`) and dates travel in
-  the cursor as they are. node-postgres reads timestamps as JavaScript
-  dates, which keep milliseconds: sort by a `timestamp(3)` column, or have
-  the driver return timestamps as text, so microseconds never split a page.
+  the cursor as they are. On PostgreSQL the page also reads each date-time
+  sort column as text (`__adt_cursor_…`, left out by `tableResponse`), so
+  microseconds that node-postgres' `Date` drops never repeat or skip rows.
+  mysql2 and mssql read `datetime(6)` / `datetime2` as `Date` too: sort by a
+  column with milliseconds at most, or have the driver return dates as text.
 - **`prismaQuery`** gives `findMany` / `count` arguments instead
   (`insensitive: false` on MySQL, SQLite and SQL Server). Nullable sort
   columns are sorted with `nulls` (Prisma 4.16 or later).
@@ -139,6 +145,10 @@ when you write the row) and name it in `search`; the term is folded the same
 way. Index it (`text_pattern_ops` or a trigram index on PostgreSQL).
 
 ## Import: `@acunsoft/datatable-server/import`
+
+> **Not released yet.** The import comes with the next release; until then
+> the browser package `@acunsoft/datatable-import` (its dialog and
+> `acun-datatable-import.min.js`) is not on npm.
 
 The back end of the import dialog (`@acunsoft/datatable-import`, protocol
 `acun-import/1`) as a web-standard handler — `(Request) => Promise<Response>`.
@@ -197,6 +207,10 @@ export const GET = ordersImport.handle, POST = ordersImport.handle, DELETE = ord
   processes on one machine), or your own `ImportStore` (a database, S3,
   Redis …). Imports and files are kept for `keepMs` (a day); the upload is
   deleted when the import ends; the error report is a formula-guarded CSV.
+  Two starts of one import at once (a double click, a retry) run it once:
+  the handler guards its own process, and a store's optional `claim(id)`
+  makes it atomic across processes (the folder store's does; give your own
+  store one, e.g. Redis `SET NX` or a unique row, when several servers share it).
 
 ## Security checklist
 

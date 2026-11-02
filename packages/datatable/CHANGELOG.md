@@ -1,6 +1,60 @@
 # @acunsoft/datatable
 
+## 0.5.0
+
+### Minor Changes
+
+- ae0f9bc: `<acun-datatable>`: every attribute is also a property (`pageSize`, `serverSide`, `scrollY`, …); properties set before the element is defined are taken over; `page-size` changes in place and the view attributes (`language`, `responsive`, `size`, `filter-panel`, `fixed-header`, `scroll-y`, `virtual`, `state-save`) rebuild the table keeping the page, sorting, filters, search, selection and columns (before, every attribute started over); `adt-change` and `adt-ready` bubble; new `adt-error`; `scroll-y="480"` means pixels (it failed before); two `state-save` tables without an id no longer share a key; `HTMLElementTagNameMap` and typed events. `AcunDataTable` takes `initialState`.
+
+### Patch Changes
+
+- c439041: Smaller bundles. Vue: the components are marked side-effect free (`/*#__PURE__*/`), so a bundle keeps only those it uses: `useDataTable` alone 11.2 KB gzip instead of 33 KB, `AcunPagination` alone 5.5 KB instead of 23 KB (esbuild, Vue not counted). `@acunsoft/datatable`: the Excel and CSV writers load at the first export, so an app's first load is 42.0 KB instead of 46.0 KB; the `<script>` build is unchanged.
+- 4da26fd: `aria-busy` is set on the rows' box (`.adt-scroll`) instead of the whole table wrapper, which also holds the "Loading…" status: assistive technology may hold back the changes of a busy region, the announcement included.
+- 2296d61: The CSV button writes `;` for German, French and Spanish too (and for regional tags such as `tr-TR` or `de-DE`), as Excel there expects; it was `;` only for exactly `tr`, so German, French and Spanish Excel opened the file as one column.
+- ab54803: After `destroy()`, a detail that arrives late or an editor that closes no longer draws the removed table again; `AcunDataTable.destroy()` also takes away its loading or error placeholder.
+- d2e6692: A column resize ends (without a change) when the browser takes the pointer back, and the pointer is captured so a release outside the window still ends it; a click on the details dialog's own scrollbar no longer closes it; the search placeholder has AA contrast; `AcunDataTableOptions` documents `detail` and `responsive: 'auto'`.
+- b5192d8: In-place editing of rows without an ID field (e.g. read from `<table>` markup) keeps the row's ID after a save, so its selection and open details stay and the focus goes back to its edit button (it fell to the page).
+- 6b4f1f6: Every export also has a `default` condition, so `require()` finds the packages (Node 22's `require(esm)`, Jest in CommonJS mode, TypeScript `node16` CommonJS files); it failed with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+- c28ae1d: A Retry that fails again shows the error again and no longer leaves an unhandled promise rejection. `AcunDataTable`: after a first load that failed before the columns were known, `reload()` and the error's new Retry button load from the start (the rows were dropped, and a server table was asked like a client one).
+- a5e1cee: Fixes:
+  
+  - React: `useDataTable({ data: orders.filter(…) })` — a new array on every render — no longer renders without end. A new array of the same records is not applied again when the table itself caused the render; a new array from the app still is.
+  - `@acunsoft/datatable`: server-side exports (Excel, CSV, copy, print) ask for `exportPageSize` rows a request (new option, default 100, the back ends' default most) instead of 1,000, which the Node back end refused and Laravel's DataTables answer cut to 100 rows. A back end that answers fewer rows than asked is paged by what it answers.
+  - A filter day (`2026-10-23`) on a date-time column is the user's day: `datatable-http` sends the browser's time zone as `tz` with day filters, and `readTableQuery` takes the day there (clock changes included); `readTableQuery(…, { timeZone })` lets the server decide. Without `tz` nothing changes. An exact instant on the server's midnight is no longer taken for a whole day. `TableDay` is exported for your own query builders.
+- Updated dependencies [747dc4f]
+- Updated dependencies [4da26fd]
+- Updated dependencies [ab54803]
+- Updated dependencies [d2e6692]
+- Updated dependencies [98f3abd]
+- Updated dependencies [6b4f1f6]
+- Updated dependencies [cd31740]
+- Updated dependencies [2f7bf80]
+- Updated dependencies [7248947]
+- Updated dependencies [68a586e]
+- Updated dependencies [c7f8a8a]
+- Updated dependencies [3422663]
+- Updated dependencies [c28ae1d]
+- Updated dependencies [caaaa57]
+- Updated dependencies [b7659b3]
+- Updated dependencies [43e068b]
+- Updated dependencies [97c7ec1]
+- Updated dependencies [f42d4f5]
+- Updated dependencies [34102a2]
+- Updated dependencies [8d46546]
+- Updated dependencies [42e84ed]
+- Updated dependencies [8ac4c5c]
+- Updated dependencies [4c333f3]
+- Updated dependencies [40195f6]
+- Updated dependencies [158c6d7]
+- Updated dependencies [a5e1cee]
+  - @acunsoft/datatable-dom@0.5.0
+  - @acunsoft/datatable-export@0.5.0
+  - @acunsoft/datatable-core@0.5.0
+  - @acunsoft/datatable-http@0.5.0
+
 ## 0.4.0
+
+Not published on npm: these changes reach npm with 0.5.0.
 
 ### Minor Changes
 

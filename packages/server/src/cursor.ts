@@ -1,5 +1,8 @@
 import { TableQueryError } from './query';
 
+/** The prefix of the columns a page reads only for its cursor; `tableResponse` leaves them out. */
+export const CURSOR_TEXT = '__adt_cursor_';
+
 /** A short, stable fingerprint of a sort, so a cursor is only used with the sort it was made for. */
 export function sortSignature(orders: readonly { readonly column: string; readonly direction: string }[]): string {
   let hash = 0x811c9dc5;

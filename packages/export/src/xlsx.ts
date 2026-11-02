@@ -38,7 +38,8 @@ function serial(date: Date, dayOnly: boolean): number | undefined {
 }
 
 function sheetName(name: string | undefined): string {
-  const clean = (name ?? 'Sheet1').replace(/[[\]:*?/\\]/g, ' ').trim().slice(0, 31);
+  // Excel refuses these characters, and an apostrophe at either end.
+  const clean = (name ?? 'Sheet1').replace(/[[\]:*?/\\]/g, ' ').trim().slice(0, 31).replace(/^[\s']+|[\s']+$/g, '');
   return clean === '' || clean.toLowerCase() === 'history' ? 'Sheet1' : clean;
 }
 
@@ -91,7 +92,8 @@ export function toXlsx(sheet: Sheet, options: ToXlsxOptions = {}): Uint8Array {
     }
     const text = cell.length > MAX_TEXT ? cell.slice(0, MAX_TEXT) : cell;
     note(text);
-    return `<c r="${ref}" t="inlineStr"${header ? ' s="1"' : ''}><is><t xml:space="preserve">${xmlText(text)}</t></is></c>`;
+    // A literal _xHHHH_ would be read as an escaped character: Excel writes its _ as _x005F_.
+    return `<c r="${ref}" t="inlineStr"${header ? ' s="1"' : ''}><is><t xml:space="preserve">${xmlText(text.replace(/_x(?=[0-9a-fA-F]{4}_)/g, '_x005F_x'))}</t></is></c>`;
   };
 
   const rowsXml: string[] = [];
@@ -161,6 +163,79 @@ function decode(text: string): string {
     .replace(/_x([0-9a-fA-F]{4})_/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
 }
 
+/** One element found by `xmlElements`: its attribute text, inner XML (undefined for `<name/>`) and where it starts and ends. */
+interface XmlElement {
+  readonly attrs: string;
+  readonly inner: string | undefined;
+  readonly start: number;
+  readonly end: number;
+}
+
+/**
+ * Each `<name>` element of `xml` (any namespace prefix), in order, matched as
+ * `/<(?:\w+:)?name\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?name>)/g` would
+ * match them, in linear time: such a regular expression searches to the end of
+ * the text once for every element that never closes, so a small file of
+ * unclosed tags took seconds. An element that never closes is not one, and
+ * once one does not close, no later one can: only `<name/>` follows.
+ */
+export function* xmlElements(xml: string, name: string, openOnly = false): Generator<XmlElement> {
+  const head = new RegExp(`(?:\\w+:)?${name}(?!\\w)`, 'y');
+  let at = 0;
+  let gt = -1; // the end of the tag that starts at the last '<'; positions only grow
+  let closes = !openOnly;
+  for (;;) {
+    const lt = xml.indexOf('<', at);
+    if (lt < 0) return;
+    if (gt <= lt) {
+      gt = xml.indexOf('>', lt + 1);
+      if (gt < 0) return; // no tag can end any more
+    }
+    head.lastIndex = lt + 1;
+    if (!head.test(xml) || head.lastIndex > gt) {
+      at = lt + 1;
+      continue;
+    }
+    const selfClosing = xml[gt - 1] === '/' && gt - 1 >= head.lastIndex;
+    const attrs = xml.slice(head.lastIndex, selfClosing ? gt - 1 : gt);
+    if (selfClosing || openOnly) {
+      yield { attrs, inner: undefined, start: lt, end: gt + 1 };
+      at = gt + 1;
+      continue;
+    }
+    const close = closes ? closingTag(xml, name, gt + 1) : undefined;
+    if (!close) {
+      closes = false;
+      at = lt + 1;
+      continue;
+    }
+    yield { attrs, inner: xml.slice(gt + 1, close[0]), start: lt, end: close[1] };
+    at = close[1];
+  }
+}
+
+/** Where the next `</name>` or `</prefix:name>` from `from` starts and ends. */
+function closingTag(xml: string, name: string, from: number): readonly [number, number] | undefined {
+  for (let search = from; ;) {
+    const found = xml.indexOf(`${name}>`, search);
+    if (found < 0) return undefined;
+    let before = found - 1;
+    if (xml[before] === ':') {
+      let word = before - 1;
+      while (word >= from && /\w/.test(xml[word]!)) word--;
+      if (word < before - 1) before = word;
+    }
+    if (xml[before] === '/' && xml[before - 1] === '<') return [before - 1, found + name.length + 1];
+    search = found + 1;
+  }
+}
+
+/** The inner XML of the first `<name>` element, or undefined. */
+function firstInner(xml: string, name: string): string | undefined {
+  for (const element of xmlElements(xml, name)) return element.inner ?? '';
+  return undefined;
+}
+
 function attributes(source: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const match of source.matchAll(/([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
@@ -171,9 +246,15 @@ function attributes(source: string): Record<string, string> {
 
 /** The text runs of a shared or inline string, without phonetic hints. */
 function runs(xml: string): string {
-  const visible = xml.replace(/<(?:\w+:)?rPh\b[\s\S]*?<\/(?:\w+:)?rPh>/g, '');
+  let visible = '';
+  let from = 0;
+  for (const hint of xmlElements(xml, 'rPh')) {
+    visible += xml.slice(from, hint.start);
+    from = hint.end;
+  }
+  visible += xml.slice(from);
   let text = '';
-  for (const match of visible.matchAll(/<(?:\w+:)?t\b[^>]*?(?:\/>|>([\s\S]*?)<\/(?:\w+:)?t>)/g)) text += decode(match[1] ?? '');
+  for (const run of xmlElements(visible, 't')) text += decode(run.inner ?? '');
   return text;
 }
 
@@ -192,9 +273,10 @@ function columnIndex(ref: string): number | undefined {
   return index - 1;
 }
 
-function fromSerial(value: number, date1904: boolean): Date {
-  const ms = Math.round(value * 86_400) * 1000 + (date1904 ? EPOCH_1904 : EPOCH_1900);
-  const utc = new Date(ms);
+/** A date-styled number as a local date; one past any date (`9e300`) stays the number. */
+function fromSerial(value: number, date1904: boolean): Date | number {
+  const utc = new Date(Math.round(value * 86_400) * 1000 + (date1904 ? EPOCH_1904 : EPOCH_1900));
+  if (Number.isNaN(utc.getTime())) return value;
   return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate(), utc.getUTCHours(), utc.getUTCMinutes(), utc.getUTCSeconds());
 }
 
@@ -224,9 +306,9 @@ export async function workbookParts(zip: ZipReader, wanted: string | number = 0)
   };
   const workbook = await text('xl/workbook.xml');
   if (workbook === undefined) throw new ImportError('not an xlsx file (no workbook)');
-  const date1904 = /<(?:\w+:)?workbookPr\b[^>]*\bdate1904\s*=\s*["'](?:1|true)["']/.test(workbook);
-  const sheets = [...workbook.matchAll(/<(?:\w+:)?sheet\b([^>]*?)\/?>/g)].map(match => {
-    const attrs = attributes(match[1]!);
+  const date1904 = [...xmlElements(workbook, 'workbookPr', true)].some(tag => /^(?:1|true)$/.test(attributes(tag.attrs)['date1904'] ?? ''));
+  const sheets = [...xmlElements(workbook, 'sheet', true)].map(tag => {
+    const attrs = attributes(tag.attrs);
     const relation = Object.entries(attrs).find(([key]) => /(^|:)id$/.test(key) && key !== 'sheetId')?.[1];
     return { name: attrs['name'] ?? '', relation };
   });
@@ -234,8 +316,8 @@ export async function workbookParts(zip: ZipReader, wanted: string | number = 0)
   if (!chosen) throw new ImportError(`worksheet ${JSON.stringify(wanted)} not found`);
 
   const relations = new Map<string, { target: string; type: string }>();
-  for (const match of ((await text('xl/_rels/workbook.xml.rels')) ?? '').matchAll(/<(?:\w+:)?Relationship\b([^>]*?)\/?>/g)) {
-    const attrs = attributes(match[1]!);
+  for (const tag of xmlElements((await text('xl/_rels/workbook.xml.rels')) ?? '', 'Relationship', true)) {
+    const attrs = attributes(tag.attrs);
     if (attrs['Id'] && attrs['Target']) relations.set(attrs['Id'], { target: attrs['Target'], type: attrs['Type'] ?? '' });
   }
   const resolve = (target: string): string => {
@@ -258,13 +340,13 @@ export async function workbookParts(zip: ZipReader, wanted: string | number = 0)
   const dateStyles = new Set<number>();
   const stylesXml = (await text(byType('/styles', 'xl/styles.xml'))) ?? '';
   const custom = new Map<number, string>();
-  for (const match of stylesXml.matchAll(/<(?:\w+:)?numFmt\b([^>]*?)\/?>/g)) {
-    const attrs = attributes(match[1]!);
+  for (const tag of xmlElements(stylesXml, 'numFmt', true)) {
+    const attrs = attributes(tag.attrs);
     custom.set(Number(attrs['numFmtId']), attrs['formatCode'] ?? '');
   }
-  const xfs = /<(?:\w+:)?cellXfs\b[^>]*>([\s\S]*?)<\/(?:\w+:)?cellXfs>/.exec(stylesXml)?.[1] ?? '';
-  [...xfs.matchAll(/<(?:\w+:)?xf\b([^>]*?)\/?>/g)].forEach((match, index) => {
-    const id = Number(attributes(match[1]!)['numFmtId'] ?? 0);
+  const xfs = firstInner(stylesXml, 'cellXfs') ?? '';
+  [...xmlElements(xfs, 'xf', true)].forEach((tag, index) => {
+    const id = Number(attributes(tag.attrs)['numFmtId'] ?? 0);
     if (BUILTIN_DATES.has(id) || (custom.has(id) && isDateFormat(custom.get(id)!))) dateStyles.add(index);
   });
   return { sheetPath, sharedPath: byType('/sharedStrings', 'xl/sharedStrings.xml'), date1904, dateStyles };
@@ -277,22 +359,24 @@ export const sharedString = (inner: string): string => runs(inner);
 export function rowCells(xml: string, shared: readonly string[], parts: WorkbookParts, maxColumns: number): SheetCell[] {
   const cells: SheetCell[] = [];
   let next = 0;
-  for (const cellMatch of xml.matchAll(/<(?:\w+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?c>)/g)) {
-    const attrs = attributes(cellMatch[1]!);
+  for (const element of xmlElements(xml, 'c')) {
+    const attrs = attributes(element.attrs);
     const index = attrs['r'] !== undefined ? columnIndex(attrs['r']) ?? next : next;
     next = index + 1;
     if (index >= maxColumns) throw new ImportError(`more than ${maxColumns} columns`);
-    const inner = cellMatch[2] ?? '';
-    const raw = /<(?:\w+:)?v\b[^>]*>([\s\S]*?)<\/(?:\w+:)?v>/.exec(inner)?.[1];
+    const inner = element.inner ?? '';
+    const raw = firstInner(inner, 'v');
     const value = raw === undefined ? undefined : decode(raw);
     let cell: SheetCell = null;
     switch (attrs['t']) {
       case 's': cell = value === undefined ? null : shared[Number(value)] ?? null; break;
-      case 'inlineStr': cell = runs(/<(?:\w+:)?is\b[^>]*>([\s\S]*?)<\/(?:\w+:)?is>/.exec(inner)?.[1] ?? ''); break;
+      case 'inlineStr': cell = runs(firstInner(inner, 'is') ?? ''); break;
       case 'str': cell = value ?? null; break;
       case 'b': cell = value === undefined ? null : value === '1' || value === 'true'; break;
       case 'e': cell = null; break; // #N/A, #DIV/0!: no value
-      case 'd': cell = value === undefined || Number.isNaN(Date.parse(value)) ? null : new Date(value); break;
+      // ISO text; a day without a time is that day here (new Date('2026-10-23') would be UTC midnight).
+      case 'd': cell = value === undefined || Number.isNaN(Date.parse(value)) ? null
+        : /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, Number(value.slice(8, 10))) : new Date(value); break;
       default: {
         if (value === undefined || value.trim() === '') break;
         const number = Number(value);
@@ -332,16 +416,14 @@ export async function readXlsx(input: Uint8Array | ArrayBuffer, options: ReadXls
   const parts = await workbookParts(zip, options.sheet);
 
   const shared: string[] = [];
-  for (const match of ((await text(parts.sharedPath)) ?? '').matchAll(/<(?:\w+:)?si\b[^>]*?(?:\/>|>([\s\S]*?)<\/(?:\w+:)?si>)/g)) {
-    shared.push(runs(match[1] ?? ''));
-  }
+  for (const element of xmlElements((await text(parts.sharedPath)) ?? '', 'si')) shared.push(runs(element.inner ?? ''));
 
   const worksheet = await text(parts.sheetPath);
   if (worksheet === undefined) throw new ImportError('the worksheet is missing from the file');
-  const data = /<(?:\w+:)?sheetData\b[^>]*?(?:\/>|>([\s\S]*?)<\/(?:\w+:)?sheetData>)/.exec(worksheet)?.[1] ?? '';
+  const data = firstInner(worksheet, 'sheetData') ?? '';
   const table: SheetCell[][] = [];
-  for (const rowMatch of data.matchAll(/<(?:\w+:)?row\b[^>]*?(?:\/>|>([\s\S]*?)<\/(?:\w+:)?row>)/g)) {
-    const cells = rowCells(rowMatch[1] ?? '', shared, parts, maxColumns);
+  for (const row of xmlElements(data, 'row')) {
+    const cells = rowCells(row.inner ?? '', shared, parts, maxColumns);
     if (cells.every(cell => cell === null || cell === '')) continue;
     table.push(cells);
     if (table.length > maxRows + 1) throw new ImportError(`more than ${maxRows} rows`);

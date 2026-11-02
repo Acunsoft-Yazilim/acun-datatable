@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E2E · two custom elements</title>
+<!-- The <script> build loads last (defer): the page sets the properties before the element is defined. -->
+<link rel="stylesheet" href="/packages/datatable/dist/styles.css">
+<script defer src="/packages/datatable/dist/acun-datatable.min.js"></script>
+<style>body { font-family: system-ui, sans-serif; margin: 0; padding: 24px 16px; background: #f5f6f8; } h2 { font-size: 1rem; }</style>
+</head>
+<body>
+<main>
+  <h2>Siparişler</h2>
+  <acun-datatable class="orders" language="tr" state-save responsive="collapse"></acun-datatable>
+  <h2>Ürünler</h2>
+  <acun-datatable class="products" language="tr" state-save></acun-datatable>
+</main>
+<script>
+  const cities = ['İstanbul', 'Ankara', 'İzmir'];
+  const [orders, products] = document.querySelectorAll('acun-datatable');
+  // Not defined yet: these are plain properties until the script build runs.
+  orders.columns = [{ data: 'customer', title: 'Müşteri' }, { data: 'total', title: 'Tutar', type: 'number' }, { data: 'city', title: 'Şehir', priority: 3 }];
+  orders.data = Array.from({ length: 30 }, (_, i) => ({ id: i + 1, customer: `Müşteri ${String(i + 1).padStart(2, '0')}`, total: (i * 37) % 500, city: cities[i % 3] }));
+  orders.pageSize = 10;
+  orders.options = { selectable: true };
+  products.columns = [{ data: 'name', title: 'Ürün' }, { data: 'stock', title: 'Stok', type: 'number' }];
+  products.data = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, name: `Ürün ${String(i + 1).padStart(2, '0')}`, stock: i * 3 }));
+  products.pageSize = 5;
+  // Events bubble: one listener for the page.
+  window.events = [];
+  document.addEventListener('adt-ready', event => window.events.push(`ready:${event.target.className}`));
+  document.addEventListener('adt-change', event => window.events.push(`${event.detail.event.type}:${event.target.className}`));
+</script>
+</body>
+</html>

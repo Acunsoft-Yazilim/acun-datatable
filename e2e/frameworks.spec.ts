@@ -31,6 +31,21 @@ for (const app of ['react', 'vue']) {
       expect(errors).toEqual([]);
     });
 
+    test('opens the row "⋮" menu whole over the table\'s box', async ({ page }) => {
+      await page.goto(`/e2e/fixtures/${app}.html?menu`);
+      await expect(info(page)).toHaveText('Showing 1 to 10 of 500 rows');
+      const menu = page.locator('#orders tbody .adt-row-menu').last();
+      await menu.locator('summary').click();
+      await expect.poll(() => page.locator('#orders .adt-row-menu[open] .adt-menu-item').evaluateAll(items => items.length === 3 && items.every(item => {
+        const box = item.getBoundingClientRect();
+        return item.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+      }))).toBe(true);
+      await menu.getByRole('button', { name: /Delete/ }).click();
+      expect(await page.evaluate(() => (window as unknown as { __edited: string }).__edited)).toMatch(/^Delete:/);
+      await expect(menu).not.toHaveAttribute('open');
+      await expect(menu.locator('.adt-menu-list')).toHaveCSS('position', 'absolute');
+    });
+
     test('shows a lower bound when the back end stopped counting, and no total when it did not count', async ({ page }) => {
       await page.goto(`/e2e/fixtures/${app}.html?limited`);
       await expect(info(page)).toHaveText('Showing 1 to 10 of 100+ rows'); // the server counted up to 100

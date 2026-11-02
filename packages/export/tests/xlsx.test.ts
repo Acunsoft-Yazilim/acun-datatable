@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { isDecimal, normalizeValue } from '@acunsoft/datatable-core';
 import { ImportError, readXlsx, toXlsx, type Sheet } from '../src/index';
 import { openZip, writeZip } from '../src/zip';
+import { streamXlsx } from '../src/stream';
 
 const fixture = (name: string) => new Uint8Array(readFileSync(new URL(`./fixtures/${name}`, import.meta.url)));
 const decimal = (text: string) => normalizeValue(text, 'decimal') as Sheet['rows'][number][number];
@@ -152,5 +153,97 @@ describe('readXlsx safety', () => {
     const back = await readXlsx(toXlsx({ headers: ['n'], rows: [[decimal('0.10')]] }));
     expect(back.rows[0]![0]).toBe(0.1);
     expect(isDecimal(back.rows[0]![0])).toBe(false);
+  });
+});
+
+describe('dates in the user\'s time zone', () => {
+  it('reads a t="d" day as that local day, and describes a date by its local day', async () => {
+    const { importRows } = await import('../src/index');
+    const bytes = writeZip([
+      { name: 'xl/workbook.xml', data: new TextEncoder().encode('<workbook><sheets><sheet name="S" sheetId="1"/></sheets></workbook>') },
+      { name: 'xl/worksheets/sheet1.xml', data: new TextEncoder().encode('<worksheet><sheetData><row><c r="A1" t="str"><v>Day</v></c></row><row><c r="A2" t="d"><v>2026-10-23</v></c></row></sheetData></worksheet>') },
+    ]);
+    const sheet = await readXlsx(bytes);
+    expect(sheet.rows[0]![0]).toEqual(new Date(2026, 9, 23)); // local midnight, not UTC's
+    const result = importRows({ headers: ['Day'], rows: [[new Date(2026, 9, 23)]] }, [{ id: 'day', header: 'Day', accessorKey: 'day', type: 'number' }]);
+    expect(result.errors[0]!.value).toBe('2026-10-23'); // not 2026-10-22T21:00:00.000Z in Turkey
+  });
+});
+
+describe('sheet names', () => {
+  it('lose an apostrophe at either end, which Excel refuses', async () => {
+    const { openZip } = await import('../src/zip');
+    const workbook = async (name: string) => new TextDecoder().decode(await openZip(toXlsx({ headers: ['A'], rows: [] }, { sheetName: name })).read('xl/workbook.xml'));
+    expect(await workbook("'Orders'")).toContain('<sheet name="Orders"');
+    expect(await workbook("Ali's orders")).toContain(`<sheet name="Ali's orders"`); // inside it is fine
+    expect(await workbook("''")).toContain('<sheet name="Sheet1"');
+  });
+});
+
+describe('text that looks like an escape', () => {
+  it('reads back exactly, _x0041_ included', async () => {
+    const sheet: Sheet = { headers: ['Note'], rows: [['_x0041_ literal'], ['a_x0041_b_x00'], ['_x005F_']] };
+    expect((await readXlsx(toXlsx(sheet))).rows).toEqual(sheet.rows);
+  });
+});
+
+describe('zip limits', () => {
+  it('count every part read, and the real size of a stored entry', async () => {
+    const zip = writeZip([{ name: 'a', data: new Uint8Array(1_000) }, { name: 'b', data: new Uint8Array(1_000) }]);
+    const reader = openZip(zip, { maxEntryBytes: 1_000, maxTotalBytes: 1_500 });
+    expect(await reader.read('a')).toHaveLength(1_000);
+    await expect(reader.read('b')).rejects.toThrow('the archive holds more than 1500 bytes'); // each fits, both do not
+    // A stored entry whose central directory claims 10 bytes.
+    const lying = writeZip([{ name: 'big', data: new Uint8Array(5_000) }]);
+    const view = new DataView(lying.buffer, lying.byteOffset);
+    const central = lying.length - 22 - (46 + 3);
+    view.setUint32(central + 24, 10, true); // the uncompressed size it declares
+    await expect(openZip(lying, { maxEntryBytes: 1_000 }).read('big')).rejects.toThrow('larger than 1000 bytes');
+  });
+});
+
+describe('reading damaged sheets', () => {
+  // Elements that never close: regular expressions with a lazy body searched to the end
+  // once for each of them (seconds for a small file); the scanner stays linear.
+  const workbook = (sheet: string) => writeZip([
+    { name: 'xl/workbook.xml', data: new TextEncoder().encode('<workbook><sheets><sheet name="S" sheetId="1"/></sheets></workbook>') },
+    { name: 'xl/worksheets/sheet1.xml', data: new TextEncoder().encode(`<worksheet><sheetData>${sheet}</sheetData></worksheet>`) },
+  ]);
+  const cases = {
+    'cells that never close': `<row><c r="A1" t="str"><v>Ad</v></c></row><row>${'<c r="A1">'.repeat(40_000)}</row>`,
+    'rows that never close': `<row><c r="A1" t="str"><v>Ad</v></c></row>${'<row>'.repeat(40_000)}`,
+    'strings that never close': `<row><c r="A1" t="inlineStr"><is>${'<t>'.repeat(40_000)}</is></c></row>`,
+  };
+  for (const [name, sheet] of Object.entries(cases)) {
+    it(`reads ${name} in linear time`, async () => {
+      const bytes = workbook(sheet);
+      let started = performance.now();
+      await readXlsx(bytes).catch(() => undefined);
+      expect(performance.now() - started).toBeLessThan(1000);
+      started = performance.now();
+      const stream = await streamXlsx(bytes).catch(() => undefined);
+      if (stream) for await (const _ of stream.chunks) { /* drain */ }
+      expect(performance.now() - started).toBeLessThan(1000);
+    });
+  }
+
+  it('keeps a date-styled number past any date as the number, and importRows reports it', async () => {
+    const { importRows } = await import('../src/index');
+    const bytes = writeZip([
+      { name: 'xl/workbook.xml', data: new TextEncoder().encode('<workbook><sheets><sheet name="S" sheetId="1"/></sheets></workbook>') },
+      { name: 'xl/styles.xml', data: new TextEncoder().encode('<styleSheet><cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>') },
+      { name: 'xl/worksheets/sheet1.xml', data: new TextEncoder().encode('<worksheet><sheetData><row><c r="A1" t="str"><v>Day</v></c></row><row><c r="A2" s="1"><v>9e300</v></c></row><row><c r="A3" s="1"><v>45953</v></c></row></sheetData></worksheet>') },
+    ]);
+    const sheet = await readXlsx(bytes);
+    expect(sheet.rows[0]).toEqual([9e300]); // not an Invalid Date
+    expect(sheet.rows[1]![0]).toEqual(new Date(2025, 9, 23));
+    const result = importRows(sheet, [{ id: 'day', header: 'Day', accessorKey: 'day', type: 'date' }]);
+    expect(result.rows.map(row => row.values['day'])).toEqual([new Date(2025, 9, 23)]);
+    expect(result.errors).toMatchObject([{ line: 2, column: 'day' }]); // reported, not thrown
+  });
+
+  it('still reads a well-formed sheet as before, prefixes and empty elements included', async () => {
+    const bytes = workbook('<x:row><x:c r="A1" t="inlineStr"><x:is><x:t>Ad</x:t><x:rPh><x:t>ignored</x:t></x:rPh></x:is></x:c><x:c r="B1" t="str"><x:v>Şehir</x:v></x:c></x:row><row/><row><c r="A2" t="str"><v>Ayşe</v></c><c r="B2"/></row>');
+    expect(await readXlsx(bytes)).toEqual({ headers: ['Ad', 'Şehir'], rows: [['Ayşe', null]] });
   });
 });

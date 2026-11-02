@@ -1,5 +1,6 @@
 import { FILTER_OPERATORS, MAX_IN_VALUES, splitSearchTerms, type FilterOperator, type SortRule } from '@acunsoft/datatable-core';
 import type { ServerColumn } from './columns';
+import { exactInstants, isTimeZone, tableDay } from './day';
 
 /** A request that does not fit the endpoint: answer 422 (or DataTables' `error`) with `message`. */
 export class TableQueryError extends Error {
@@ -32,6 +33,10 @@ export interface ServerTableQuery {
   readonly cursor: string | undefined;
   /** DataTables' request counter when the request used its protocol. */
   readonly draw: number | undefined;
+  /** The time zone of the days in date-time filters; undefined: the server's. */
+  readonly timeZone?: string;
+  /** Rows to skip: DataTables' `start`, which need not be a whole number of pages. Undefined: `(page - 1) × pageSize`. */
+  readonly offset?: number;
 }
 
 export interface ReadTableQueryOptions {
@@ -39,6 +44,13 @@ export interface ReadTableQueryOptions {
   readonly maxPageSize?: number;
   /** Page size when the request has none. Default 25. */
   readonly defaultPageSize?: number;
+  /**
+   * The time zone of a day given for a date-time column (`2026-10-23` means
+   * that whole day there), e.g. the user's from your session. Default: the
+   * zone the browser sends as `tz` (datatable-http does with day filters),
+   * else the server's.
+   */
+  readonly timeZone?: string;
 }
 
 const MAX_PAGE = 1_000_000;
@@ -68,12 +80,16 @@ export function readTableQuery(input: Input, columns: readonly ServerColumn[], o
   const maxPageSize = options.maxPageSize ?? 100;
   const defaultPageSize = Math.min(options.defaultPageSize ?? 25, maxPageSize);
   if (!Number.isInteger(maxPageSize) || maxPageSize < 1 || maxPageSize > 1000) throw new RangeError('maxPageSize must be from 1 to 1000');
+  if (options.timeZone !== undefined && !isTimeZone(options.timeZone)) throw new RangeError(`unknown time zone "${String(options.timeZone)}"`);
   const raw = toObject(input);
   const byId = new Map(columns.map(column => [column.id, column]));
-  return raw['draw'] !== undefined ? fromDataTables(raw, byId, maxPageSize, defaultPageSize) : fromTable(raw, byId, maxPageSize, defaultPageSize);
+  // The browser's zone is a hint: an unknown one leaves the server's.
+  const timeZone = options.timeZone ?? (isTimeZone(raw['tz']) ? raw['tz'] : undefined);
+  const query = raw['draw'] !== undefined ? fromDataTables(raw, byId, maxPageSize, defaultPageSize, timeZone) : fromTable(raw, byId, maxPageSize, defaultPageSize, timeZone);
+  return timeZone === undefined ? query : Object.freeze({ ...query, timeZone });
 }
 
-function fromTable(raw: Record<string, unknown>, byId: Map<string, ServerColumn>, maxPageSize: number, defaultPageSize: number): ServerTableQuery {
+function fromTable(raw: Record<string, unknown>, byId: Map<string, ServerColumn>, maxPageSize: number, defaultPageSize: number, timeZone: string | undefined): ServerTableQuery {
   const page = integer(raw['page'] ?? 1, 'page', 1, MAX_PAGE);
   const pageSize = integer(raw['pageSize'] ?? defaultPageSize, 'pageSize', 1, maxPageSize);
   const search = text(raw['search'] ?? '', 'search');
@@ -82,7 +98,7 @@ function fromTable(raw: Record<string, unknown>, byId: Map<string, ServerColumn>
   return Object.freeze({
     page, pageSize,
     sorting: sorting(raw['sort'] ?? '', byId),
-    filters: filters(raw['filters'], byId),
+    filters: filters(raw['filters'], byId, timeZone),
     search, terms: Object.freeze(splitSearchTerms(search).slice(0, MAX_TERMS)),
     cursorPaging: raw['paging'] === 'cursor' || cursor !== undefined,
     cursor,
@@ -90,7 +106,7 @@ function fromTable(raw: Record<string, unknown>, byId: Map<string, ServerColumn>
   });
 }
 
-function fromDataTables(raw: Record<string, unknown>, byId: Map<string, ServerColumn>, maxPageSize: number, defaultPageSize: number): ServerTableQuery {
+function fromDataTables(raw: Record<string, unknown>, byId: Map<string, ServerColumn>, maxPageSize: number, defaultPageSize: number, timeZone: string | undefined): ServerTableQuery {
   // A column without data (`data: null`, e.g. an actions column) is no column of the query:
   // ordering by it is ignored, as is its search.
   const listed = list(raw['columns']).map(column => {
@@ -100,8 +116,10 @@ function fromDataTables(raw: Record<string, unknown>, byId: Map<string, ServerCo
     return { id: typeof id === 'string' ? id : '', search: typeof search === 'string' ? search : '' };
   });
   const lengthRaw = raw['length'] ?? defaultPageSize;
-  const length = lengthRaw === '-1' || lengthRaw === -1 ? -1 : integer(lengthRaw, 'length', 1, 1_000_000);
-  const pageSize = length === -1 ? maxPageSize : Math.min(length, maxPageSize);
+  // "All" (-1), or more rows than a page may hold, is refused: a page cut short would leave rows
+  // out with no sign (DataTables shows no pager and counts them as shown).
+  if (lengthRaw === '-1' || lengthRaw === -1) throw new TableQueryError('length', `length -1 (all rows) is not allowed: at most ${maxPageSize} rows a page`);
+  const pageSize = integer(lengthRaw, 'length', 1, maxPageSize);
   const start = integer(raw['start'] ?? 0, 'start', 0, MAX_PAGE * maxPageSize);
   const sort = list(raw['order']).flatMap((rule, index) => {
     const entry = rule as Record<string, unknown> | undefined;
@@ -110,9 +128,14 @@ function fromDataTables(raw: Record<string, unknown>, byId: Map<string, ServerCo
     if (!column) throw new TableQueryError(`order.${index}.column`, 'order[].column must be the index of a column');
     return column.id === '' ? [] : [`${column.id}:${entry?.['dir'] === 'desc' ? 'desc' : 'asc'}`];
   });
+  // This package's client sends each filter twice: in `filters[i]` and, for DataTables back ends,
+  // as its column's search. With `filters[i]` the column searches are those copies; without them
+  // (DataTables itself) a column's search is a `contains` filter.
   const extra = list(raw['filters']);
-  for (const column of listed) {
-    if (column.id !== '' && column.search.trim() !== '') extra.push({ field: column.id, op: 'contains', value: column.search });
+  if (extra.length === 0) {
+    for (const column of listed) {
+      if (column.id !== '' && column.search.trim() !== '') extra.push({ field: column.id, op: 'contains', value: column.search });
+    }
   }
   const searchRaw = raw['search'];
   const search = text(typeof searchRaw === 'object' && searchRaw !== null ? (searchRaw as Record<string, unknown>)['value'] ?? '' : searchRaw ?? '', 'search');
@@ -120,11 +143,12 @@ function fromDataTables(raw: Record<string, unknown>, byId: Map<string, ServerCo
     page: Math.floor(start / pageSize) + 1,
     pageSize,
     sorting: sorting([...new Set(sort)].join(','), byId),
-    filters: filters(extra, byId),
+    filters: filters(extra, byId, timeZone),
     search, terms: Object.freeze(splitSearchTerms(search).slice(0, MAX_TERMS)),
     cursorPaging: false,
     cursor: undefined,
     draw: integer(raw['draw'], 'draw', 0, 999_999_999),
+    offset: start,
   });
 }
 
@@ -146,7 +170,7 @@ function sorting(value: unknown, byId: Map<string, ServerColumn>): ServerTableQu
   return Object.freeze(rules);
 }
 
-function filters(value: unknown, byId: Map<string, ServerColumn>): readonly ServerFilter[] {
+function filters(value: unknown, byId: Map<string, ServerColumn>, timeZone: string | undefined): readonly ServerFilter[] {
   const rules = list(value);
   if (rules.length > MAX_FILTERS) throw new TableQueryError('filters', `at most ${MAX_FILTERS} filters`);
   const out: ServerFilter[] = [];
@@ -168,7 +192,7 @@ function filters(value: unknown, byId: Map<string, ServerColumn>): readonly Serv
       const values = list(raw);
       if (operator === 'between' && values.length !== 2) throw new TableQueryError(`${at}.value`, 'between needs two values');
       if (operator === 'in' && (values.length === 0 || values.length > MAX_IN_VALUES)) throw new TableQueryError(`${at}.value`, `in needs 1 to ${MAX_IN_VALUES} values`);
-      out.push(Object.freeze({ column, operator, value: Object.freeze(values.map(item => typed(column, item, `${at}.value`))) }));
+      out.push(Object.freeze({ column, operator, value: Object.freeze(values.map(item => typed(column, item, `${at}.value`, timeZone))) }));
       return;
     }
     if (operator === 'contains' || operator === 'startsWith') {
@@ -177,13 +201,13 @@ function filters(value: unknown, byId: Map<string, ServerColumn>): readonly Serv
       out.push(Object.freeze({ column, operator, value: term }));
       return;
     }
-    out.push(Object.freeze({ column, operator, value: typed(column, raw, `${at}.value`) }));
+    out.push(Object.freeze({ column, operator, value: typed(column, raw, `${at}.value`, timeZone) }));
   });
   return Object.freeze(out);
 }
 
-/** A filter value as the column's type. */
-function typed(column: ServerColumn, raw: unknown, field: string): unknown {
+/** A filter value as the column's type; a day for a date-time column is a `TableDay` in `timeZone`. */
+function typed(column: ServerColumn, raw: unknown, field: string, timeZone?: string): unknown {
   const value = typeof raw === 'string' ? raw.trim() : raw;
   const fail = (): never => { throw new TableQueryError(field, `"${String(raw)}" is not a valid ${column.type} for "${column.id}"`); };
   switch (column.type) {
@@ -199,8 +223,11 @@ function typed(column: ServerColumn, raw: unknown, field: string): unknown {
       return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value) && realDay(value) ? value.slice(0, 10) : fail();
     case 'datetime': {
       if (typeof value !== 'string' || value.length > 40 || (/^\d{4}-\d{2}-\d{2}/.test(value) && !realDay(value))) return fail();
-      const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
-      return Number.isNaN(date.getTime()) ? fail() : date;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return tableDay(value, timeZone);
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return fail();
+      exactInstants.add(date);
+      return date;
     }
     case 'boolean':
       if (value === true || value === 'true' || value === '1' || value === 1) return true;

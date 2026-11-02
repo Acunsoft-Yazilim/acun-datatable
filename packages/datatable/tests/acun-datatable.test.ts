@@ -160,6 +160,20 @@ describe('buttons and custom cells', () => {
     expect((await created[0]!.text()).split('\r\n')[0]).toBe('Müşteri;Total'); // ; for Turkish Excel
   });
 
+  it('writes CSV with ; for the languages whose Excel expects it, regional tags included', async () => {
+    const created: Blob[] = [];
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: (blob: Blob) => { created.push(blob); return 'blob:x'; }, revokeObjectURL: () => undefined }));
+    for (const language of ['de-DE', 'fr', 'es', 'tr-TR', 'en']) {
+      const host = document.body.appendChild(document.createElement('div'));
+      const dt = new AcunDataTable(host, { data: orders.slice(0, 2), language, buttons: ['csv'], columns: [{ data: 'customer', title: 'C' }, { data: 'total', title: 'T' }] });
+      await dt.ready;
+      host.querySelector<HTMLButtonElement>('.adt-menu-item[data-action="csv"]')!.click();
+      await vi.waitFor(() => expect(created).toHaveLength(['de-DE', 'fr', 'es', 'tr-TR', 'en'].indexOf(language) + 1));
+      expect((await created.at(-1)!.text()).replace(/^\uFEFF/, '').split('\r\n')[0]).toBe(language === 'en' ? 'C,T' : 'C;T');
+      dt.destroy();
+    }
+  });
+
   it('exports every matching row of a server table, page by page, within the limit', async () => {
     const fetch = vi.fn(async (url: string) => {
       const query = new URL(url, 'http://x').searchParams;
@@ -174,7 +188,8 @@ describe('buttons and custom cells', () => {
     await dt.ready;
     document.querySelector<HTMLButtonElement>('.adt-menu-item[data-action="copy"]')!.click();
     await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
-    expect(String(fetch.mock.calls.at(-1)![0])).toContain('pageSize=1000');
+    expect(String(fetch.mock.calls.at(-1)![0])).toContain('pageSize=100'); // what the back ends allow by default
+    expect(String(fetch.mock.calls.at(-1)![0])).not.toContain('pageSize=1000');
     expect((writeText.mock.calls[0] as unknown as [string])[0].trim().split('\n')).toHaveLength(31); // header + 30 rows, not one page
 
     const small = new AcunDataTable(document.body.appendChild(document.createElement('div')), {
@@ -183,6 +198,61 @@ describe('buttons and custom cells', () => {
     await small.ready;
     small.element.querySelector<HTMLButtonElement>('.adt-menu-item[data-action="copy"]')!.click();
     await vi.waitFor(() => expect(small.element.querySelector('.adt-menu-status--error')!.textContent).toBe('Dışa aktarma 20 satırı aşıyor; filtreleri daraltın.'));
+  });
+
+  // 250 rows behind a server that, like the Node and Laravel back ends by default, allows 100 rows a page.
+  const many = Array.from({ length: 250 }, (_, i) => ({ id: i + 1, customer: `Müşteri ${i + 1}`, total: i }));
+  const copied = async (options: ConstructorParameters<typeof AcunDataTable>[1], writeText: ReturnType<typeof vi.fn>) => {
+    const dt = new AcunDataTable(document.body.appendChild(document.createElement('div')), { buttons: ['copy'], ...options });
+    await dt.ready;
+    dt.element.querySelector<HTMLButtonElement>('.adt-menu-item[data-action="copy"]')!.click();
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
+    return (writeText.mock.calls[0] as unknown as [string])[0].trim().split('\n').slice(1);
+  };
+
+  it('exports from a server that refuses more than 100 rows a page (the defaults of both back ends)', async () => {
+    const fetch = vi.fn(async (url: string) => {
+      const query = new URL(url, 'http://x').searchParams;
+      const page = Number(query.get('page'));
+      const size = Number(query.get('pageSize'));
+      if (size > 100) return new Response(JSON.stringify({ message: 'pageSize' }), { status: 422 });
+      return new Response(JSON.stringify({ rows: many.slice((page - 1) * size, page * size), totalRows: many.length }));
+    });
+    vi.stubGlobal('fetch', fetch);
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const lines = await copied({ serverSide: true, ajax: '/api/orders' }, writeText);
+    expect(lines).toHaveLength(250);
+    expect(lines.at(-1)).toContain('Müşteri 250');
+    expect(fetch).toHaveBeenCalledTimes(1 + 3); // the table's page, then 100 + 100 + 50: no request past the total
+  });
+
+  it('exports every row from a DataTables back end that silently caps the length, and takes exportPageSize', async () => {
+    const seen: number[] = [];
+    const fetch = vi.fn(async (url: string) => {
+      const query = new URL(url, 'http://x').searchParams;
+      const start = Number(query.get('start'));
+      const length = Math.min(Number(query.get('length')), 100); // like Laravel's TableResponse
+      seen.push(Number(query.get('length')));
+      return new Response(JSON.stringify({ draw: Number(query.get('draw')), data: many.slice(start, start + length), recordsTotal: 250, recordsFiltered: 250 }));
+    });
+    vi.stubGlobal('fetch', fetch);
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const lines = await copied({
+      serverSide: true, ajax: { url: '/api/orders', protocol: 'datatables' }, exportPageSize: 500,
+      columns: [{ data: 'customer', title: 'Müşteri' }, { data: 'total', title: 'Tutar' }],
+    }, writeText);
+    expect(seen.slice(1)).toEqual([500, 100, 100]); // asked for 500, got 100: paged by 100 from there
+    expect(lines).toHaveLength(250);
+    expect(new Set(lines).size).toBe(250); // no row twice, none missing
+    expect(lines.at(-1)).toContain('Müşteri 250');
+  });
+
+  it('refuses an exportPageSize the back ends cannot take', () => {
+    expect(() => new AcunDataTable('#orders', { exportPageSize: 0 })).toThrow(RangeError);
+    expect(() => new AcunDataTable('#orders', { exportPageSize: 1001 })).toThrow(RangeError);
+    expect(() => new AcunDataTable('#orders', { exportPageSize: 2.5 })).toThrow(RangeError);
   });
 });
 
@@ -207,8 +277,36 @@ describe('loading', () => {
     vi.stubGlobal('fetch', json({ message: 'boom' }, 500));
     const dt = new AcunDataTable('#orders', { serverSide: true, ajax: '/api/orders' });
     await expect(dt.ready).rejects.toThrow();
-    expect(document.querySelector('.adt-notice[role="alert"]')!.textContent).toBe('The data could not be loaded.');
+    expect(document.querySelector('.adt-notice[role="alert"] .adt-notice-text')!.textContent).toBe('The data could not be loaded.');
     expect(document.querySelector('.adt-skeleton')).toBeNull();
+  });
+
+  it('destroy() takes the loading or error placeholder away too', async () => {
+    vi.stubGlobal('fetch', json({ message: 'boom' }, 500));
+    const dt = new AcunDataTable('#orders', { serverSide: true, ajax: '/api/orders' });
+    await expect(dt.ready).rejects.toThrow();
+    expect(document.querySelector('#orders .adt-notice')).not.toBeNull();
+    dt.destroy();
+    expect(document.querySelector('#orders')!.children).toHaveLength(0);
+  });
+
+  it('loads again from the start after a failed first load: Retry and reload(), server and client side', async () => {
+    for (const serverSide of [true, false]) {
+      document.body.innerHTML = '<div id="orders"></div>';
+      let down = true;
+      const fetch = vi.fn(async () => (down ? new Response('{}', { status: 500 }) : new Response(JSON.stringify(serverSide ? { rows: orders.slice(0, 5), totalRows: 30 } : orders), { headers: { 'Content-Type': 'application/json' } })));
+      vi.stubGlobal('fetch', fetch);
+      const dt = new AcunDataTable('#orders', { serverSide, ajax: '/api/orders', pagination: { pageSize: 5 } });
+      await expect(dt.ready).rejects.toThrow();
+      document.querySelector<HTMLButtonElement>('.adt-notice .adt-retry')!.click(); // fails again: no unhandled rejection
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+      down = false;
+      await dt.reload();
+      expect(dt.table).toBeDefined();
+      expect(document.querySelectorAll('tbody .adt-row')).toHaveLength(5); // the table is there, with its rows
+      expect(String((fetch.mock.calls.at(-1) as unknown as [string])[0])).toContain(serverSide ? 'page=1' : '/api/orders');
+      dt.destroy();
+    }
   });
 });
 
@@ -420,6 +518,24 @@ describe('editing in place', () => {
     expect(onEdit).toHaveBeenCalledWith({ row: orders[0], field: 'customer', value: 'Ayşe Yılmaz', previous: 'Ayşe 1' });
     expect(dt.element.querySelector('tbody tr:first-child td')!.textContent).toBe('Ayşe Yılmaz');
     expect(orders[0]!.customer).toBe('Ayşe 1'); // your array is not changed
+  });
+
+  it('keeps the row, its selection and the focus when the rows have no ID field', async () => {
+    const plain = orders.slice(0, 3).map(({ customer, total }) => ({ customer, total })); // e.g. read from <table> markup
+    const dt = new AcunDataTable('#orders', { data: plain, selectable: true, onEdit: async () => undefined, columns: [{ data: 'customer', title: 'Customer', editable: true }, { data: 'total' }] });
+    await dt.ready;
+    dt.table!.toggleRow(dt.table!.getCoreRows()[0]!.id);
+    const before = dt.table!.getState().selectedIds;
+    const button = dt.element.querySelector<HTMLButtonElement>('tbody tr:first-child .adt-edit')!;
+    button.focus();
+    button.click();
+    const input = dt.element.querySelector<HTMLInputElement>('.adt-edit-control')!;
+    input.value = 'Renamed';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await vi.waitFor(() => expect(dt.element.querySelector('.adt-editor')).toBeNull());
+    expect(dt.element.querySelector('tbody tr:first-child td:not(.adt-select)')!.textContent).toBe('Renamed');
+    expect(dt.table!.getState().selectedIds).toEqual(before); // the same row, still selected
+    expect(document.activeElement).toBe(dt.element.querySelector('tbody tr:first-child .adt-edit')); // focus back on its button
   });
 
   it('reloads the page of a server table after a save', async () => {

@@ -25,6 +25,7 @@ final class XlsxWriter
     /** @var resource */
     private $sheet;
     private string $sheetPath;
+    private bool $done = false;
     private int $row = 0;
     /** @var list<int> */
     private array $widths = [];
@@ -103,6 +104,25 @@ final class XlsxWriter
         $zip->close();
         @unlink($worksheet);
         @unlink($this->sheetPath);
+        $this->done = true;
+    }
+
+    /** Drop the rows written so far (an export that failed half-way): no temporary file is left behind. */
+    public function discard(): void
+    {
+        if ($this->done) {
+            return;
+        }
+        $this->done = true;
+        if (is_resource($this->sheet)) {
+            fclose($this->sheet);
+        }
+        @unlink($this->sheetPath);
+    }
+
+    public function __destruct()
+    {
+        $this->discard();
     }
 
     /** @param list<array{0: string, 1: mixed}> $cells */
@@ -155,6 +175,9 @@ final class XlsxWriter
                 $note($text);
                 $style = $kind === 'header' ? ' s="1"' : '';
 
+                // A literal _xHHHH_ would be read as an escaped character: Excel writes its _ as _x005F_.
+                $text = preg_replace('/_x(?=[0-9a-fA-F]{4}_)/', '_x005F_x', $text) ?? $text;
+
                 return '<c r="'.$ref.'" t="inlineStr"'.$style.'><is><t xml:space="preserve">'.self::xml($text).'</t></is></c>';
         }
     }
@@ -190,7 +213,8 @@ final class XlsxWriter
 
     private static function sheetName(string $name): string
     {
-        $clean = trim(mb_substr(preg_replace('/[\[\]:*?\/\\\\]/', ' ', $name) ?? '', 0, 31));
+        // Excel refuses these characters, and an apostrophe at either end.
+        $clean = trim(trim(mb_substr(preg_replace('/[\[\]:*?\/\\\\]/', ' ', $name) ?? '', 0, 31)), " '");
 
         return $clean === '' || strtolower($clean) === 'history' ? 'Sheet1' : $clean;
     }

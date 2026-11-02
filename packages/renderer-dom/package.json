@@ -1,6 +1,6 @@
 {
   "name": "@acunsoft/datatable-dom",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Accessible DOM renderer for @acunsoft/datatable-core: semantic table, pagination and search without a framework.",
   "keywords": [
     "datatable",
@@ -11,14 +11,14 @@
     "dom",
     "vanilla"
   ],
-  "homepage": "https://kemaloskan.github.io/acun-datatable/",
+  "homepage": "https://acunsoft-yazilim.github.io/acun-datatable/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kemaloskan/acun-datatable.git",
+    "url": "git+https://github.com/Acunsoft-Yazilim/acun-datatable.git",
     "directory": "packages/renderer-dom"
   },
   "bugs": {
-    "url": "https://github.com/kemaloskan/acun-datatable/issues"
+    "url": "https://github.com/Acunsoft-Yazilim/acun-datatable/issues"
   },
   "author": "Kemal OSKAN (https://github.com/kemaloskan)",
   "license": "MIT",
@@ -32,7 +32,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./internal": {
+      "types": "./dist/internal.d.ts",
+      "import": "./dist/internal.js",
+      "default": "./dist/internal.js"
     },
     "./styles.css": "./dist/styles.css"
   },
@@ -42,10 +48,10 @@
   "scripts": {
     "check": "tsc -p tsconfig.check.json",
     "test": "vitest run",
-    "build": "tsup src/index.ts --format esm --dts --clean --external @acunsoft/datatable-core && node -e \"require('node:fs').copyFileSync('src/styles.css','dist/styles.css')\""
+    "build": "tsup src/index.ts src/internal.ts --format esm --dts --clean --external @acunsoft/datatable-core && node -e \"require('node:fs').copyFileSync('src/styles.css','dist/styles.css')\""
   },
   "dependencies": {
-    "@acunsoft/datatable-core": "0.4.0"
+    "@acunsoft/datatable-core": "0.5.0"
   },
   "devDependencies": {
     "jsdom": "^30.1.3",

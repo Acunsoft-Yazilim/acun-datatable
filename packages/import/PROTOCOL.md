@@ -212,8 +212,10 @@ stopped as a whole (see `message`).
 
 Back ends MAY add fields; the UI ignores what it does not know. URLs
 (`errorReport`, `templateUrl`) are absolute `http(s)` URLs or paths relative
-to `{url}`; the UI refuses any other scheme. Every text is shown as text, never
-as HTML.
+to `{url}`; the UI refuses any other scheme. The client sends its headers (a
+bearer token) and credentials only to the origin of `{url}`: a report on
+another host, such as a signed storage link, is fetched with neither. Every
+text is shown as text, never as HTML.
 
 ## Problems
 
@@ -235,7 +237,7 @@ same shape as the query protocol's errors and as Laravel's validation errors.
 | `413` | The file is larger than the back end takes. |
 | `415` | A file type the back end does not take. |
 | `422` | Anything else wrong with the file or the mapping. |
-| `429` | Too many requests (`Retry-After` is honoured). |
+| `429` | Too many requests: polling waits for `Retry-After` and goes on; an upload is offered again. |
 | `5xx` | The back end failed; the UI offers to try again. |
 
 ## What a back end MUST do
@@ -245,7 +247,8 @@ same shape as the query protocol's errors and as Laravel's validation errors.
 2. Read xlsx as data: never evaluate formulas, macros or external links.
 3. Authorize every request, and bind an import to the user (and tenant) that
    uploaded it; anyone else gets `404`.
-4. Validate the mapping and the mode again on start (see step 2).
+4. Validate the mapping and the mode again on start (see step 2); to update
+   or upsert, the column that finds existing records must be matched too.
 5. Honour `Idempotency-Key` on upload, and refuse a second start (`409`).
 6. Keep uploads private and delete them when the import ends or expires.
 7. Guard the cells of a CSV error report against formulas (a leading `=`, `+`,

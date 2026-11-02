@@ -1,15 +1,19 @@
 import * as Vue from 'vue';
 import {
-  computed, defineComponent, h, nextTick, onMounted, onScopeDispose, onUpdated, shallowRef, watch,
+  computed, defineComponent, h, nextTick, onBeforeMount, onMounted, onScopeDispose, onUpdated, shallowRef, watch,
   type PropType, type SlotsType, type VNode,
 } from 'vue';
-import { COLUMN_WIDTH_LIMITS, getPageItems, type ColumnDef, type DataTable, type Row } from '@acunsoft/datatable-core';
+import type { ColumnDef, DataTable, Row } from '@acunsoft/datatable-core';
 import {
-  cellValue, checkPageSizes, checkResponsive, checkSize, confirmed, filterControls, splitActions, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
-  afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, rangeOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
+  cellValue, checkPageSizes, checkResponsive, checkSize, resolveLabels, filterControls, createCellText, ICONS, labelsEn, knownPageCount, nextSorting, pageInfoText,
+  afterPointerRelease, autoResponsive, cellEditor, checkVirtual, virtualWindow, columnsChanged, columnTools, isEditable, numeric, pageSizeChoices, pinColumns, placeMenu, resetColumns, priorityOf, renderBulkActions, renderFilterChips, renderFilterPanel, renderFilters, renderMenu, rowName, scrollHeight,
   checkFixedColumns, type FilterPanelMode, type ToolbarButton, type ToolbarButtons, type CellEditor, type EditHandler, type FixedColumns, type MenuItem, type RenderedComponent, type ResponsiveMode, type TableSize,
   type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction, type StatusSource,
 } from '@acunsoft/datatable-dom';
+import {
+  actionsCellClass, cellClass, checkActions, clickRowCheckbox, measureRowHeight, closeMenu, closeMenuOnEscape, rowActionsView, selectAllState, togglePageSelection, closeLikeAMenu, closeRowMenusOnOutsideClick, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, priorityLevels,
+  pagingView, resizeHandle, responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, toolbarButtonModel, totalCells, wrapClass,
+} from '@acunsoft/datatable-dom/internal';
 import { useTable } from './composables';
 
 type AnyTable = DataTable<any>;
@@ -22,9 +26,21 @@ type AnyColumn = ColumnDef<any>;
  */
 type LooseAction = RowAction<unknown>;
 
-let tables = 0;
-// Vue 3.5+: ids that match between the server render and hydration; 3.4: a counter.
-const useId: () => string = (Vue as { useId?: () => string }).useId ?? (() => `vue-${++tables}`);
+const counters = new WeakMap<object, number>();
+let outside = 0;
+/*
+ * Vue 3.5+: `useId`. Vue 3.4 has none: a counter per app instead. A server
+ * render makes a new app for each request and hydration creates the
+ * components in the same order, so both count the same; a counter for the
+ * whole process (as before) kept counting across requests and never matched.
+ */
+const useId: () => string = (Vue as { useId?: () => string }).useId ?? (() => {
+  const app = Vue.getCurrentInstance()?.appContext;
+  if (!app) return `vue-${++outside}`;
+  const next = (counters.get(app) ?? 0) + 1;
+  counters.set(app, next);
+  return `vue-${next}`;
+});
 const tableProp = {
   type: Object as PropType<AnyTable>,
   required: true as const,
@@ -70,7 +86,7 @@ export interface DetailSlotProps {
  * custom cells, `empty` for the empty state, `detail` (`{ row }`) for child rows. Slot content is rendered by Vue,
  * so it is escaped unless you inject HTML yourself.
  */
-export const AcunDataTable = defineComponent({
+export const AcunDataTable = /*#__PURE__*/ defineComponent({
   name: 'AcunDataTable',
   props: {
     table: tableProp,
@@ -146,11 +162,15 @@ export const AcunDataTable = defineComponent({
     }));
     const phase = shallowRef<string>(props.status?.getState().status ?? 'idle');
     let stopStatus: (() => void) | undefined;
-    watch(() => props.status, source => {
+    let mounted = false; // onBeforeMount never runs in server rendering: no listener is left behind there
+    const followStatus = (source: StatusSource | undefined): void => {
       stopStatus?.();
+      stopStatus = undefined;
       phase.value = source?.getState().status ?? 'idle';
-      stopStatus = source?.subscribe(state => { phase.value = state.status; });
-    }, { immediate: true });
+      if (mounted) stopStatus = source?.subscribe(state => { phase.value = state.status; });
+    };
+    watch(() => props.status, followStatus);
+    onBeforeMount(() => { mounted = true; followStatus(props.status); });
     onScopeDispose(() => stopStatus?.());
     const uid = `adt-${useId()}`;
     let anchor: string | undefined;
@@ -160,19 +180,9 @@ export const AcunDataTable = defineComponent({
     const dialog = shallowRef<HTMLDialogElement | null>(null);
     const openDialog = (id: string): void => {
       dialogRow.value = id;
-      void nextTick(() => {
-        const node = dialog.value;
-        if (node && !node.open) {
-          if (typeof node.showModal === 'function') node.showModal();
-          else node.setAttribute('open', '');
-        }
-      });
+      void nextTick(() => showDialog(dialog.value));
     };
-    const closeDialog = (): void => {
-      const node = dialog.value;
-      if (node?.open && typeof node.close === 'function') node.close();
-      else node?.removeAttribute('open');
-    };
+    const closeDialog = (): void => hideDialog(dialog.value);
     const onDialogClose = (): void => {
       const id = dialogRow.value;
       dialogRow.value = undefined;
@@ -180,14 +190,9 @@ export const AcunDataTable = defineComponent({
       const buttons = dialog.value?.closest('.adt-table-wrap')?.querySelectorAll<HTMLElement>('.adt-expand') ?? [];
       [...buttons].find(button => button.dataset['row'] === id)?.focus();
     };
-    // One listener closes any open row "⋮" menu on a click outside it.
     const wrapEl = shallowRef<HTMLElement | null>(null);
-    const closeMenus = (event: Event): void => {
-      wrapEl.value?.querySelectorAll<HTMLDetailsElement>('.adt-row-menu[open]').forEach(menu => {
-        if (!event.composedPath().includes(menu)) menu.open = false;
-      });
-    };
-    onMounted(() => document.addEventListener('click', closeMenus));
+    let stopMenus: (() => void) | undefined;
+    onMounted(() => { stopMenus = closeRowMenusOnOutsideClick(document, () => wrapEl.value); });
     // Fixed columns: sticky offsets measured after every render.
     let unpin: (() => void) | undefined;
     watch([wrapEl, () => props.fixedColumns?.start, () => props.fixedColumns?.end], ([node]) => {
@@ -221,11 +226,11 @@ export const AcunDataTable = defineComponent({
     // window of rows sizes the columns anew); measured again when the columns or the width change.
     const locked = shallowRef<{ key: string; width: number; widths: Readonly<Record<string, number>> } | undefined>();
     let lockKey = '';
-    let frame = 0;
+    const frames = frameThrottle(globalThis);
+    onScopeDispose(() => frames.cancel()); // a scroll just before unmounting: no update after
     const onScroll = (event: Event): void => {
       const node = event.currentTarget as HTMLElement;
-      if (frame) return;
-      frame = requestAnimationFrame(() => { frame = 0; scrollTop.value = node.scrollTop; viewport.value = node.clientHeight || viewport.value; });
+      frames.schedule(() => { scrollTop.value = node.scrollTop; viewport.value = node.clientHeight || viewport.value; });
     };
     // The viewport is measured once mounted and follows resizes where ResizeObserver exists.
     let stopViewport: (() => void) | undefined;
@@ -249,8 +254,7 @@ export const AcunDataTable = defineComponent({
     // Without rowHeight: the first drawn row is measured once, on mount or the first render with rows.
     const measureRow = (): void => {
       if (!props.virtual || measuredRow.value) return;
-      const row = wrapEl.value?.querySelector<HTMLElement>('tbody .adt-row');
-      const height = row?.getBoundingClientRect().height ?? 0;
+      const height = measureRowHeight(wrapEl.value);
       if (height > 0) measuredRow.value = height;
     };
     onMounted(measureRow);
@@ -306,7 +310,7 @@ export const AcunDataTable = defineComponent({
     };
     onUpdated(mountEditor);
     onScopeDispose(closeEditor);
-    onScopeDispose(() => { if (typeof document !== 'undefined') document.removeEventListener('click', closeMenus); });
+    onScopeDispose(() => stopMenus?.());
     // Close the dialog when its row leaves the page (scrolled virtually: the matching rows).
     watch(() => binding.page.value, page => {
       const rows = props.virtual ? props.table.getFilteredRows() : page.rows;
@@ -316,9 +320,8 @@ export const AcunDataTable = defineComponent({
     return (): VNode => {
       const { table } = props;
       const responsive = responsiveMode.value;
-      const collapsible = responsive === 'collapse' || responsive === 'modal' || responsive === 'auto';
       const detailSlot = slots.detail as ((props: DetailSlotProps) => VNode[]) | undefined; // absent unless given
-      const expandable = collapsible || detailSlot !== undefined;
+      const { collapsible, inlineDetails, expandable } = responsiveFlags(responsive, detailSlot !== undefined);
       const state = binding.state.value;
       const page = binding.page.value;
       const columns = binding.visibleColumns.value;
@@ -329,97 +332,74 @@ export const AcunDataTable = defineComponent({
       const rows = all && view ? all.slice(view.start, view.end) : page.rows;
       // With virtual scrolling "all" is every matching row, not only those drawn.
       const pageIds = (all ?? page.rows).map(row => row.id);
-      const actions = props.rowActions as readonly LooseAction[];
+      // Checked as the DOM renderer and React do: a wrong value is an error, not a warning.
+      const actions = checkActions<LooseAction>(props.rowActions, 'rowActions', ['hidden', 'disabled']);
+      const size = checkSize(props.size);
+      checkFixedColumns(props.fixedColumns);
       const rowLabel = props.rowLabel as ((row: AnyRow) => string) | undefined;
       const label = labels.value;
 
       const head: VNode[] = [];
-      const levels = new Set(columns.map((column, index) => priorityOf(column, index)));
-      if (actions.length > 0) levels.add(2);
-      const level = (column: AnyColumn): string => (collapsible ? ` adt-col--p${priorityOf(column, columns.indexOf(column))}` : '');
-      lockKey = virtual ? `${columns.map(column => column.id).join('|')}#${props.selectable}#${actions.length > 0}#${expandable}` : '';
+      const levels = priorityLevels(columns, actions.length > 0);
+      lockKey = virtual ? layoutKey(columns, props.selectable, actions.length > 0, expandable) : '';
       const lock = virtual && locked.value?.key === lockKey ? locked.value.widths : undefined;
       const lockedWidth = (key: string): Record<string, string> | undefined => (lock?.[key] ? { width: `${lock[key]}px` } : undefined);
-      if (expandable) head.push(h('td', { class: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }));
+      if (expandable) head.push(h('td', { class: 'adt-expand-cell', key: '__expand', 'data-lock': '__expand', style: lockedWidth('__expand') }, [h('span', { class: 'adt-sr-only' }, label.detailsColumn)]));
       if (props.selectable) {
-        const status = table.getSelectionStatus(pageIds);
+        const selection = selectAllState(table, pageIds);
         head.push(h('th', { scope: 'col', class: 'adt-select', key: '__select', 'data-lock': '__select', style: lockedWidth('__select') },
-          table.getSelectionMode() === 'multiple' && pageIds.length > 0
+          selection.show
             ? [h('label', { class: 'adt-select-all' }, [h('input', {
-              type: 'checkbox', 'aria-label': label.selectAll, checked: status === 'all', indeterminate: status === 'some',
-              onChange: () => (table.getSelectionStatus(pageIds) === 'all'
-                ? table.setSelectedRows(table.getState().selectedIds.filter(id => !pageIds.includes(id)))
-                : table.selectRows(pageIds)),
-            }), h('span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, label.selectAll)])]
+              type: 'checkbox', 'aria-label': all ? label.selectAllRows : label.selectAll, checked: selection.checked, indeterminate: selection.indeterminate,
+              onChange: () => togglePageSelection(table, pageIds),
+            }), h('span', { class: 'adt-select-all-text', 'aria-hidden': 'true' }, all ? label.selectAllRows : label.selectAll)])]
             : []));
       }
-      const primary = state.sorting[0];
+      const fixedLayout = Object.keys(state.columnWidths).length > 0 || lock !== undefined;
       for (const column of columns) {
-        const index = state.sorting.findIndex(rule => rule.field === column.id);
-        const rule = state.sorting[index];
+        const sort = column.enableSorting ? sortView(column.id, state.sorting) : undefined;
         const width = state.columnWidths[column.id];
         head.push(h('th', {
-          scope: 'col', class: `adt-th${level(column)}${numeric(column) ? ' adt-num' : ''}`, key: column.id,
-          'aria-sort': primary?.field === column.id ? (primary.direction === 'asc' ? 'ascending' : 'descending') : undefined,
+          scope: 'col', class: headerClass(column, columns.indexOf(column), collapsible, width === undefined && fixedLayout), key: column.id,
+          'aria-sort': sort?.ariaSort,
           'data-column-id': column.id, draggable: props.reorderableColumns ? 'true' : undefined,
           'data-lock': column.id,
           style: width !== undefined ? { width: `${width}px` } : lockedWidth(column.id),
         }, [
-          column.enableSorting
+          sort
             ? h('button', {
-              type: 'button', class: rule ? `adt-sort adt-sort--${rule.direction}` : 'adt-sort',
+              type: 'button', class: sort.className,
               onClick: (event: MouseEvent) => table.setSorting(nextSorting(table.getState().sorting, column.id, event.shiftKey && props.multiSort)),
-            }, [column.header, h('span', { class: 'adt-sort-mark', 'aria-hidden': 'true' },
-              rule ? `${rule.direction === 'asc' ? '▲' : '▼'}${state.sorting.length > 1 ? index + 1 : ''}` : '')])
+            }, [column.header, h('span', { class: 'adt-sort-mark', 'aria-hidden': 'true' }, sort.mark),
+              sort.order ? h('span', { class: 'adt-sr-only' }, label.sortOrder(sort.order.position, sort.order.direction)) : null])
             : column.header,
-          props.resizableColumns
-            ? h('span', {
-              class: 'adt-resize', role: 'separator', 'aria-orientation': 'vertical', tabindex: 0,
-              'aria-label': label.resizeColumn(column.header), 'data-column-id': column.id,
-              'aria-valuemin': COLUMN_WIDTH_LIMITS.min, 'aria-valuemax': COLUMN_WIDTH_LIMITS.max, 'aria-valuenow': width,
-            })
-            : null,
+          props.resizableColumns ? h('span', { ...resizeHandle(column.id, label.resizeColumn(column.header), width), tabindex: 0 }) : null,
         ]));
       }
       if (actions.length > 0) {
         head.push(h('th', { scope: 'col', class: `adt-th adt-actions${collapsible ? ' adt-col--p2' : ''}`, key: '__actions', 'data-lock': '__actions', style: lockedWidth('__actions') }, label.actions));
       }
-      const span = columns.length + (props.selectable ? 1 : 0) + (actions.length > 0 ? 1 : 0) + (expandable ? 1 : 0);
+      const span = columnSpan(columns.length, { selectable: props.selectable, actions: actions.length > 0, expandable });
       // Buttons in the row, the rest in a "⋮" menu; icons, danger colour and a confirm question.
       const actionButtons = (row: AnyRow, name: string, maxInline = props.maxInlineActions): VNode[] => {
-        const { inline, menu } = splitActions(actions, row, maxInline);
-        const run = (action: LooseAction, disabled: boolean): void => { if (!disabled && confirmed(action, row)) action.onSelect(row); };
-        const buttons: VNode[] = inline.map(action => {
-          const disabled = action.disabled?.(row) === true;
-          const iconOnly = action.iconOnly === true && action.icon !== undefined;
-          return h('button', {
-            type: 'button', key: action.id, 'data-action': action.id,
-            class: ['adt-action', iconOnly ? 'adt-action--icon' : '', action.danger ? 'adt-action--danger' : ''].filter(Boolean).join(' '),
-            'aria-label': label.rowAction(action.label, name), title: iconOnly ? action.label : undefined,
-            'aria-disabled': disabled ? 'true' : undefined, onClick: () => run(action, disabled),
-          }, [action.icon ? iconNode(action.icon) : null, iconOnly ? null : h('span', action.label)]);
-        });
-        if (menu.length > 0) {
+        const { inline, menu } = rowActionsView(actions, row, name, label, maxInline);
+        const buttons: VNode[] = inline.map(view => h('button', {
+          type: 'button', key: view.action.id, 'data-action': view.action.id, class: view.className,
+          'aria-label': view.ariaLabel, title: view.title, 'aria-disabled': view.disabled ? 'true' : undefined, onClick: view.run,
+        }, [view.icon ? iconNode(view.icon) : null, view.text === undefined ? null : h('span', view.text)]));
+        if (menu) {
           buttons.push(h('details', {
-            class: 'adt-row-menu', key: '__menu', onToggle: (event: Event) => placeMenu(event.currentTarget as HTMLDetailsElement),
-            onKeydown: (event: KeyboardEvent) => {
-              const details = event.currentTarget as HTMLDetailsElement;
-              if (event.key === 'Escape' && details.open) { details.open = false; details.querySelector('summary')?.focus(); }
-            },
+            class: 'adt-row-menu', key: '__menu', onToggle: (event: Event) => placeMenu(event.currentTarget as HTMLDetailsElement), onKeydown: closeMenuOnEscape,
           }, [
-            h('summary', { class: 'adt-action adt-action--icon', 'aria-label': label.moreActions(name), title: label.moreActions(name) }, [iconNode('more')]),
-            h('div', { class: 'adt-menu-list' }, menu.map(action => {
-              const disabled = action.disabled?.(row) === true;
-              return h('button', {
-                type: 'button', key: action.id, 'data-action': action.id, class: action.danger ? 'adt-menu-item adt-menu-item--danger' : 'adt-menu-item',
-                'aria-label': label.rowAction(action.label, name), 'aria-disabled': disabled ? 'true' : undefined,
-                onClick: (event: MouseEvent) => {
-                  const details = (event.currentTarget as HTMLElement).closest('details');
-                  if (details) details.open = false;
-                  run(action, disabled);
-                },
-              }, [action.icon ? iconNode(action.icon) : null, h('span', action.label)]);
-            })),
+            h('summary', { class: 'adt-action adt-action--icon', 'aria-label': menu.label, title: menu.label }, [iconNode('more')]),
+            h('div', { class: 'adt-menu-list' }, menu.items.map(view => h('button', {
+              type: 'button', key: view.action.id, 'data-action': view.action.id, class: view.className,
+              'aria-label': view.ariaLabel, 'aria-disabled': view.disabled ? 'true' : undefined,
+              onClick: (event: MouseEvent) => {
+                closeMenu((event.currentTarget as HTMLElement).closest('details'));
+                view.run();
+              },
+            }, [view.icon ? iconNode(view.icon) : null, h('span', view.text)]))),
           ]));
         }
         return buttons;
@@ -446,17 +426,17 @@ export const AcunDataTable = defineComponent({
 
       const body: VNode[] = [];
       // Placeholder rows while the first rows of a remote table load.
-      const skeleton = props.skeleton && props.status !== undefined && phase.value === 'loading' && page.rows.length === 0;
+      const skeleton = showSkeleton(props.skeleton, props.status !== undefined, phase.value, page.rows.length);
       if (skeleton) {
-        for (let index = 0; index < Math.min(state.pageSize, SKELETON_ROWS); index++) {
+        for (let index = 0; index < skeletonRows(state.pageSize); index++) {
           body.push(h('tr', { class: 'adt-row adt-skeleton-row', key: `__skeleton${index}` }, [
             expandable ? h('td', { class: 'adt-expand-cell' }) : null,
             props.selectable ? h('td', { class: 'adt-select' }) : null,
             ...columns.map((column, columnIndex) => h('td', {
               'data-label': column.header, key: column.id,
-              class: [collapsible ? `adt-col--p${priorityOf(column, columnIndex)}` : '', numeric(column) ? 'adt-num' : ''].filter(Boolean).join(' ') || undefined,
+              class: cellClass(column, columnIndex, collapsible) || undefined,
             }, [h('span', { class: 'adt-skeleton' })])),
-            actions.length > 0 ? h('td', { class: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions' }) : null,
+            actions.length > 0 ? h('td', { class: actionsCellClass(collapsible) }) : null,
           ]));
         }
       } else if (rows.length === 0) {
@@ -499,15 +479,7 @@ export const AcunDataTable = defineComponent({
             type: 'checkbox', 'aria-label': label.selectRow(name), checked: selected,
             // Shift+click selects (or clears) every row between the last clicked one and this one.
             onClick: (event: MouseEvent) => {
-              const from = anchor;
-              anchor = row.id;
-              if (event.shiftKey && from !== undefined && from !== row.id && table.getSelectionMode() === 'multiple') {
-                const ids = rangeOf(pageIds, from, row.id);
-                if ((event.currentTarget as HTMLInputElement).checked) table.selectRows(ids);
-                else table.setSelectedRows(table.getState().selectedIds.filter(id => !ids.includes(id)));
-              } else {
-                table.toggleRow(row.id);
-              }
+              anchor = clickRowCheckbox(table, pageIds, anchor, row.id, event.shiftKey, (event.currentTarget as HTMLInputElement).checked);
             },
           })]));
         }
@@ -517,8 +489,7 @@ export const AcunDataTable = defineComponent({
           const start = (): void => { editing.value = { rowId: row.id, columnId: column.id }; };
           cells.push(h('td', {
             'data-label': column.header, key: column.id,
-            class: [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', numeric(column) ? 'adt-num' : '',
-              editable ? 'adt-editable' : '', isEditing ? 'adt-editing' : ''].filter(Boolean).join(' ') || undefined,
+            class: cellClass(column, index, collapsible, editable, isEditing) || undefined,
             'data-adt-edit-host': isEditing ? '' : undefined,
             onDblclick: editable && !isEditing
               ? (event: MouseEvent) => { if (!(event.target as Element).closest('a, button, input, select')) start(); }
@@ -535,7 +506,7 @@ export const AcunDataTable = defineComponent({
         });
         if (actions.length > 0) {
           cells.push(h('td', {
-            class: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions', 'data-label': label.actions, key: '__actions',
+            class: actionsCellClass(collapsible), 'data-label': label.actions, key: '__actions',
           }, actionButtons(row, name)));
         }
         const rowClass = ['adt-row', selected ? 'adt-row--selected' : '', open ? 'adt-row--expanded' : ''].filter(Boolean).join(' ');
@@ -543,7 +514,7 @@ export const AcunDataTable = defineComponent({
         if (open) {
           body.push(h('tr', { class: 'adt-detail', id: detailId, key: `${row.id}__detail` }, [
             h('td', { colspan: span }, [
-              responsive === 'collapse' || responsive === 'auto' ? detailList(row, texts, name, false) : null,
+              inlineDetails ? detailList(row, texts, name, false) : null,
               detailSlot ? h('div', { class: 'adt-detail-content' }, detailSlot({ row })) : null,
             ]),
           ]));
@@ -558,36 +529,31 @@ export const AcunDataTable = defineComponent({
           ? h('div', { class: 'adt-notice', role: 'alert' }, [
             h('span', { class: 'adt-notice-text' }, label.error),
             typeof props.status?.retry === 'function'
-              ? h('button', { type: 'button', class: 'adt-retry', onClick: () => { void props.status!.retry!(); } }, label.retry)
+              ? h('button', { type: 'button', class: 'adt-retry', onClick: () => { Promise.resolve(props.status!.retry!()).catch(() => undefined); } }, label.retry)
               : null,
           ])
           : h('div', { class: 'adt-notice', role: 'status', 'aria-live': 'polite' });
       const height = scrollHeight(props.scrollY) ?? (virtual ? '480px' : undefined);
-      const wrapClass = ['adt-table-wrap', `adt-responsive--${responsive}`, props.size === 'md' ? '' : `adt-size--${props.size}`,
-        props.stickyHeader ? 'adt-sticky-header' : '', height ? 'adt-scroll-y' : '', busy ? 'adt-loading' : '', skeleton ? 'adt-skeleton-on' : '', virtual ? 'adt-virtual' : ''].filter(Boolean).join(' ');
-      const tableClass = ['adt-table', collapsible && levels.has(2) ? 'adt-has-p2' : '', collapsible && levels.has(3) ? 'adt-has-p3' : '', detailSlot ? 'adt-has-detail' : '',
-        Object.keys(state.columnWidths).length > 0 || lock ? 'adt-fixed-layout' : '', Object.keys(state.columnWidths).length > 0 ? 'adt-user-widths' : '']
-        .filter(Boolean).join(' ');
-      return h('div', { ref: wrapEl, class: wrapClass, style: height ? { '--adt-scroll-y': height } : undefined, 'aria-busy': props.status ? String(busy) : undefined }, [
+      const wrapClassName = wrapClass({ responsive, size, stickyHeader: props.stickyHeader, scrollY: height !== undefined, loading: busy, skeleton, virtual: virtual !== undefined });
+      const tableClassName = tableClass({ collapsible, levels, detail: detailSlot !== undefined, userWidths: Object.keys(state.columnWidths).length > 0, locked: lock !== undefined });
+      return h('div', { ref: wrapEl, class: wrapClassName, style: height ? { '--adt-scroll-y': height } : undefined }, [
         notice,
-        h('div', { class: 'adt-scroll', onScroll: virtual ? onScroll : undefined }, [h('table', { class: tableClass, 'aria-rowcount': all ? all.length + 1 : undefined }, [
+        // aria-busy on the rows' box, not around the notice (a busy region's changes may be held back).
+        h('div', { class: 'adt-scroll', onScroll: virtual ? onScroll : undefined, 'aria-busy': props.status ? String(busy) : undefined }, [h('table', { class: tableClassName, 'aria-rowcount': all ? all.length + 1 + (columns.some(column => column.aggregate !== undefined) ? 1 : 0) : undefined }, [
           props.caption !== undefined ? h('caption', props.caption) : null,
           h('thead', [h('tr', head)]),
           h('tbody', skeleton ? { 'aria-hidden': 'true' } : null, body),
           // Footer totals of the columns with `aggregate` (every matching row).
           columns.some(column => column.aggregate !== undefined) ? h('tfoot', [h('tr', { class: 'adt-total' }, (() => {
-            const totals = table.getAggregates();
             const cells: VNode[] = [];
             if (expandable) cells.push(h('td', { class: 'adt-expand-cell' }));
             if (props.selectable) cells.push(h('td', { class: 'adt-select' }));
-            columns.forEach((column, index) => {
-              const result = totals[column.id];
-              const cellClass = [collapsible ? `adt-col--p${priorityOf(column, index)}` : '', result ? 'adt-num' : ''].filter(Boolean).join(' ') || undefined;
-              cells.push(index === 0 && !result
-                ? h('th', { scope: 'row', class: cellClass, 'data-label': column.header, key: column.id }, label.totals)
-                : h('td', { class: cellClass, key: column.id, 'data-label': result ? `${column.header} · ${label.aggregate(result.aggregate)}` : column.header, title: result ? label.aggregate(result.aggregate) : undefined }, text.value.total(column, result)));
-            });
-            if (actions.length > 0) cells.push(h('td', { class: collapsible ? 'adt-actions adt-col--p2' : 'adt-actions' }));
+            for (const cell of totalCells(columns, table.getAggregates(), collapsible, label, (column, result) => text.value.total(column, result))) {
+              cells.push(h(cell.header ? 'th' : 'td', {
+                scope: cell.header ? 'row' : undefined, class: cell.className || undefined, 'data-label': cell.label, title: cell.title, key: cell.columnId,
+              }, cell.text));
+            }
+            if (actions.length > 0) cells.push(h('td', { class: actionsCellClass(collapsible) }));
             return cells;
           })())]) : null,
         ])]),
@@ -603,15 +569,12 @@ export const AcunDataTable = defineComponent({
 });
 
 /** Placeholder rows while the first rows load: as many as a page, at most this many. */
-const SKELETON_ROWS = 10;
 
 /** A toolbar button's summary, as `fillButton` builds it in the DOM. */
 function toolbarSummary(custom: ToolbarButton | undefined, label: string, fallback: keyof typeof ICONS): VNode {
-  const text = custom?.label ?? label;
-  const chosen = custom?.icon ?? fallback;
-  const className = [custom?.iconOnly ? 'adt-icon-only' : '', custom?.className ?? ''].filter(Boolean).join(' ');
-  return h('summary', { ...(className ? { class: className } : {}), ...(custom?.iconOnly ? { title: text } : {}) },
-    [...(chosen === false ? [] : [iconNode(chosen)]), h('span', { class: 'adt-summary-text' }, text)]);
+  const model = toolbarButtonModel(custom, { label, icon: fallback });
+  return h('summary', { ...(model.className ? { class: model.className } : {}), ...(model.title !== undefined ? { title: model.title } : {}) },
+    [...(model.icon === false ? [] : [iconNode(model.icon)]), h('span', { class: 'adt-summary-text' }, model.label)]);
 }
 
 const iconNode = (name: keyof typeof ICONS | { readonly path: string }): VNode => h('svg', {
@@ -624,7 +587,7 @@ const iconNode = (name: keyof typeof ICONS | { readonly path: string }): VNode =
  * there are more pages than fit. With an unknown server total it numbers the
  * pages seen so far and keeps "next" while the page is full.
  */
-export const AcunPagination = defineComponent({
+export const AcunPagination = /*#__PURE__*/ defineComponent({
   name: 'AcunPagination',
   props: {
     table: tableProp,
@@ -641,16 +604,14 @@ export const AcunPagination = defineComponent({
     const numbers = computed(() => new Intl.NumberFormat(props.locale));
     return (): VNode => {
       const label = withLabels(props.labels);
-      const page = binding.page.value;
-      const known = binding.totalRows.value !== undefined;
+      void binding.page.value; // follow the table
       const { table } = props;
-      const atStart = page.page <= 1;
-      const atEnd = page.page >= page.pageCount;
+      const page = pagingView(table, knownPageCount(table), { siblings: props.siblings, boundaries: props.boundaries });
+      const { known, items, atStart, atEnd } = page;
       const arrow = (name: 'first' | 'previous' | 'next' | 'last', disabled: boolean, target: number): VNode => h('button', {
         type: 'button', class: `adt-page adt-page-arrow adt-${name}`, 'aria-label': label[name],
         'aria-disabled': disabled ? 'true' : undefined, onClick: () => { if (!disabled) table.setPage(target); },
       }, [iconNode(name)]);
-      const items = getPageItems(page.page, knownPageCount(props.table), { siblings: props.siblings, boundaries: props.boundaries });
       return h('nav', { class: 'adt-paging', 'aria-label': label.pagination }, [
         props.firstLast ? arrow('first', atStart, 1) : null,
         arrow('previous', atStart, page.page - 1),
@@ -668,7 +629,7 @@ export const AcunPagination = defineComponent({
 });
 
 /** A rows-per-page select with a visually hidden label. */
-export const AcunPageSize = defineComponent({
+export const AcunPageSize = /*#__PURE__*/ defineComponent({
   name: 'AcunPageSize',
   props: {
     table: tableProp,
@@ -693,7 +654,7 @@ export const AcunPageSize = defineComponent({
 });
 
 /** The visible range and the total, `1–25 of 5,000 rows`, as a polite live region. */
-export const AcunPageInfo = defineComponent({
+export const AcunPageInfo = /*#__PURE__*/ defineComponent({
   name: 'AcunPageInfo',
   props: {
     table: tableProp, labels: labelsProp,
@@ -710,7 +671,7 @@ export const AcunPageInfo = defineComponent({
 });
 
 /** A search input with an icon and a visually hidden label, bound to the global search; debounced, Enter applies at once. */
-export const AcunSearch = defineComponent({
+export const AcunSearch = /*#__PURE__*/ defineComponent({
   name: 'AcunSearch',
   props: {
     table: tableProp,
@@ -750,7 +711,7 @@ export const AcunSearch = defineComponent({
 });
 
 /** A "Columns" menu (`<details>`) with a labelled checkbox per column. */
-export const AcunColumnToggle = defineComponent({
+export const AcunColumnToggle = /*#__PURE__*/ defineComponent({
   name: 'AcunColumnToggle',
   props: {
     table: tableProp, labels: labelsProp,
@@ -761,13 +722,18 @@ export const AcunColumnToggle = defineComponent({
   },
   setup(props) {
     const binding = useTable(() => props.table);
+    const menu = shallowRef<HTMLDetailsElement | null>(null);
+    let stopMenu: (() => void) | undefined;
+    onMounted(() => { if (menu.value) stopMenu = closeLikeAMenu(menu.value); }); // Escape and a click outside close it
+    onScopeDispose(() => stopMenu?.());
+    const focusSummary = (): void => menu.value?.querySelector<HTMLElement>(':scope > summary')?.focus();
     return (): VNode => {
       const label = withLabels(props.labels);
       const { hiddenColumns: hidden, columnOrder } = binding.state.value;
       const columns = props.table.getColumns();
       const byId = new Map(columns.map(column => [column.id, column]));
       const lastVisible = columns.length - hidden.length === 1;
-      return h('details', { class: 'adt-columns', onToggle: (event: Event) => placeMenu(event.currentTarget as HTMLDetailsElement) }, [
+      return h('details', { class: 'adt-columns', ref: menu, onToggle: (event: Event) => placeMenu(event.currentTarget as HTMLDetailsElement) }, [
         toolbarSummary(props.button, label.columns, 'columns'),
         h('fieldset', [h('legend', label.showColumns), ...columnOrder.map((id, index) => {
           const column = byId.get(id)!;
@@ -792,7 +758,7 @@ export const AcunColumnToggle = defineComponent({
           };
           return h('div', { class: 'adt-column-item', key: id }, [checkbox, move('up'), move('down')]);
         }), columnsChanged(props.table)
-          ? h('button', { type: 'button', class: 'adt-columns-reset', onClick: () => resetColumns(props.table) }, label.resetColumns)
+          ? h('button', { type: 'button', class: 'adt-columns-reset', onClick: () => { resetColumns(props.table); focusSummary(); } }, label.resetColumns)
           : null]),
       ]);
     };
@@ -803,7 +769,7 @@ export const AcunColumnToggle = defineComponent({
  * A bar for actions on the selected rows (see `renderBulkActions`): "N
  * selected", the actions, "Select all N matching" and "Clear selection".
  */
-export const AcunBulkActions = defineComponent({
+export const AcunBulkActions = /*#__PURE__*/ defineComponent({
   name: 'AcunBulkActions',
   props: {
     table: tableProp,
@@ -850,7 +816,7 @@ function domControl(name: string, render: (el: HTMLElement, props: { table: AnyT
  * The "Filters" button: a control per column with `filter`, under the button
  * (default), in a drawer or a modal (`panel`; see `renderFilters`).
  */
-export const AcunFilters = defineComponent({
+export const AcunFilters = /*#__PURE__*/ defineComponent({
   name: 'AcunFilters',
   props: {
     table: tableProp, labels: labelsProp, locale: { type: String, default: 'en' },
@@ -877,12 +843,12 @@ export const AcunFilters = defineComponent({
   },
 });
 /** Only the filter fields and "Clear filters", for your own drawer, modal or sidebar (see `renderFilterPanel`). */
-export const AcunFilterPanel = domControl('AcunFilterPanel', (el, props) => renderFilterPanel(el, props.table, props));
+export const AcunFilterPanel = /*#__PURE__*/ domControl('AcunFilterPanel', (el, props) => renderFilterPanel(el, props.table, props));
 /** The active filters as removable chips (see `renderFilterChips`). */
-export const AcunFilterChips = domControl('AcunFilterChips', (el, props) => renderFilterChips(el, props.table, props));
+export const AcunFilterChips = /*#__PURE__*/ domControl('AcunFilterChips', (el, props) => renderFilterChips(el, props.table, props));
 
 /** A tools menu (export, copy, print, your own actions) with `items` (see `renderMenu`). */
-export const AcunTools = defineComponent({
+export const AcunTools = /*#__PURE__*/ defineComponent({
   name: 'AcunTools',
   props: {
     items: { type: Array as PropType<readonly MenuItem[]>, required: true },
@@ -915,7 +881,7 @@ export const AcunTools = defineComponent({
  * responsive, stickyHeader, …), and so do its cell slots. Slots `top-start`,
  * `top-end`, `bottom-start` and `bottom-end` add your own controls.
  */
-export const AcunDataTableLayout = defineComponent({
+export const AcunDataTableLayout = /*#__PURE__*/ defineComponent({
   name: 'AcunDataTableLayout',
   inheritAttrs: false,
   props: {
@@ -946,7 +912,9 @@ export const AcunDataTableLayout = defineComponent({
   },
   setup(props, { attrs, slots }) {
     return (): VNode => {
-      const common = { table: props.table, labels: props.labels };
+      // The texts of `locale` (tr, de, fr, es), with `labels` over them, as renderDataTable does.
+      const labels = resolveLabels(props.locale, props.labels);
+      const common = { table: props.table, labels };
       const hasFilters = props.filters && filterControls(props.table.getColumns()).length > 0;
       const tableSlots = Object.fromEntries(Object.entries(slots).filter(([name]) => name === 'cell' || name === 'empty' || name === 'detail' || name.startsWith('cell-')));
       const bar = (position: 'top' | 'bottom', start: (VNode | null | VNode[] | undefined)[], end: (VNode | null | VNode[] | undefined)[]): VNode =>
@@ -960,7 +928,7 @@ export const AcunDataTableLayout = defineComponent({
           slots['top-end']?.(),
           hasFilters ? h(AcunFilters, { ...common, locale: props.locale, panel: props.filterPanel, ...(props.toolbarButtons.filters ? { button: props.toolbarButtons.filters } : {}) }) : null,
           props.columnToggle ? h(AcunColumnToggle, { ...common, reorderable: props.reorderableColumns, ...(props.toolbarButtons.columns ? { button: props.toolbarButtons.columns } : {}) }) : null,
-          props.tools.length > 0 ? h(AcunTools, { items: props.tools, labels: props.labels, ...(props.toolbarButtons.tools ? { button: props.toolbarButtons.tools } : {}) }) : null,
+          props.tools.length > 0 ? h(AcunTools, { items: props.tools, labels, ...(props.toolbarButtons.tools ? { button: props.toolbarButtons.tools } : {}) }) : null,
         ]),
         hasFilters ? h(AcunFilterChips, { ...common, locale: props.locale }) : null,
         // The selection bar (count, "select all N matching", clear, bulk actions) with any selectable table.

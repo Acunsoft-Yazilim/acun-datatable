@@ -1,0 +1,19 @@
+{
+  "name": "acun-datatable-next-test-app",
+  "private": true,
+  "description": "Next.js (App Router) test app for the React package: server rendering and hydration (e2e/ssr.spec.ts).",
+  "scripts": {
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 --port 4174"
+  },
+  "dependencies": {
+    "@acunsoft/datatable-core": "file:../../../packages/core",
+    "@acunsoft/datatable-dom": "file:../../../packages/renderer-dom",
+    "@acunsoft/datatable-http": "file:../../../packages/datasource-http",
+    "@acunsoft/datatable-react": "file:../../../packages/react",
+    "@acunsoft/datatable-server": "file:../../../packages/server",
+    "next": "16.4.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

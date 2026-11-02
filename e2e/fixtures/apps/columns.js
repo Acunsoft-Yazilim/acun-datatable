@@ -15,7 +15,7 @@ export function ordersTable() {
       { id: 'paid', header: 'Paid', accessorKey: 'paid', type: 'boolean', enableFiltering: true, filter: true },
     ],
   });
-  const runner = createQueryRunner(createHttpDataSource({ url, ...(cursor ? { paging: 'cursor' } : {}) }));
+  const runner = createQueryRunner(createHttpDataSource({ url }));
   window.__table = table;
   return { table, runner, connect: () => connectTable(table, runner) };
 }
@@ -35,3 +35,9 @@ export function peopleTable() {
   window.__table = table;
   return table;
 }
+
+/** ?menu: four row actions, three of them in each row's "⋮" menu. */
+export const rowMenu = new URLSearchParams(location.search).has('menu') ? {
+  rowActions: ['Edit', 'Copy', 'Archive', 'Delete'].map(label => ({ id: label.toLowerCase(), label, onSelect: row => { window.__edited = `${label}:${row.id}`; } })),
+  maxInlineActions: 1,
+} : {};

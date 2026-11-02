@@ -68,6 +68,21 @@ describe('the import client against the in-memory back end', () => {
     expect(nextPoll({}, 61_000)).toBe(5_000);
   });
 
+  it('goes on polling after a 429 or 503, waiting the Retry-After the back end gives', async () => {
+    let polls = 0;
+    const waits: number[] = [];
+    const answer = (status: number, body: unknown, headers: Record<string, string> = {}) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
+    const state = (status: string) => ({ protocol: 'acun-import/1', id: 'imp_1', status, file: { name: 'a.csv', rows: 1 }, processed: 0, total: 1, inserted: 0, updated: 0, skipped: 0, failed: 0, errors: [], errorsTruncated: false, errorReport: null, cancellable: status !== 'done', expiresAt: '2030-01-01T00:00:00Z' });
+    const imports = createImportClient({
+      url: URL_BASE, delay: async ms => { waits.push(ms); },
+      fetch: async () => [answer(200, state('running')), answer(429, { message: 'Slow down.' }, { 'Retry-After': '3' }), answer(503, { message: 'Busy.' }), answer(200, state('done'))][polls++]!,
+    });
+    expect(await imports.wait('imp_1')).toMatchObject({ status: 'done' });
+    expect(waits).toEqual([1_000, 3_000, 1_000]); // poll, then Retry-After: 3, then (a 503 without one) the usual wait
+    const refused = createImportClient({ url: URL_BASE, delay: async () => undefined, fetch: async () => answer(polls++ === 4 ? 200 : 403, polls === 5 ? state('running') : { message: 'No.' }) });
+    await expect(refused.wait('imp_1')).rejects.toMatchObject({ status: 403 }); // anything else still ends it
+  });
+
   it('downloads the error report with the client headers (a bearer token), only over http(s)', async () => {
     const server = backend();
     const seen: Headers[] = [];
@@ -81,6 +96,21 @@ describe('the import client against the in-memory back end', () => {
     expect(await report.text()).toContain('line,column,value,message');
     expect(seen.at(-1)!.get('authorization')).toBe('Bearer t0k3n');
     await expect(imports.file('javascript:alert(1)')).rejects.toThrow('Not an http(s) URL.');
+  });
+
+  it('keeps its headers and credentials for its own origin: a report on another host gets neither', async () => {
+    const calls: { url: string; headers: Headers; credentials: RequestCredentials | undefined }[] = [];
+    const imports = createImportClient({
+      url: 'https://app.example/import', headers: { Authorization: 'Bearer t0k3n' }, credentials: 'include', delay: instant,
+      fetch: async (input, init) => { calls.push({ url: String(input), headers: new Headers(init?.headers), credentials: init?.credentials }); return new Response('line,column'); },
+    });
+    await imports.file('https://storage.example/reports/1.csv?signature=abc');
+    expect(calls[0]).toMatchObject({ url: 'https://storage.example/reports/1.csv?signature=abc', credentials: 'omit' });
+    expect(calls[0]!.headers.has('authorization')).toBe(false);
+    await imports.file('/import/1/errors.csv');
+    expect(calls[1]!.url).toBe('https://app.example/import/1/errors.csv');
+    expect(calls[1]!.headers.get('authorization')).toBe('Bearer t0k3n');
+    expect(calls[1]!.credentials).toBe('include');
   });
 
   it('sends the configured headers and an Idempotency-Key', async () => {

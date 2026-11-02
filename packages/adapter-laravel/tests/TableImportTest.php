@@ -39,6 +39,8 @@ final class TableImportTest extends TestCase
         \Illuminate\Support\Facades\Schema::create('users', fn (\Illuminate\Database\Schema\Blueprint $table) => $table->id());
         \Illuminate\Support\Facades\DB::table('users')->insert([['id' => 5], ['id' => 6]]);
         OrdersImport::$queueFrom = PHP_INT_MAX;
+        OrdersImport::$requiredColumns = ['customer'];
+        OrdersImport::$qualified = false;
         OrdersImport::$maxKilobytes = 64;
         $this->actingAs(new GenericUser(['id' => 5]));
     }
@@ -134,6 +136,31 @@ final class TableImportTest extends TestCase
         $start(['mapping' => ['customer', 'city', 'total', null], 'mode' => 'upsert'])->assertStatus(409);
     }
 
+    public function test_a_start_while_another_takes_it_is_refused_and_imports_nothing(): void
+    {
+        $id = $this->upload($this->csv($this->orders(3)))->json('id');
+        $body = ['mapping' => ['customer', 'city', 'total', null], 'mode' => 'insert'];
+        $other = \Illuminate\Support\Facades\Cache::lock("acun-datatable:import:{$id}:start", 30);
+        self::assertTrue($other->get()); // another request is starting it right now
+        $this->postJson(self::URL."/{$id}/start", $body)->assertStatus(409);
+        self::assertSame(0, Order::query()->where('customer', 'like', 'New %')->count());
+        $other->release();
+        $this->postJson(self::URL."/{$id}/start", $body)->assertOk()->assertJson(['status' => 'done', 'inserted' => 3]);
+        $this->postJson(self::URL."/{$id}/start", $body)->assertStatus(409); // once started, never again
+        self::assertSame(3, Order::query()->where('customer', 'like', 'New %')->count());
+    }
+
+    public function test_update_and_upsert_need_the_import_key_matched_insert_does_not(): void
+    {
+        OrdersImport::$requiredColumns = []; // the key column is not required as such
+        $id = $this->upload($this->csv("Customer,Total\nAli Kaya,3"))->json('id');
+        foreach (['update', 'upsert'] as $mode) {
+            $this->postJson(self::URL."/{$id}/start", ['mapping' => [null, 'total'], 'mode' => $mode])
+                ->assertStatus(422)->assertJsonPath('errors.mapping', 'Match the required columns: Customer.');
+        }
+        $this->postJson(self::URL."/{$id}/start", ['mapping' => [null, 'total'], 'mode' => 'insert'])->assertOk();
+    }
+
     public function test_insert_refuses_existing_rows_and_update_skips_new_ones(): void
     {
         $file = "Customer,Total\nAli Kaya,1\nBrand New,2";
@@ -143,6 +170,17 @@ final class TableImportTest extends TestCase
         $id = $this->upload($this->csv("Customer,Total\nAli Kaya,3\nNobody Yet,4"))->json('id');
         $this->postJson(self::URL."/{$id}/start", ['mapping' => ['customer', 'total'], 'mode' => 'update'])->assertJson(['updated' => 1, 'skipped' => 1, 'inserted' => 0]);
         self::assertFalse(Order::query()->where('customer', 'Nobody Yet')->exists());
+    }
+
+    public function test_columns_named_with_their_table_find_and_fill_their_records(): void
+    {
+        OrdersImport::$qualified = true; // ->column('orders.customer'), ->column('orders.total')
+        $before = Order::query()->count();
+        $id = $this->upload($this->csv("Customer,Total\nAli Kaya,3.25\nBrand New,4"))->json('id');
+        $this->postJson(self::URL."/{$id}/start", ['mapping' => ['customer', 'total'], 'mode' => 'upsert'])->assertJson(['status' => 'done', 'updated' => 1, 'inserted' => 1]);
+        self::assertSame($before + 1, Order::query()->count());
+        self::assertSame(['3.25'], Order::query()->where('customer', 'Ali Kaya')->pluck('total')->map(fn ($total) => (string) $total)->all());
+        self::assertSame('brand new', Order::query()->where('customer', 'Brand New')->value('customer_search'));
     }
 
     public function test_a_key_twice_in_one_file_inserts_once_then_updates(): void
@@ -196,6 +234,19 @@ final class TableImportTest extends TestCase
         (new RunTableImport(OrdersImport::class, $id, 5, null, 'en'))->handle();
         $this->getJson(self::URL."/{$id}")->assertJson(['status' => 'done', 'inserted' => 7, 'processed' => 7, 'total' => 7]);
         self::assertSame(12, Order::query()->count());
+    }
+
+    public function test_a_queued_import_whose_user_is_gone_fails_and_imports_nothing(): void
+    {
+        OrdersImport::$queueFrom = 5;
+        Queue::fake();
+        $id = $this->upload($this->csv($this->orders(7)))->json('id');
+        $this->postJson(self::URL."/{$id}/start", ['mapping' => ['customer', 'city', 'total', null], 'mode' => 'insert'])->assertJson(['status' => 'queued']);
+        \Illuminate\Support\Facades\DB::table('users')->where('id', 5)->delete();
+        (new RunTableImport(OrdersImport::class, $id, 5, null, 'en'))->handle();
+        $this->getJson(self::URL."/{$id}")->assertJson(['status' => 'failed', 'inserted' => 0, 'message' => 'The import could not be completed.']);
+        self::assertSame(5, Order::query()->count());
+        Storage::disk('local')->assertMissing("acun-datatable/imports/{$id}/source.csv");
     }
 
     public function test_a_running_import_stops_between_chunks_when_cancelled(): void

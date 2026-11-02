@@ -1,6 +1,8 @@
 import { element, fillButton, placeMenu, type RenderedComponent, type ToolbarButton } from './dom';
 import { labelsEn, type DataTableLabels } from './labels';
 
+let groups = 0; // ids of the group labels
+
 /** An entry of a menu such as the tools menu (export, copy, print, your own). */
 export interface MenuItem {
   readonly id: string;
@@ -55,15 +57,24 @@ export function renderMenu(container: HTMLElement, options: RenderMenuOptions): 
     timer = setTimeout(() => { status.textContent = ''; }, 4000);
   };
   let group: string | undefined;
+  let into: HTMLElement = list;
   items.forEach((item, index) => {
     if (item.group !== group) {
       if (index > 0) list.append(element(doc, 'hr', { class: 'adt-menu-separator' }));
-      if (item.group) list.append(element(doc, 'div', { class: 'adt-menu-label', 'aria-hidden': 'true' }, item.group));
+      into = list;
+      if (item.group) {
+        // A named group, so a screen reader says "Export" with its items.
+        const id = `adt-menu-group-${++groups}`;
+        into = element(doc, 'div', { class: 'adt-menu-group', role: 'group', 'aria-labelledby': id });
+        into.append(element(doc, 'div', { class: 'adt-menu-label', id }, item.group));
+        list.append(into);
+      }
       group = item.group;
     }
     const button = element(doc, 'button', { type: 'button', class: 'adt-menu-item', 'data-action': item.id }, item.label);
     button.addEventListener('click', () => {
       root.open = false;
+      summary.focus(); // the item is hidden now
       void (async () => {
         try {
           const result = await item.onSelect();
@@ -73,7 +84,7 @@ export function renderMenu(container: HTMLElement, options: RenderMenuOptions): 
         }
       })();
     });
-    list.append(button);
+    into.append(button);
   });
   root.append(summary, list);
   container.replaceChildren(root, status);

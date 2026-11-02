@@ -36,6 +36,7 @@ final class TableExport
     private ?array $queryColumns = null;
     private int $limit = 100_000;
     private int $chunk = 1_000;
+    private ?string $key = null;
 
     private function __construct(private readonly EloquentBuilder|QueryBuilder $builder)
     {
@@ -74,6 +75,15 @@ final class TableExport
         $copy = clone $this;
         $copy->query = $query;
         $copy->queryColumns = $columns === null ? null : array_values(is_array($columns) ? $columns : iterator_to_array($columns, false));
+
+        return $copy;
+    }
+
+    /** The unique key of a query-builder table, the last sort tie-breaker so chunks never repeat or skip rows (Eloquent uses the model key). */
+    public function key(string $column): self
+    {
+        $copy = clone $this;
+        $copy->key = $column;
 
         return $copy;
     }
@@ -122,12 +132,17 @@ final class TableExport
     /** Write the xlsx to a file (e.g. in a queued export) instead of a download. */
     public function saveXlsx(string $path, ?string $sheetName = null): void
     {
+        $rows = $this->rows(); // "too large" before any file is made
         $writer = new XlsxWriter($path, $sheetName ?? 'Sheet1');
-        $writer->header(array_map(fn (Column $column) => $column->headerText(), $this->columns));
-        foreach ($this->rows() as $row) {
-            $writer->row(array_map(fn (Column $column) => $this->cell($column, $row), $this->columns));
+        try {
+            $writer->header(array_map(fn (Column $column) => $column->headerText(), $this->columns));
+            foreach ($rows as $row) {
+                $writer->row(array_map(fn (Column $column) => $this->cell($column, $row), $this->columns));
+            }
+            $writer->close();
+        } finally {
+            $writer->discard(); // after a failure half-way; nothing to do once closed
         }
-        $writer->close();
     }
 
     private static function checkDelimiter(string $delimiter): void
@@ -194,8 +209,10 @@ final class TableExport
         if ($query->searchKeys !== null) {
             $rebuilt = $rebuilt->withSearchKeys($query->searchKeys, $query->searchKeyColumn); // the engine's answer, as on screen
         }
-        $builder = QueryApplier::apply(clone $this->builder, $rebuilt, $this->queryColumns ?? $this->columns);
-        if ((clone $builder)->limit($this->limit + 1)->count() > $this->limit) {
+        $rebuilt = $rebuilt->withTimeZone($query->timeZone); // the user's days, as on screen
+        $builder = QueryApplier::apply(clone $this->builder, $rebuilt, $this->queryColumns ?? $this->columns, $this->key);
+        // Stops after limit + 1 rows (a plain count() ignores the limit and counts every row).
+        if (! QueryApplier::count($builder, $this->limit, null)[1]) {
             throw InvalidTableQuery::at('export', __('acun-datatable::table.export_too_large', ['max' => $this->limit]));
         }
         if ($builder instanceof QueryBuilder && $builder->orders === null) {

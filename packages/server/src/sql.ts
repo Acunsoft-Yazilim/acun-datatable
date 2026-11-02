@@ -1,6 +1,7 @@
 import { foldText } from '@acunsoft/datatable-core';
 import { checkIdentifier, type ServerColumn } from './columns';
-import { decodeCursor, encodeCursor, sortSignature } from './cursor';
+import { CURSOR_TEXT, decodeCursor, encodeCursor, sortSignature } from './cursor';
+import { isDay, nextDay } from './day';
 import { TableQueryError, type ServerFilter, type ServerTableQuery } from './query';
 
 export type SqlDialect = 'postgres' | 'mysql' | 'sqlite' | 'sqlserver';
@@ -53,8 +54,6 @@ export interface SqlTableQuery {
 }
 
 const pad = (value: number): string => String(value).padStart(2, '0');
-const isMidnight = (date: Date): boolean => date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0 && date.getMilliseconds() === 0;
-const nextDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 
 /**
  * Parameterized SQL for a checked query (`readTableQuery`): filters, the
@@ -119,7 +118,7 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
   function condition(filter: ServerFilter): string {
     const { column, operator, value } = filter;
     const sql = quote(column.sql);
-    const day = column.type === 'datetime' && value instanceof Date && isMidnight(value);
+    const day = column.type === 'datetime' && isDay(value);
     switch (operator) {
       case 'contains':
         return column.search
@@ -139,11 +138,17 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
         return day ? `${sql} < ${bind(nextDay(value as Date))}` : `${sql} <= ${bind(value)}`;
       case 'between': {
         const [low, high] = value as [unknown, unknown];
-        const wholeDay = column.type === 'datetime' && high instanceof Date && isMidnight(high);
+        const wholeDay = column.type === 'datetime' && isDay(high);
         return wholeDay ? `(${sql} >= ${bind(low)} AND ${sql} < ${bind(nextDay(high as Date))})` : `${sql} BETWEEN ${bind(low)} AND ${bind(high)}`;
       }
-      case 'in':
-        return `${sql} IN (${(value as unknown[]).map(item => bind(item)).join(', ')})`;
+      case 'in': {
+        // A day among the values means the whole day, as eq (and the browser, and Laravel) read it.
+        const days = column.type === 'datetime' ? (value as unknown[]).filter(isDay) : [];
+        const exact = (value as unknown[]).filter(item => !days.includes(item as Date));
+        const parts = days.map(item => `(${sql} >= ${bind(item)} AND ${sql} < ${bind(nextDay(item))})`);
+        if (exact.length > 0) parts.push(`${sql} IN (${exact.map(item => bind(item)).join(', ')})`);
+        return parts.length === 1 ? parts[0]! : `(${parts.join(' OR ')})`;
+      }
       case 'empty':
         return column.type === 'text' ? `(${sql} IS NULL OR ${textOf(column)} = '')` : `${sql} IS NULL`;
       case 'notEmpty':
@@ -173,7 +178,7 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
     ? `OFFSET ${skip} ROWS FETCH NEXT ${take} ROWS ONLY`
     : `LIMIT ${take}${skip > 0 || !query.cursorPaging ? ` OFFSET ${skip}` : ''}`);
   let pageWhere = filterSql;
-  let limit = window(query.pageSize, (query.page - 1) * query.pageSize);
+  let limit = window(query.pageSize, query.offset ?? (query.page - 1) * query.pageSize);
   if (query.cursorPaging) {
     limit = window(query.pageSize + 1, 0);
     if (query.cursor !== undefined) {
@@ -200,7 +205,14 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
       pageWhere = `${filterSql}${filterSql ? ' AND' : ' WHERE'} ${bound === undefined ? '' : `${bound} AND `}${nest(0)}`;
     }
   }
-  const page: SqlStatement = { text: `SELECT ${select} FROM ${table}${pageWhere} ${orderBy} ${limit}`, values };
+  // node-postgres reads a timestamp as a Date, which keeps milliseconds: a cursor made from it
+  // would repeat or skip rows stored with microseconds. The page also reads each date-time sort
+  // column as text (any DateStyle), and the cursor carries that.
+  const exact = dialect === 'postgres' && query.cursorPaging
+    ? orders.map((order, index) => (query.sorting[index]?.column.type === 'datetime' ? `${CURSOR_TEXT}${index}` : undefined))
+    : [];
+  const texts = exact.map((alias, index) => (alias ? `, to_char(${quote(orders[index]!.column)}, 'YYYY-MM-DD HH24:MI:SS.US OF') AS "${alias}"` : '')).join('');
+  const page: SqlStatement = { text: `SELECT ${select}${texts} FROM ${table}${pageWhere} ${orderBy} ${limit}`, values };
   if (values.length > MAX_BINDINGS[dialect]) {
     throw new TableQueryError('filters', `the query needs ${values.length} values; ${dialect} allows ${MAX_BINDINGS[dialect]} per statement`);
   }
@@ -208,7 +220,9 @@ export function sqlQuery(query: ServerTableQuery, columns: readonly ServerColumn
   return Object.freeze({
     page,
     count,
-    cursorOf: (row: Readonly<Record<string, unknown>>) => encodeCursor(signature, orders.map(order => {
+    cursorOf: (row: Readonly<Record<string, unknown>>) => encodeCursor(signature, orders.map((order, index) => {
+      const text = exact[index] === undefined ? undefined : row[exact[index]!];
+      if (typeof text === 'string') return text;
       const name = order.column.split('.').pop()!;
       if (!(name in row)) throw new TypeError(`the row has no "${name}" for the cursor; select it (${keyName} too)`);
       return row[name];

@@ -1,6 +1,21 @@
 # @acunsoft/datatable-core
 
+## 0.5.0
+
+### Minor Changes
+
+- c7f8a8a: Cursor paging is set once, on the table: a table created with `paging: 'cursor'` gives every query `paging: 'cursor'` (new optional `TableQuery.paging`), and `createHttpDataSource` sends `paging=cursor` for it without its own option. Before, the table and the source each needed `paging: 'cursor'`, and with only the table set the server answered page numbers and the table never got past page 1. The source's `paging` option stays for calling `getPage` yourself; with it, page 2 or later without a cursor is now refused with a clear error instead of fetching page 1 again.
+
+### Patch Changes
+
+- 6b4f1f6: Every export also has a `default` condition, so `require()` finds the packages (Node 22's `require(esm)`, Jest in CommonJS mode, TypeScript `node16` CommonJS files); it failed with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+- 3422663: `persistState` keeps date filters as dates. JSON wrote a `Date` as UTC text, which came back as a string: a day filter on a `datetime` column (the whole local day) became an exact instant matching almost nothing, and in server mode the text went to the server as it was. Dates are now saved as their local wall time and restored as `Date`.
+- b7659b3: A space typed after the search words no longer sends the same request again nor goes back to page 1: the search text is kept as typed, and `connectTable` does not ask for the query whose answer is on its way or on screen.
+- 8d46546: `validatePageResult` returns a result it made itself as it is (only the page size is checked again), so a server page is checked and copied once instead of three times (by the HTTP source, the query runner and the table).
+
 ## 0.4.0
+
+Not published on npm: these changes reach npm with 0.5.0.
 
 ### Minor Changes
 

@@ -135,6 +135,26 @@ describe('createImportHandler', () => {
     expect((await fetch(URL_BASE, { method: 'POST', headers: { ...as('u1'), 'Content-Length': String(10 * 1024 * 1024) }, body: 'x' })).status).toBe(413);
   });
 
+  it('refuses a body with no Content-Length (chunked) past the limit without reading it all', async () => {
+    const { fetch } = setup();
+    const form = new FormData();
+    form.set('file', new File(['Customer\n', 'x'.repeat(5 * 1024 * 1024)], 'orders.csv'));
+    const encoded = new Response(form);
+    const type = encoded.headers.get('content-type')!;
+    const bytes = new Uint8Array(await encoded.arrayBuffer());
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({ // 16 KB at a time, as a network would deliver it
+      pull(controller) {
+        if (pulled >= bytes.length) { controller.close(); return; }
+        controller.enqueue(bytes.subarray(pulled, pulled + 16 * 1024));
+        pulled += 16 * 1024;
+      },
+    });
+    const response = await fetch(URL_BASE, { method: 'POST', headers: { ...as('u1'), 'Content-Type': type }, body, duplex: 'half' } as RequestInit);
+    expect(response.status).toBe(413);
+    expect(pulled).toBeLessThan(1024 * 1024); // stopped soon after the limit, not 5 MB later
+  });
+
   it('refuses a zip bomb: 207 KB that inflates to 200 MB, claiming 1 KB', async () => {
     const { fetch } = setup({ limits: { maxBytes: 1024 * 1024 } });
     const bomb = new File([readFileSync(new URL('fixtures/zip-bomb.xlsx', import.meta.url))], 'orders.xlsx');
@@ -169,6 +189,60 @@ describe('createImportHandler', () => {
     await jobs[0]!();
     expect(await (await fetch(`${URL_BASE}/${id}`, { headers: as('u1') })).json()).toMatchObject({ status: 'cancelled', inserted: 0 });
     expect((await fetch(`${URL_BASE}/${id}`, { method: 'DELETE', headers: as('u1') })).status).toBe(409);
+  });
+
+  it('run again by a worker after a crash, goes on after the rows saved before', async () => {
+    const jobs: (() => Promise<void>)[] = [];
+    const lines: number[] = [];
+    let calls = 0;
+    const { fetch, handler } = setup({
+      background: () => true, schedule: run => { jobs.push(run); },
+      save: async (rows, context) => {
+        if (++calls === 2) return new Promise<void>(() => {}); // the worker dies while saving the second chunk
+        lines.push(...rows.map(row => row.line));
+        context.inserted(rows.length);
+      },
+    });
+    const { id } = await (await upload(fetch, csv(`Customer\n${Array.from({ length: 8 }, (_, i) => `C${i}`).join('\n')}\n`))).json() as { id: string };
+    await start(fetch, id, { mapping: ['customer'], mode: 'insert' });
+    void jobs[0]!();
+    await vi.waitFor(() => expect(calls).toBe(2));
+    expect(await (await fetch(`${URL_BASE}/${id}`, { headers: as('u1') })).json()).toMatchObject({ status: 'running', processed: 3, inserted: 3 });
+    await handler.process(id); // the queue runs it again
+    expect(await (await fetch(`${URL_BASE}/${id}`, { headers: as('u1') })).json()).toMatchObject({ status: 'done', processed: 8, inserted: 8, failed: 0 });
+    expect(lines).toEqual([2, 3, 4, 5, 6, 7, 8, 9]); // each line once
+  });
+
+  it('in the background, reports a store that fails instead of ending the process', async () => {
+    const memory = memoryImportStore();
+    const errors: unknown[] = [];
+    const { fetch } = setup({
+      background: () => true,
+      store: { ...memory, put: async (state, keepMs) => { if (state.status === 'running') throw new Error('disk full'); return memory.put(state, keepMs); } },
+      onError: error => { errors.push(error); throw new Error('the logger fails too'); },
+    });
+    const { id } = await (await upload(fetch, csv('Customer\nA\n'))).json() as { id: string };
+    expect(await (await start(fetch, id, { mapping: ['customer'], mode: 'insert' })).json()).toMatchObject({ status: 'queued' });
+    await vi.waitFor(() => expect(errors).toEqual([new Error('disk full')]));
+  });
+
+  it('gives save() the owner and tenant as owner() and tenant() gave them', async () => {
+    const seen: [string, string | null][] = [];
+    const { fetch } = setup({ save: (rows, context) => { seen.push([context.owner, context.tenant]); context.inserted(rows.length); } });
+    const { id } = await (await upload(fetch, csv('Customer\nA\n'), as('42', 'acme'))).json() as { id: string };
+    await start(fetch, id, { mapping: ['customer'], mode: 'insert' }, as('42', 'acme'));
+    expect(seen).toEqual([['42', 'acme']]);
+    expect((await fetch(`${URL_BASE}/${id}`, { headers: as('42', 'other') })).status).toBe(404); // still kept per tenant
+  });
+
+  it('needs the import key matched to update or upsert, not to insert', async () => {
+    const { fetch } = setup({ columns: [{ id: 'customer', title: 'Customer' }, { id: 'total', title: 'Total', type: 'decimal' }] }); // the key is not required
+    const { id } = await (await upload(fetch, csv('Customer,Total\nA,1\n'))).json() as { id: string };
+    for (const mode of ['update', 'upsert']) {
+      const refused = await start(fetch, id, { mapping: [null, 'total'], mode });
+      expect([refused.status, ((await refused.json()) as { errors: Record<string, string> }).errors]).toEqual([422, { mapping: 'Match the required columns: Customer.' }]);
+    }
+    expect(await (await start(fetch, id, { mapping: [null, 'total'], mode: 'insert' })).json()).toMatchObject({ status: 'done' });
   });
 
   it('a save() that throws fails the import as a whole, with a general message', async () => {
@@ -211,5 +285,88 @@ describe('createImportHandler', () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe('memoryImportStore', () => {
+  it('drops what expired within a minute of a write, read again or not', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryImportStore();
+      const removed = vi.spyOn(Map.prototype, 'delete');
+      await store.putFile('imp_left', 'source', new Uint8Array(1024), 1_000); // an upload nobody comes back for
+      await store.putKey('key', 'imp_left', 1_000);
+      vi.advanceTimersByTime(30_000);
+      await store.putFile('imp_new', 'source', new Uint8Array(1), 86_400_000);
+      expect(removed).not.toHaveBeenCalledWith('imp_left/source'); // swept at most once a minute
+      vi.advanceTimersByTime(31_000);
+      await store.putFile('imp_newer', 'source', new Uint8Array(1), 86_400_000);
+      expect(removed).toHaveBeenCalledWith('imp_left/source');
+      expect(removed).toHaveBeenCalledWith('key');
+      expect(removed).not.toHaveBeenCalledWith('imp_new/source');
+      removed.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('directoryImportStore', () => {
+  it('keeps an import\'s files only as long as its state', async () => {
+    vi.useFakeTimers();
+    try {
+      const folder = mkdtempSync(`${tmpdir()}/adt-import-`);
+      folders.push(folder);
+      const store = directoryImportStore(folder);
+      const state = { id: 'imp_x', status: 'mapping' } as unknown as Parameters<typeof store.put>[0];
+      await store.putFile('imp_x', 'source', new Uint8Array([1, 2]), 1_000);
+      await store.put(state, 1_000);
+      expect(await store.getFile('imp_x', 'source')).toEqual(new Uint8Array([1, 2]));
+      vi.advanceTimersByTime(2_000);
+      expect(await store.getFile('imp_x', 'source')).toBeUndefined(); // expired with the import
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('two starts at once (a double click, a retry)', () => {
+  const twoStarts = async (first: typeof globalThis.fetch, second: typeof globalThis.fetch) => {
+    const uploaded = await (await upload(first, csv('Customer\nAyşe\nAli\nCan'))).json() as { id: string };
+    const body = { mapping: ['customer'], mode: 'insert' };
+    const answers = await Promise.all([start(first, uploaded.id, body), start(second, uploaded.id, body)]);
+    return answers.map(answer => answer.status).sort();
+  };
+  const counting = () => {
+    let saved = 0;
+    return {
+      save: async (rows: readonly ImportRow[], context: ImportSaveContext) => { await instant(); saved += rows.length; context.inserted(rows.length); },
+      saved: () => saved,
+    };
+  };
+
+  it('run one import with the memory store', async () => {
+    const rows = counting();
+    const { fetch } = setup({ store: memoryImportStore(), save: rows.save });
+    expect(await twoStarts(fetch, fetch)).toEqual([200, 409]);
+    expect(rows.saved()).toBe(3);
+  });
+
+  it('run one import with a store of your own that cannot claim (one process)', async () => {
+    const rows = counting();
+    const { claim: _claim, ...store } = memoryImportStore();
+    const { fetch } = setup({ store, save: rows.save });
+    expect(await twoStarts(fetch, fetch)).toEqual([200, 409]);
+    expect(rows.saved()).toBe(3);
+  });
+
+  it('run one import across two handlers sharing a folder (two processes)', async () => {
+    const folder = mkdtempSync(`${tmpdir()}/adt-claim-`);
+    folders.push(folder);
+    const rows = counting();
+    const one = setup({ store: directoryImportStore(folder), save: rows.save });
+    const two = setup({ store: directoryImportStore(folder), save: rows.save });
+    expect(await twoStarts(one.fetch, two.fetch)).toEqual([200, 409]);
+    expect(rows.saved()).toBe(3);
   });
 });

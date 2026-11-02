@@ -437,7 +437,7 @@ test('virtual scrolling keeps 50,000 rows to a handful in the page', async ({ pa
   expect(await first()).toBeGreaterThan(24_000);
 });
 
-test('<acun-datatable> works from the script build, as in Angular, Svelte or Astro', async ({ page }) => {
+test('<acun-datatable> works from the script build, with no bundler and no framework', async ({ page }) => {
   await page.goto('/e2e/fixtures/element.html');
   await expect(page.locator('body[data-ready=true]')).toBeAttached();
   await expect(page.getByRole('columnheader', { name: 'Ürün' })).toBeVisible();
@@ -547,4 +547,43 @@ test.describe('filterPanel: the filter fields in a drawer or a modal', () => {
       }
     });
   }
+});
+
+test.describe('the row "⋮" menu', () => {
+  /** Whether a click on every item of the open menu lands on that item (not cut off by the table's box). */
+  const reachable = (page: Page) => page.locator('#orders .adt-row-menu[open] .adt-menu-item').evaluateAll(items => items.every(item => {
+    const box = item.getBoundingClientRect();
+    return item.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+  }));
+
+  for (const [name, width, query] of [['in the table', 1280, ''], ['in cards on a phone', 375, '&responsive=cards']] as const) {
+    test(`opens whole on the last row, ${name}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`/e2e/fixtures/table.html?menu${query}`);
+      await expect(page.locator('body[data-ready=true]')).toBeAttached();
+      const menu = page.locator('#orders tbody tr:last-child .adt-row-menu');
+      await menu.locator('summary').click();
+      await expect(menu.locator('.adt-menu-item')).toHaveCount(3);
+      await expect.poll(() => reachable(page)).toBe(true);
+      await menu.getByRole('button', { name: 'Delete' }).click();
+      expect(await page.evaluate(() => (window as unknown as { __edited: string }).__edited)).toBe('Delete:5');
+      await expect(menu).not.toHaveAttribute('open');
+    });
+  }
+
+  test('follows its row when the page scrolls', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 400 });
+    await page.goto('/e2e/fixtures/table.html?menu');
+    await expect(page.locator('body[data-ready=true]')).toBeAttached();
+    const menu = page.locator('#orders tbody tr:first-child .adt-row-menu');
+    await menu.locator('summary').click();
+    await expect.poll(() => menu.evaluate(element => (element as HTMLElement).style.getPropertyValue('--adt-menu-y'))).not.toBe(''); // placed
+    const gap = async () => page.evaluate(() => {
+      const open = document.querySelector('#orders .adt-row-menu[open]')!;
+      return Math.round(open.querySelector('.adt-menu-list')!.getBoundingClientRect().top - open.querySelector('summary')!.getBoundingClientRect().bottom);
+    });
+    const before = await gap();
+    await page.evaluate(() => { document.body.style.minHeight = '2000px'; window.scrollBy(0, 60); });
+    await expect.poll(gap).toBe(before);
+  });
 });

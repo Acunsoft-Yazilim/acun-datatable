@@ -94,6 +94,32 @@ describe('placeMenu', () => {
     expect(fits.style.getPropertyValue('--adt-menu-shift')).toBe('');
   });
 
+  it('places a row menu over the page below its button, above without room, and stops when it closes', () => {
+    const menu = document.createElement('details');
+    menu.className = 'adt-row-menu';
+    const summary = document.createElement('summary');
+    const panel = document.createElement('div');
+    menu.append(summary, panel);
+    document.body.append(menu);
+    const rect = (left: number, top: number, width: number, height: number) => () => ({ left, top, right: left + width, bottom: top + height, x: left, y: top, width, height, toJSON: () => ({}) });
+    Object.defineProperty(document.documentElement, 'clientWidth', { configurable: true, value: 1000 });
+    Object.defineProperty(document.documentElement, 'clientHeight', { configurable: true, value: 600 });
+    panel.getBoundingClientRect = rect(0, 0, 200, 120);
+    summary.getBoundingClientRect = rect(900, 100, 30, 30);
+    menu.open = true;
+    placeMenu(menu);
+    const at = () => [menu.style.getPropertyValue('--adt-menu-x'), menu.style.getPropertyValue('--adt-menu-y')];
+    expect(at()).toEqual(['730px', '136px']); // ends at the button's right edge
+    summary.getBoundingClientRect = rect(900, 500, 30, 30);
+    window.dispatchEvent(new Event('scroll'));
+    expect(at()).toEqual(['730px', '374px']); // no room below: above the button
+    menu.open = false;
+    placeMenu(menu);
+    summary.getBoundingClientRect = rect(10, 10, 30, 30);
+    window.dispatchEvent(new Event('scroll'));
+    expect(at()).toEqual(['730px', '374px']); // no listener left
+  });
+
   it('the column menu keeps its name for screen readers when phones show only the icon', () => {
     renderColumnToggle(host, make());
     expect(host.querySelector('summary .adt-summary-text')?.textContent).toBe('Columns');

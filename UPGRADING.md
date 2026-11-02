@@ -1,8 +1,38 @@
 # Upgrading
 
+## npm 0.5.0 · `acunsoft/datatable-laravel` 0.6.0
+
+### `acunsoft/datatable-laravel`
+
+1. **Editing in place needs a policy.** A Livewire table with `editable()`
+   columns let anyone who could see it edit every cell when the model had no
+   policy. Now an edit without a policy is refused (403). Add a policy with
+   `update()` for the model, or allow it on purpose:
+
+   ```php
+   protected function editableWithoutPolicy(): bool
+   {
+       return true; // whoever sees this table may edit it
+   }
+   ```
+
+   Query-builder rows have no policy: override `authorizeEdit()` (or
+   `editableWithoutPolicy()`) for them.
+
+### Both back ends (`@acunsoft/datatable-server`, `acunsoft/datatable-laravel`)
+
+1. **DataTables "All" and oversized pages are refused.** A DataTables request
+   with `length=-1` ("All"), or with more rows than the endpoint's largest
+   page (`maxPageSize`, default 100), used to get a page cut down to that
+   size: DataTables showed no pager and the other rows were silently
+   missing. Now it gets DataTables' `error` (Node: `TableQueryError`, Laravel:
+   `InvalidTableQuery`, both on `length`). Keep `lengthMenu` within the
+   endpoint's largest page, or raise it on the endpoint.
+
 ## npm packages: 0.2.x → 0.4.0
 
-0.3.0 was prepared but not published, so 0.4.0 carries both releases. Most of
+0.3.0 and 0.4.0 were prepared but not published to npm: coming from 0.2.x,
+read this section and the one above, which 0.5.0 carries together. Most of
 it is new; the changes below are the ones that can need a change in your code.
 
 ### Must change

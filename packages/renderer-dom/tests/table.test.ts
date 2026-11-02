@@ -95,7 +95,8 @@ describe('renderTable sorting', () => {
     sortButton('Total').click();
     sortButton('Customer').dispatchEvent(new MouseEvent('click', { shiftKey: true, bubbles: true }));
     expect(table.getState().sorting).toEqual([{ field: 'total', direction: 'asc' }, { field: 'customer', direction: 'asc' }]);
-    expect(headers().filter(th => th.hasAttribute('aria-sort')).map(th => th.textContent)).toEqual(['Total▲1']);
+    expect(headers().filter(th => th.hasAttribute('aria-sort')).map(th => th.textContent)).toEqual(['Total▲1sort 1, ascending']);
+    expect(sortButton('Customer').textContent).toBe('Customer▲2sort 2, ascending'); // the second rule is read out too (aria-sort names the first only)
     expect(sortButton('Customer').querySelector('.adt-sort-mark')!.getAttribute('aria-hidden')).toBe('true');
     sortButton('Customer').dispatchEvent(new MouseEvent('click', { shiftKey: true, bubbles: true }));
     sortButton('Customer').dispatchEvent(new MouseEvent('click', { shiftKey: true, bubbles: true }));
@@ -236,24 +237,44 @@ describe('renderTable second-review additions', () => {
     expect(() => renderTable(host, make(), { rowLabel: 'x' as never })).toThrow('rowLabel must be a function');
   });
 
-  it('shows loading with aria-busy and an error with a retry button', () => {
+  it('takes its texts from locale when no labels are given, as renderDataTable does', async () => {
+    const { renderPagination } = await import('../src/index');
+    renderTable(host, make({ data: [] }), { locale: 'tr' });
+    expect(host.querySelector('tbody')!.textContent).toBe(labelsTr.empty);
+    const pager = document.createElement('div');
+    renderPagination(pager, make(), { locale: 'tr' });
+    expect(pager.querySelector('nav')!.getAttribute('aria-label')).toBe(labelsTr.pagination);
+    renderPagination(pager, make(), { locale: 'tr', labels: { pagination: 'Sayfalar' } });
+    expect(pager.querySelector('nav')!.getAttribute('aria-label')).toBe('Sayfalar'); // labels still win
+  });
+
+  it('shows loading with aria-busy and an error with a retry button', async () => {
     let state: { status: 'idle' | 'loading' | 'success' | 'error'; error?: unknown } = { status: 'loading' };
     const listeners = new Set<(s: typeof state) => void>();
-    const retry = vi.fn();
+    let retries = 0;
+    const retry = (): Promise<void> => { retries += 1; return Promise.reject(new Error('still down')); }; // fails again (no vi.fn: it would handle the rejection)
     const status = { getState: () => state, subscribe: (l: (s: typeof state) => void) => { listeners.add(l); return () => listeners.delete(l); }, retry };
     const set = (next: typeof state) => { state = next; listeners.forEach(l => l(state)); };
     const rendered = renderTable(host, make(), { status, labels: labelsTr });
-    const wrap = host.querySelector('.adt-table-wrap')!;
+    const wrap = host.querySelector('.adt-scroll')!; // the rows' box is busy …
     const notice = host.querySelector('.adt-notice')!;
     expect(wrap.getAttribute('aria-busy')).toBe('true');
+    expect(notice.closest('[aria-busy="true"]')).toBeNull(); // … not the notice that says "Loading…"
     expect(notice.textContent).toBe('Yükleniyor…');
     set({ status: 'error', error: new Error('500') });
     expect(wrap.getAttribute('aria-busy')).toBe('false');
     expect(notice.getAttribute('role')).toBe('alert');
+    expect(notice.hasAttribute('aria-live')).toBe(false); // assertive, as role="alert" is
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
     host.querySelector<HTMLButtonElement>('.adt-retry')!.click();
-    expect(retry).toHaveBeenCalledTimes(1);
+    expect(retries).toBe(1);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled(); // the failed retry shows as the error state, nothing else
     set({ status: 'success' });
     expect(notice.textContent).toBe('');
+    expect(notice.getAttribute('aria-live')).toBe('polite'); // a status again
     rendered.destroy();
     expect(listeners.size).toBe(0);
     expect(() => renderTable(host, make(), { status: {} as never })).toThrow('status must have getState and subscribe');

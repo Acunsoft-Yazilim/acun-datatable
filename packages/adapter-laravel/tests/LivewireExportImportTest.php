@@ -33,6 +33,24 @@ final class LivewireExportImportTest extends TestCase
         self::assertStringNotContainsString('Ayşe', $content);
     }
 
+    public function test_the_file_choosers_made_of_labels_are_buttons(): void
+    {
+        $html = Livewire::test(OrdersImportTable::class)->html();
+        self::assertSame(substr_count($html, 'tabindex="0"'), substr_count($html, 'tabindex="0" role="button"'));
+        self::assertGreaterThan(0, substr_count($html, 'role="button"'));
+    }
+
+    public function test_csv_uses_semicolons_where_excel_expects_them(): void
+    {
+        foreach (['de' => ';', 'fr_FR' => ';', 'es' => ';', 'tr' => ';', 'en' => ','] as $locale => $delimiter) {
+            app()->setLocale($locale);
+            $content = base64_decode(Livewire::test(OrdersImportTable::class)->call('export', 'csv')->effects['download']['content']);
+            $header = explode("\r\n", ltrim($content, "\u{FEFF}"))[0];
+            self::assertStringContainsString($delimiter, $header, $locale);
+            self::assertStringNotContainsString($delimiter === ';' ? ',' : ';', $header, $locale);
+        }
+    }
+
     public function test_export_is_off_unless_formats_are_declared(): void
     {
         $table = Livewire::test(OrdersTable::class)->call('export', 'csv');

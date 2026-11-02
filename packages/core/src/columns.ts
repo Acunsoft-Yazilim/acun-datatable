@@ -1,3 +1,4 @@
+import { AGGREGATES, type Aggregate } from './aggregates';
 import { COLUMN_TYPES, type ColumnType } from './values';
 
 interface ColumnBase {
@@ -32,7 +33,7 @@ interface ColumnBase {
    * A footer total over every row matching the filters and search: `sum`,
    * `avg`, `min`, `max` or `count` (server mode: from the server's `totals`).
    */
-  readonly aggregate?: 'sum' | 'avg' | 'min' | 'max' | 'count';
+  readonly aggregate?: Aggregate;
   /**
    * Let a renderer edit the cell in place (with its `onEdit` saving it).
    * `true` picks the control from `type`; `options` gives a list to choose from.
@@ -122,8 +123,8 @@ export function createColumns<TData>(
         throw new TypeError(`column "${id}".editable.options must be a non-empty list of { value, label }`);
       }
     }
-    if (aggregate !== undefined && !['sum', 'avg', 'min', 'max', 'count'].includes(aggregate)) {
-      throw new TypeError(`column "${id}".aggregate must be sum, avg, min, max or count`);
+    if (aggregate !== undefined && !AGGREGATES.includes(aggregate)) {
+      throw new TypeError(`column "${id}".aggregate must be ${AGGREGATES.slice(0, -1).join(', ')} or ${AGGREGATES.at(-1)}`);
     }
     ids.add(id);
     const base = {

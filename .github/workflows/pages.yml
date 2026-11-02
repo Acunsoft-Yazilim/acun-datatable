@@ -5,7 +5,8 @@ on:
   push:
     branches: [main]
     # The docs and the live demo; the demo runs the packages' current build.
-    paths: ['site/**', 'packages/**', '.github/workflows/pages.yml']
+    # The scripts that build the demo and the lock file (the React and Vue it bundles) count too.
+    paths: ['site/**', 'packages/**', 'scripts/**', 'package.json', 'package-lock.json', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -13,9 +14,10 @@ permissions:
   pages: write
   id-token: write
 
+# A deployment that has begun is never cut off halfway (GitHub's own Pages template).
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:

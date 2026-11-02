@@ -74,6 +74,38 @@ final class LivewireActionsTest extends TestCase
         self::assertSame([1], Order::query()->where('note', 'archived')->pluck('id')->all());
     }
 
+    public function test_rows_taken_out_of_every_matching_row_are_bounded_like_the_selection(): void
+    {
+        $table = Livewire::test(OrdersTable::class, ['maxRows' => 3])->call('selectAllMatching');
+        $table->call('toggleRow', str_repeat('x', 65)); // longer than any key
+        self::assertSame([], $table->get('excluded'));
+        for ($i = 0; $i < 5; $i++) {
+            $table->call('toggleRow', "k{$i}");
+        }
+        self::assertSame(['k0', 'k1', 'k2'], $table->get('excluded')); // maxSelected(), not every key the browser sends
+        $table->call('toggleRow', 'k3');
+        self::assertNotContains('k3', $table->get('excluded')); // taking it back still works
+    }
+
+    public function test_the_selection_is_announced_from_the_first_row_on(): void
+    {
+        $table = Livewire::test(OrdersTable::class);
+        self::assertMatchesRegularExpression('/<span class="adt-sr-only adt-selection-status" role="status">\s*<\/span>/', $table->html()); // there before anything is chosen
+        $table->call('toggleRow', '1');
+        self::assertMatchesRegularExpression('/<span class="adt-sr-only adt-selection-status" role="status">1 selected<\/span>/', $table->html());
+        self::assertSame(1, substr_count($table->html(), 'role="status">1 selected'), 'read out once, not by the visible count too');
+    }
+
+    public function test_screen_readers_hear_the_second_sort_and_the_details_column(): void
+    {
+        $html = Livewire::test(OrdersTable::class)->call('sortBy', 'total')->call('sortBy', 'customer', true)->html();
+        self::assertStringContainsString('<span class="adt-sr-only">sort 2, ascending</span>', $html); // aria-sort names the first only
+        self::assertStringContainsString('<span class="adt-sr-only">sort 1, ascending</span>', $html);
+        self::assertStringNotContainsString('sort 1', Livewire::test(OrdersTable::class)->call('sortBy', 'total')->html()); // one rule: aria-sort is enough
+        $detail = Livewire::test(\Acunsoft\DataTable\Laravel\Tests\Fixtures\ResponsiveOrdersTable::class, ['detail' => 'fixtures::pill'])->html();
+        self::assertStringContainsString('<td class="adt-expand-cell"><span class="adt-sr-only">Details</span></td>', $detail);
+    }
+
     public function test_bulk_actions_need_a_selection_and_must_be_visible(): void
     {
         Livewire::test(OrdersTable::class)->call('runBulkAction', 'archive'); // nothing selected

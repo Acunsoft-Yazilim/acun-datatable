@@ -53,6 +53,18 @@ describe('resizable columns', () => {
     expect(handle('city').getAttribute('aria-valuenow')).toBe('190');
   });
 
+  it('a pointer the browser takes back (pointercancel) ends the drag without a change', () => {
+    const table = make();
+    renderTable(host, table, { resizableColumns: true });
+    pointer(handle('total'), 'pointerdown', 450);
+    pointer(document, 'pointermove', 380);
+    pointer(document, 'pointercancel', 380);
+    expect(th('total').style.width).toBe('150px'); // put back
+    expect(host.querySelector('.adt-resizing')).toBeNull(); // not stuck dragging
+    pointer(document, 'pointermove', 300);
+    expect(th('total').style.width).toBe('150px');
+  });
+
   it('Escape cancels a drag; the keyboard resizes and Delete resets', () => {
     const table = make();
     renderTable(host, table, { resizableColumns: true });

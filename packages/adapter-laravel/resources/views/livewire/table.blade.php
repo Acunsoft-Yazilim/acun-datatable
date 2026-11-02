@@ -63,11 +63,16 @@
         @include('acun-datatable::livewire.task')
     @endif
 
+    @if ($selectable)
+        @php $selectedText = $selectedCount === 0 ? '' : ($selectedExact
+            ? $this->tableText('selected', $selectedCount, ['count' => \Acunsoft\DataTable\Laravel\Support\Format::count($selectedCount)])
+            : $this->tableText('selected_many', ['count' => \Acunsoft\DataTable\Laravel\Support\Format::count($selectedCount)])); @endphp
+        {{-- Always there, so the first row chosen is announced too (a live region must exist before it changes). --}}
+        <span class="adt-sr-only adt-selection-status" role="status">{{ $selectedText }}</span>
+    @endif
     @if ($selectable && $selectedCount > 0)
         <div class="adt-selection" role="group" aria-label="{{ $this->tableText('bulk_actions') }}">
-            <span class="adt-selection-count" role="status">{{ $selectedExact
-                ? $this->tableText('selected', $selectedCount, ['count' => \Acunsoft\DataTable\Laravel\Support\Format::count($selectedCount)])
-                : $this->tableText('selected_many', ['count' => \Acunsoft\DataTable\Laravel\Support\Format::count($selectedCount)]) }}</span>
+            <span class="adt-selection-count">{{ $selectedText }}</span>
             @foreach ($bulkActions as $action)
                 <button type="button" class="adt-bulk-action" data-action="{{ $action->id() }}"
                     wire:click="runBulkAction({{ \Illuminate\Support\Js::from($action->id()) }})"
@@ -112,7 +117,7 @@
                 <thead>
                     <tr>
                         @if ($expandable)
-                            <td class="adt-expand-cell"></td>
+                            <td class="adt-expand-cell"><span class="adt-sr-only">{{ $this->tableText('details_column') }}</span></td>
                         @endif
                         @if ($selectable)
                             <th scope="col" class="adt-select">
@@ -141,7 +146,7 @@
                                     <button type="button"
                                         class="adt-sort{{ $rule ? ' adt-sort--'.$rule['direction'] : '' }}"
                                         wire:click="sortBy({{ \Illuminate\Support\Js::from($column->id()) }}, $event.shiftKey)">
-                                        {{ $column->headerText() }}<span class="adt-sort-mark" aria-hidden="true">{{ $rule ? ($rule['direction'] === 'asc' ? '▲' : '▼').(count($sorting) > 1 ? $position + 1 : '') : '' }}</span>
+                                        {{ $column->headerText() }}<span class="adt-sort-mark" aria-hidden="true">{{ $rule ? ($rule['direction'] === 'asc' ? '▲' : '▼').(count($sorting) > 1 ? $position + 1 : '') : '' }}</span>@if ($rule && count($sorting) > 1)<span class="adt-sr-only">{{ $this->tableText($rule['direction'] === 'asc' ? 'sort_order_asc' : 'sort_order_desc', ['position' => $position + 1]) }}</span>@endif
                                     </button>
                                 @else
                                     {{ $column->headerText() }}

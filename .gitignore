@@ -36,3 +36,9 @@ site/demo/vue-demo.js
 site/demo/styles.css
 site/demo/import-demo.js
 site/demo/import.css
+
+# Next.js and Nuxt test apps (e2e/ssr): their builds
+e2e/ssr/*/.next/
+e2e/ssr/*/.nuxt/
+e2e/ssr/*/.output/
+e2e/ssr/*/next-env.d.ts

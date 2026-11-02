@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTableQuery } from '@acunsoft/datatable-core';
+import { createDataTable, createTableQuery } from '@acunsoft/datatable-core';
 import {
   createHttpDataSource, createQueryRunner, formatLocalDate, fromDataTablesResponse, fromLaravelPaginator, HttpError, serializeDataTablesQuery, serializeTableQuery,
 } from '../src/index';
@@ -31,8 +31,33 @@ describe('serializeTableQuery', () => {
       'filters[2][field]': 'createdAt', 'filters[2][op]': 'gt', 'filters[2][value]': '2025-01-01',
       'filters[3][field]': 'active', 'filters[3][op]': 'eq', 'filters[3][value]': 'true',
       search: 'Ayşe & co',
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone, // a day among the filters: whose day it is
     });
     expect(params.toString()).toContain('search=Ay%C5%9Fe+%26+co'); // encoded safely
+  });
+
+  it('names the browser\'s time zone only when a filter holds a day', () => {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const send = (value: unknown) => serializeTableQuery(createTableQuery({ page: 1, pageSize: 10, filters: [{ field: 'at', operator: 'gt', value: value as string }] }));
+    expect(send('2026-10-23').get('tz')).toBe(zone);
+    expect(send(new Date(2026, 9, 23)).get('tz')).toBe(zone);
+    expect(send(new Date(2026, 9, 23, 14, 5)).has('tz')).toBe(false); // an instant carries its offset
+    expect(send('2026-10-23T14:05:00+03:00').has('tz')).toBe(false);
+    expect(send(42).has('tz')).toBe(false);
+    const between = serializeTableQuery(createTableQuery({ page: 1, pageSize: 10, filters: [{ field: 'at', operator: 'between', value: ['2026-10-01', '2026-10-23'] }] }));
+    expect(between.get('tz')).toBe(zone);
+    const datatables = serializeDataTablesQuery(createTableQuery({ page: 1, pageSize: 10, filters: [{ field: 'at', operator: 'eq', value: '2026-10-23' }] }), [{ data: 'at' }], 1);
+    expect(datatables.get('tz')).toBe(zone);
+    expect(serializeDataTablesQuery(query, [{ data: 'at' }], 1).has('tz')).toBe(false);
+  });
+
+  it('sends no tz where the runtime names no time zone', () => {
+    const resolved = vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockImplementation(() => { throw new Error('no Intl'); });
+    try {
+      expect(serializeTableQuery(createTableQuery({ page: 1, pageSize: 10, filters: [{ field: 'at', operator: 'eq', value: '2026-10-23' }] })).has('tz')).toBe(false);
+    } finally {
+      resolved.mockRestore();
+    }
   });
 
   it('omits empty sorting, filters and search', () => {
@@ -223,6 +248,25 @@ describe('cursor paging', () => {
     expect(url.searchParams.get('cursor')).toBe('eyJpZCI6Mn0');
     expect(result.nextCursor).toBe('eyJpZCI6M30');
     expect(serializeTableQuery(createTableQuery({ page: 1, pageSize: 1 })).has('cursor')).toBe(false);
+  });
+
+  it('follows a cursor table without being told, from the first page on', async () => {
+    const table = createDataTable<{ id: number }>({ mode: 'server', paging: 'cursor', columns: [], initialState: { pageSize: 1 } });
+    const fetch = okFetch({ rows: [{ id: 1 }], nextCursor: 'c2' });
+    const source = createHttpDataSource<{ id: number }>({ url: '/api/orders', fetch });
+    table.setPageResult(await source.getPage(table.getQuery()));
+    table.setPage(2);
+    await source.getPage(table.getQuery());
+    const sent = fetch.mock.calls.map(call => new URL(String(call[0]), 'http://x').searchParams);
+    expect(sent.map(params => [params.get('paging'), params.get('cursor')])).toEqual([['cursor', null], ['cursor', 'c2']]);
+    const pages = createHttpDataSource({ url: '/api/orders', fetch });
+    await pages.getPage(createDataTable<{ id: number }>({ mode: 'server', columns: [] }).getQuery());
+    expect(new URL(String(fetch.mock.calls[2]![0]), 'http://x').searchParams.has('paging')).toBe(false);
+  });
+
+  it('refuses page 2 without a cursor when only the source was set to cursor paging', async () => {
+    const source = createHttpDataSource({ url: '/api/orders', fetch: okFetch({ rows: [] }), paging: 'cursor' });
+    await expect(source.getPage(createTableQuery({ page: 2, pageSize: 1 }))).rejects.toThrow("create the table with paging: 'cursor'");
   });
 });
 

@@ -1,24 +1,26 @@
 # Acun DataTable
 
-[![CI](https://github.com/kemaloskan/acun-datatable/actions/workflows/ci.yml/badge.svg)](https://github.com/kemaloskan/acun-datatable/actions/workflows/ci.yml)
+[![CI](https://github.com/Acunsoft-Yazilim/acun-datatable/actions/workflows/ci.yml/badge.svg)](https://github.com/Acunsoft-Yazilim/acun-datatable/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@acunsoft/datatable-core.svg)](https://www.npmjs.com/package/@acunsoft/datatable-core)
 [![Packagist](https://img.shields.io/packagist/v/acunsoft/datatable-laravel.svg)](https://packagist.org/packages/acunsoft/datatable-laravel)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**[Documentation](https://kemaloskan.github.io/acun-datatable/)** ·
-**[Live demo](https://kemaloskan.github.io/acun-datatable/demo/)** ·
-[Performance measurements](https://kemaloskan.github.io/acun-datatable/#/performance) ·
+**[Documentation](https://acunsoft-yazilim.github.io/acun-datatable/)** ·
+**[Live demo](https://acunsoft-yazilim.github.io/acun-datatable/demo/)** ·
+[Performance measurements](https://acunsoft-yazilim.github.io/acun-datatable/#/performance) ·
 [Upgrading](UPGRADING.md)
 
-A framework-independent data table for **Laravel + Livewire, Vue, React,
-Next.js and plain HTML**. Sorting, smart search, filters, paging, export and
+A framework-independent data table for **plain HTML / JavaScript (also as
+the `<acun-datatable>` Web Component), React and Next.js, Vue and Nuxt, and
+Laravel + Livewire**: one TypeScript core, one package per framework, no
+separate Next.js or Nuxt package. Sorting, smart search, filters, paging, export and
 mobile layouts come ready; the table manages the interface and your back end
 decides how the data is queried. Free and MIT licensed, with no third-party
 runtime dependencies.
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/styles.css">
-<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/acun-datatable.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/acun-datatable.min.js"></script>
 
 <table id="orders">…</table>
 <script>new AcunDataTable('#orders', { language: 'tr' });</script>
@@ -29,7 +31,7 @@ runtime dependencies.
 | [`@acunsoft/datatable`](packages/datatable) | Everything in one call, like DataTables: `new AcunDataTable('#table', { serverSide: true, ajax: '/api/orders' })`; also a single `<script>`. |
 | [`@acunsoft/datatable-core`](packages/core) | Headless engine: sorting, filters, Turkish-aware search, pages, selection, column visibility, server mode. No dependencies. |
 | [`@acunsoft/datatable-dom`](packages/renderer-dom) | Accessible renderer without a framework: `renderDataTable` with a DataTables-style layout, optional `styles.css`. |
-| [`@acunsoft/datatable-vue`](packages/vue) · [`@acunsoft/datatable-react`](packages/react) | Components and composables/hooks with the same markup. |
+| [`@acunsoft/datatable-vue`](packages/vue) · [`@acunsoft/datatable-react`](packages/react) | Components and composables/hooks with the same markup; server rendering and hydration tested in a Nuxt and a Next.js (App Router) app. |
 | [`@acunsoft/datatable-http`](packages/datasource-http) | Server mode over `fetch`: latest request wins, abort, retry. |
 | [`@acunsoft/datatable-server`](packages/server) | Node back end (Next.js, Express, Fastify): checks the query against a column allowlist, builds bound-parameter SQL (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server; no driver required) or Prisma arguments, answers in the table or DataTables format. |
 | [`@acunsoft/datatable-export`](packages/export) | Excel (.xlsx) and CSV export and import, written from scratch. |
@@ -67,7 +69,7 @@ composer require acunsoft/datatable-laravel                     # Laravel + Live
 ```
 
 The rest of this file documents the core API for contributors; the
-[documentation site](https://kemaloskan.github.io/acun-datatable/) and each
+[documentation site](https://acunsoft-yazilim.github.io/acun-datatable/) and each
 package README cover usage.
 
 ## Upgrading
@@ -77,9 +79,9 @@ From npm 0.2.x or `acunsoft/datatable-laravel` 0.4: see [UPGRADING.md](UPGRADING
 ## Setup
 
 The development standard is **Node.js 24 LTS**, pinned in [`.nvmrc`](.nvmrc).
-The packages support **Node.js 22+** (`engines`), and CI runs the full suite on
-Node **22 and 24**, every supported LTS line, so consumers are not limited to a
-single version. Node 20 reached end of life in April 2026 and is not supported.
+The packages support **Node.js 22+** (`engines`): CI runs the checks and unit
+tests on Node **22 and 24**, every supported LTS line, and the browser and
+database jobs on the `.nvmrc` version. Node 20 reached end of life in April 2026 and is not supported.
 Dependencies are pinned by the committed lockfile; updates land only through a PR
 that passes the CI matrix, never unattended. With [nvm](https://github.com/nvm-sh/nvm):
 

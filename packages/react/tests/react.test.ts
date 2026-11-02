@@ -100,7 +100,8 @@ describe('DataTable', () => {
       retry,
     };
     render(h(DataTable<Order>, { table: make(), status }));
-    expect(host.querySelector('.adt-table-wrap')!.getAttribute('aria-busy')).toBe('true');
+    expect(host.querySelector('.adt-scroll')!.getAttribute('aria-busy')).toBe('true');
+    expect(host.querySelector('.adt-notice')!.closest('[aria-busy="true"]')).toBeNull(); // "Loading…" is not held back
     act(() => { phase = 'error'; listeners.forEach(fn => fn({ status: phase })); });
     expect(host.querySelector('[role="alert"]')!.textContent).toContain('The data could not be loaded.');
     click(host.querySelector('.adt-retry'));
@@ -200,6 +201,58 @@ describe('useDataTable', () => {
     expect(host.textContent).toBe('0');
     const live = [...seen].filter(table => (table as { getState(): unknown }).getState() !== undefined);
     expect(live.length).toBeGreaterThan(0);
+  });
+
+  it('settles when the data is a new array on every render (an inline filter)', () => {
+    let renders = 0;
+    let setMin!: (min: number) => void;
+    function Orders(): ReactElement {
+      const [min, set] = useState(0);
+      setMin = set;
+      renders += 1;
+      const { page } = useDataTable<Order>({ data: orders.filter(order => Number(order.total) >= min), columns });
+      return h('p', null, String(page.totalRows));
+    }
+    render(h(StrictMode, null, h(Orders)));
+    expect(host.textContent).toBe('3');
+    expect(renders).toBeLessThan(10);
+    renders = 0;
+    act(() => setMin(100));
+    expect(host.textContent).toBe('2');
+    expect(renders).toBeLessThan(10);
+  });
+
+  it('still takes a new array of the same records, e.g. after a record changed in place', () => {
+    const rows = orders.map(order => ({ ...order }));
+    let setRows!: (rows: Order[]) => void;
+    let table!: ReturnType<typeof useDataTable<Order>>['table'];
+    function Orders(): ReactElement {
+      const [data, set] = useState(rows);
+      setRows = set;
+      const view = useDataTable<Order>({ data, columns });
+      table = view.table;
+      return h('p', null, view.page.rows.map(row => row.original.customer).join(','));
+    }
+    render(h(Orders));
+    act(() => table.setSorting([{ field: 'customer', direction: 'asc' }])); // a table event first
+    expect(host.textContent).toBe('Ali,Ayşe,Can');
+    rows[0]!.customer = 'Zeynep';
+    act(() => setRows([...rows]));
+    expect(host.textContent).toBe('Ali,Can,Zeynep'); // sorted again: the new array was applied
+  });
+
+  it('keeps table events with an inline array and does not apply it again', () => {
+    let table!: ReturnType<typeof useDataTable<Order>>['table'];
+    function Orders(): ReactElement {
+      const view = useDataTable<Order>({ data: orders.filter(() => true), columns });
+      table = view.table;
+      return h('p', null, view.page.rows.map(row => row.original.customer).join(','));
+    }
+    render(h(StrictMode, null, h(Orders)));
+    const setData = vi.spyOn(table, 'setData');
+    act(() => table.setSorting([{ field: 'customer', direction: 'desc' }]));
+    expect(host.textContent).toBe('Can,Ayşe,Ali');
+    expect(setData).not.toHaveBeenCalled();
   });
 });
 
@@ -574,5 +627,85 @@ describe('filter panel modes and toolbar buttons', () => {
     render(h(FilterPanel, { table: filtered(), labels: labelsTr }));
     expect(host.querySelector('summary, .adt-filter-open')).toBeNull();
     expect([...host.querySelectorAll('.adt-filter legend')].map(node => node.textContent)).toEqual(['Müşteri', 'Tutar']);
+  });
+});
+
+describe('selection speed', () => {
+  it('clears a large selection quickly (virtual: every row is on the page)', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+    const many = Array.from({ length: 30_000 }, (_, i) => ({ id: i + 1, customer: `Row ${i + 1}`, total: '1.00' }));
+    const table = createDataTable<Order>({ data: many, columns });
+    render(h(DataTable<Order>, { table, virtual: { rowHeight: 40 }, selectable: true }));
+    click(host.querySelector('thead .adt-select input'));
+    expect(table.getState().selectedIds).toHaveLength(30_000);
+    const started = performance.now();
+    click(host.querySelector('thead .adt-select input'));
+    expect(table.getState().selectedIds).toHaveLength(0);
+    expect(performance.now() - started).toBeLessThan(300);
+  });
+});
+
+describe('unmount while a scroll waits for its frame', () => {
+  it('cancels the frame', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame');
+    const many = Array.from({ length: 1000 }, (_, i) => ({ id: i + 1, customer: `Row ${i + 1}`, total: '1.00' }));
+    render(h(DataTable<Order>, { table: createDataTable<Order>({ data: many, columns }), virtual: { rowHeight: 40 } }));
+    act(() => { host.querySelector('.adt-scroll')!.dispatchEvent(new Event('scroll', { bubbles: true })); });
+    act(() => root!.unmount());
+    root = undefined;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+});
+
+describe('ColumnToggle closes like a menu', () => {
+  it('Escape closes it with the focus back on its button; a click outside closes it; reset keeps the focus there', () => {
+    const table = make();
+    render(h(ColumnToggle, { table }));
+    const menu = host.querySelector<HTMLDetailsElement>('details.adt-columns')!;
+    const summary = menu.querySelector('summary')!;
+    menu.open = true;
+    act(() => { menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    expect(menu.open).toBe(false);
+    expect(document.activeElement).toBe(summary);
+    menu.open = true;
+    click(document.body);
+    expect(menu.open).toBe(false);
+    menu.open = true;
+    act(() => table.setColumnWidth('total', 200));
+    click(host.querySelector('.adt-columns-reset'));
+    expect(table.getState().columnWidths).toEqual({});
+    expect(document.activeElement).toBe(summary);
+  });
+});
+
+describe('option checks, as the DOM renderer', () => {
+  it('refuses row actions without an id, label or onSelect, or with an id twice', () => {
+    const table = make();
+    const actions = (list: unknown) => () => render(h(DataTable<Order>, { table, rowActions: list as never }));
+    expect(actions([{ id: 'edit', label: 'Edit', onSelect: () => undefined }, { id: 'edit', label: 'Again', onSelect: () => undefined }])).toThrow('duplicate action id "edit"');
+    expect(actions([{ id: 'edit', label: '', onSelect: () => undefined }])).toThrow('needs a label');
+    expect(actions([{ id: 'edit', label: 'Edit' }])).toThrow('needs onSelect');
+    expect(actions([{ id: '1x', label: 'Edit', onSelect: () => undefined }])).toThrow('id must start with a letter');
+  });
+});
+
+describe('DataTableLayout locale', () => {
+  it('shows the texts of its locale, as renderDataTable does; labels still win', () => {
+    render(h(DataTableLayout<Order>, { table: make(), locale: 'tr' }));
+    expect(host.querySelector('.adt-columns summary')!.textContent).toBe('Kolonlar');
+    expect(host.querySelector('.adt-search .adt-sr-only')!.textContent).toBe('Ara');
+    act(() => root!.unmount());
+    root = undefined;
+    render(h(DataTableLayout<Order>, { table: make(), locale: 'de-DE', labels: { columns: 'Felder' } }));
+    expect(host.querySelector('.adt-columns summary')!.textContent).toBe('Felder');
+    expect(host.querySelector('.adt-search .adt-sr-only')!.textContent).toBe('Suchen');
+  });
+});
+
+describe('toolbar buttons, as the DOM renderer', () => {
+  it('refuses an icon that is not one of ICONS or { path }', () => {
+    expect(() => render(h(ColumnToggle, { table: make(), button: { icon: 'rocket' as never } }))).toThrow('Unknown icon "rocket"');
+    expect(() => render(h(ColumnToggle, { table: make(), button: { icon: 42 as never } }))).toThrow('icon must be an icon name');
   });
 });

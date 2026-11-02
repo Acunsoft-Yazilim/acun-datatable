@@ -36,7 +36,9 @@ final class TableResponse implements Responsable
     private ?int $maxResultWindow = 100_000;
     private ?Closure $searchEngine = null;
     private string $searchKeyColumn = 'id';
+    private ?string $key = null;
     private ?int $countTimeout = 250;
+    private ?string $timeZone = null;
 
     private function __construct(private readonly EloquentBuilder|QueryBuilder $builder)
     {
@@ -51,6 +53,20 @@ final class TableResponse implements Responsable
     public function columns(iterable $columns): self
     {
         $this->columns = [...$columns];
+
+        return $this;
+    }
+
+    /**
+     * The time zone of a day given for a datetime column (`2026-10-23` means
+     * that whole day there), e.g. the user's from the session. Default: the
+     * zone the browser sends as `tz` (datatable-http does with day filters),
+     * else the application's.
+     */
+    public function timeZone(?string $zone): self
+    {
+        TableQuery::fromArray([])->withTimeZone($zone); // refuses an unknown zone now, not at the first request
+        $this->timeZone = $zone;
 
         return $this;
     }
@@ -127,6 +143,18 @@ final class TableResponse implements Responsable
         return $this;
     }
 
+    /**
+     * The unique key of a query-builder table: the last sort tie-breaker, so
+     * rows never repeat or go missing between pages (cursor paging uses `id`
+     * without it). An Eloquent query uses its model key.
+     */
+    public function key(string $column): self
+    {
+        $this->key = $column;
+
+        return $this;
+    }
+
     /** @param Closure(mixed $row): array<string, mixed> $transform e.g. fn ($order) => new OrderResource($order) */
     public function transform(Closure $transform): self
     {
@@ -141,11 +169,14 @@ final class TableResponse implements Responsable
         $unfiltered = clone $this->builder;
         try {
             $query = TableQuery::fromRequest($request, $this->maxPageSize, $this->defaultPageSize);
+            if ($this->timeZone !== null) {
+                $query = $query->withTimeZone($this->timeZone);
+            }
             if ($this->searchEngine !== null && $query->search !== '') {
                 $query = $query->withSearchKeys(($this->searchEngine)($query->search), $this->searchKeyColumn);
             }
             $fresh = clone $this->builder; // paginate() applies the query to the builder it gets
-            $page = QueryApplier::paginate($this->builder, $query, $this->columns, $this->countLimit, $this->maxResultWindow, $this->countTimeout);
+            $page = QueryApplier::paginate($this->builder, $query, $this->columns, $this->countLimit, $this->maxResultWindow, $this->countTimeout, $this->key);
             // Footer totals (columns with aggregate()) only while the count is exact.
             $totals = $page->totalIsExact() ? QueryApplier::aggregates($fresh, $query, $this->columns) : [];
         } catch (InvalidTableQuery $error) {

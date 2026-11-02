@@ -44,6 +44,7 @@ interface DataTableBaseOptions<TData> {
    * `'cursor'` sends the `nextCursor` of the page before (keyset): the server
    * continues through an index instead of skipping `OFFSET` rows. Pages are then reached one after another: every
    * page up to the furthest one seen, plus the next while there is one.
+   * Its queries carry `paging: 'cursor'`, which the HTTP data source follows.
    */
   readonly paging?: 'pages' | 'cursor';
   /**
@@ -420,7 +421,7 @@ export function createDataTable<TData>(options: DataTableOptions<TData>): DataTa
     getSelectionMode: () => selection.getState().mode,
     getQuery: () => {
       const cursor = cursorPaging ? cursors[state.page - 1] : undefined;
-      return createTableQuery(cursor === undefined ? state : { ...state, cursor });
+      return createTableQuery(cursorPaging ? { ...state, paging, ...(cursor === undefined ? {} : { cursor }) } : state);
     },
     getPaging: () => paging,
     getTotalRows: () => (server ? serverTotal : getFilteredRows().length),
@@ -530,6 +531,8 @@ export function createDataTable<TData>(options: DataTableOptions<TData>): DataTa
       if (destroyed) return;
       const next = checkSearch(text);
       if (next === globalSearch) return;
+      // Spaces around the words change no match (the query trims them): kept as typed, page and rows stay.
+      if (next.trim() === globalSearch.trim()) { globalSearch = next; emit({ type: 'globalSearch', globalSearch }); return; }
       viewChanged(() => { globalSearch = next; }, () => ({ type: 'globalSearch', globalSearch }));
     },
 

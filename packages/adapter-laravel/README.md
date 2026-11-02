@@ -48,7 +48,8 @@ the CSRF token, which `AcunDataTable` sends from `<meta name="csrf-token">`).
 **An existing DataTables front end works too.** A request in DataTables'
 server-side protocol (it carries `draw`) is read as such — `start`/`length`,
 `order[i][column|dir]` by column index, `columns[i][search][value]` as a
-`contains` filter, `search[value]`, `length=-1` as the largest page allowed —
+`contains` filter, `search[value]`; `length=-1` ("All") and a length past
+the endpoint's largest page are refused, never cut short —
 and answered with `{ draw, recordsTotal, recordsFiltered, data }`; an
 invalid request gets DataTables' `error` (with a 200, as DataTables expects).
 The same column allowlist and limits apply. So a page still on DataTables
@@ -320,8 +321,9 @@ Column::make('status')->header('Durum')->options(['new' => 'Yeni', 'paid' => 'Ö
 
 The cell gets an edit button (and a double click) with an editor for its type;
 Enter or leaving the field calls `updateCell()`. On the server the row is
-looked up inside `query()`, the model's policy must allow `update` (when it
-has one), and the value is validated against the type, `options()` and your
+looked up inside `query()`, the model's policy must allow `update` (a model
+without a policy is not editable unless `editableWithoutPolicy()` returns
+`true`), and the value is validated against the type, `options()` and your
 rules (`nullable` unless `required`; a decimal comma is accepted); an error
 keeps the editor open with the message. `saveCell()` then sets only that
 column's attribute and saves the model; override it for query-builder rows or
@@ -435,9 +437,11 @@ protected function bulkActions(): array
 
 An export past `exportLimit()` (or a `queued()` bulk action) goes to a job,
 `RunTableTask`, and the table says so while you keep working. The job
-rebuilds the table from its state (search, filters, sorting, selection) **as
-the user who started it**, so `query()` and policies see the same user (and
-the worker forgets that user afterwards). When the file is ready the table
+rebuilds the table from its public properties (search, filters, sorting,
+selection, and your own: a model, an enum or a date travels through
+Livewire's synthesizers, as between requests) **as the user who started
+it**, so `query()` and policies see the same user (and the worker forgets
+that user afterwards); a user deleted meanwhile fails the task. When the file is ready the table
 shows "Download": a signed link valid for an hour, only for that user (a
 guest's task belongs to the guest's session), and the file is deleted once
 sent. A table runs one task at a time, and one visitor may start
@@ -531,12 +535,18 @@ Unknown, undeclared or not-allowed fields and malformed values throw
 - **Smart search:** the `search` text is split into words, a quoted phrase is one
   term; every term must match in some searchable column. At most 10 terms.
 - **Types:** `number`/`decimal` values must be finite numbers; `boolean` reads
-  `true/false/1/0`; `date` compares days with `whereDate`; in a `datetime` column
-  a date-only value (`2026-10-23`, also how the browser sends a date picker's
-  value) means **the whole day** (`whereDate`), a value with a time is an exact
-  instant converted to `app.timezone`.
+  `true/false/1/0`; `date` compares calendar days; in a `datetime` column a
+  date-only value (`2026-10-23`, also how the browser sends a date picker's
+  value) means **the whole day**, as a range the column's index serves: the
+  day in the browser's time zone (`tz`, sent with day filters), or in
+  `->timeZone('Europe/Istanbul')` when you set one (e.g. from the user's
+  profile), else in `app.timezone`; a value with a time is an exact instant
+  converted to `app.timezone`.
 - **Sorting:** up to 5 rules (`sort=total:desc,customer:asc`); the primary key
-  is added as a tie-breaker so pages are stable.
+  is added as a tie-breaker so pages are stable. A query builder
+  (`DB::table('orders')`) has no model key: name it with
+  `TableResponse::for(…)->key('id')` / `TableExport::for(…)->key('id')`
+  (Livewire tables use `keyName()`).
 - **Limits:** page 1–10,000,000; page size up to `maxPageSize` (≤ 1000); at most
   20 filters, 1000 `in` values, 200 characters per value and search.
 - **Rows:** only the key and the declared columns are returned, unless you pass
@@ -722,6 +732,10 @@ Route::get('/orders/export', function (Request $request) {
 
 ## Import with the import dialog: `TableImport`
 
+> **Not released yet.** The import comes with the next release; until then
+> the browser package `@acunsoft/datatable-import` (its dialog and
+> `acun-datatable-import.min.js`) is not on npm.
+
 The import dialog of `@acunsoft/datatable-import` (file and drag and drop,
 column mapping with a preview, progress, results, error report) talks to your
 back end by the import protocol `acun-import/1`. `TableImport` is that back
@@ -783,7 +797,8 @@ protected function importEndpoint(): ?string { return url('orders/import'); }
 - **At once or in the background — your choice:** `shouldQueue(int $rows)`
   (default `false`) dispatches `RunTableImport` on your queue
   (`queueConnection()`, `queueName()`; `database`, `redis`, `sqs`, `sync` —
-  none is required), as the user who started it. The dialog follows the
+  none is required), as the user who started it (deleted meanwhile: the
+  import fails and imports nothing). The dialog follows the
   progress after every chunk and can cancel between chunks.
 - **State** lives in the app's cache store (any driver; `array` only works in
   one request), files on `disk()` (`local`, private) for `keepSeconds()` (a
@@ -826,7 +841,7 @@ $page  = QueryApplier::paginate(Order::query(), $query, $columns); // LengthAwar
 
 ## Upgrading
 
-From 0.4: see [UPGRADING.md](https://github.com/kemaloskan/acun-datatable/blob/main/UPGRADING.md#acunsoftdatatable-laravel-04--05) (re-publish customized views, the user's sort now comes first).
+From 0.4: see [UPGRADING.md](https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/UPGRADING.md#acunsoftdatatable-laravel-04--05) (re-publish customized views, the user's sort now comes first).
 
 ## Tests
 

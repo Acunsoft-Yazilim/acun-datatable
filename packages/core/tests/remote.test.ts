@@ -93,3 +93,14 @@ describe('validatePageResult', () => {
       .toThrow('page result has 3 rows, more than the requested page size 2');
   });
 });
+
+describe('validatePageResult, called again on its own result', () => {
+  it('returns it as it is (no second copy of every row), still checking the page size', () => {
+    const rows = Array.from({ length: 3 }, (_, i) => ({ id: i }));
+    const first = validatePageResult({ rows, totalRows: 3 });
+    expect(validatePageResult(first)).toBe(first); // the source, the runner and the table: one copy
+    expect(() => validatePageResult(first, { pageSize: 2 })).toThrow('more than the requested page size 2');
+    expect(validatePageResult({ rows, totalRows: 3 })).not.toBe(first); // anything else is checked and copied
+    expect(() => validatePageResult(null)).toThrow('page result must be an object');
+  });
+});

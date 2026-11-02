@@ -21,7 +21,11 @@ export function connectTable<TData>(table: DataTable<TData>, runner: QueryRunner
   const offTable = table.subscribe((_, event) => {
     // Selection, results and the column layout (visibility, order, widths) do not change the query.
     if (PRESENTATION.has(event.type)) return;
-    void runner.run(table.getQuery());
+    const query = table.getQuery();
+    // The same query again (a space after the search words): the answer on its way or on screen holds.
+    const last = runner.getState();
+    if ((last.status === 'loading' || last.status === 'success') && sameQuery(last.query, query)) return;
+    void runner.run(query);
   });
   const offRunner = runner.subscribe((state) => {
     if (state.status !== 'success' || state.result === undefined) return;

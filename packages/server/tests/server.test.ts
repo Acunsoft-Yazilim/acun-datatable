@@ -92,6 +92,11 @@ describe('sqlQuery (SQLite)', () => {
     expect(day.total).toBeGreaterThan(0);
     const range = ask('pageSize=50&filters[0][field]=ordered&filters[0][op]=between&filters[0][value][0]=2026-10-06&filters[0][value][1]=2026-10-07');
     expect(range.total).toBe(all(row => /^2026-10-0[67]/.test(String(row['ordered_at']))).length);
+    const days = ask('pageSize=50&filters[0][field]=ordered&filters[0][op]=in&filters[0][value][0]=2026-10-06&filters[0][value][1]=2026-10-09');
+    expect(days.total).toBe(all(row => /^2026-10-0[69]/.test(String(row['ordered_at']))).length); // in: whole days too, as in the browser
+    expect(days.total).toBeGreaterThan(0);
+    const mixed = ask('pageSize=50&filters[0][field]=ordered&filters[0][op]=in&filters[0][value][0]=2026-10-06&filters[0][value][1]=2026-10-09T09:00:00');
+    expect(mixed.total).toBe(all(row => String(row['ordered_at']).startsWith('2026-10-06') || row['ordered_at'] === '2026-10-09 09:00:00').length);
     const empty = ask('pageSize=50&filters[0][field]=city&filters[0][op]=empty');
     expect(empty.total).toBe(all(row => row['city'] === null).length);
     const paid = ask('pageSize=50&filters[0][field]=paid&filters[0][op]=eq&filters[0][value]=true');
@@ -155,6 +160,15 @@ describe('sqlQuery (SQL Server)', () => {
 });
 
 describe('prismaQuery', () => {
+  it('reads days in an in list as whole days, other values exactly', () => {
+    const where = (value: string) => prismaQuery(readTableQuery(new URLSearchParams(`filters[0][field]=ordered&filters[0][op]=in&${value}`), columns), columns).count.where;
+    expect(where('filters[0][value][0]=2026-10-05&filters[0][value][1]=2026-10-07T09:30:00')).toEqual({ OR: [ // one condition: no AND around it
+      { ordered: { gte: new Date(2026, 9, 5), lt: new Date(2026, 9, 6) } },
+      { ordered: { in: [new Date(2026, 9, 7, 9, 30)] } },
+    ] });
+    expect(prismaQuery(readTableQuery(new URLSearchParams('filters[0][field]=qty&filters[0][op]=in&filters[0][value][0]=1'), columns), columns).count.where).toEqual({ qty: { in: [1] } });
+  });
+
   it('builds findMany and count arguments', () => {
     const query = readTableQuery(new URLSearchParams('page=2&pageSize=10&sort=total:asc&filters[0][field]=ordered&filters[0][op]=eq&filters[0][value]=2026-10-05&search=kaya'), columns);
     const prisma = prismaQuery(query, columns, { where: { tenant: 1 } });
@@ -221,6 +235,21 @@ describe('NULL values, big integers and odd requests', () => {
     expect(next({ score: null, id: 4 }).text).toContain('WHERE "score" IS NULL AND ("score" IS NULL AND "id" > $1)');
   });
 
+  it('reads PostgreSQL date-time sort columns as text for the cursor, which the answer leaves out', () => {
+    const stamped = defineColumns({ at: { type: 'datetime', sortable: true }, name: { sortable: true } });
+    const query = readTableQuery(new URLSearchParams('sort=at:desc,name:asc&paging=cursor&pageSize=1'), stamped);
+    const sql = sqlQuery(query, stamped, { dialect: 'postgres', table: 'events', select: ['id', 'at', 'name'] });
+    expect(sql.page.text).toContain(`SELECT "id", "at", "name", to_char("at", 'YYYY-MM-DD HH24:MI:SS.US OF') AS "__adt_cursor_0" FROM "events"`);
+    const rows = [0, 1].map(id => ({ id, at: new Date(2026, 9, 1, 10, 0, 0, 123), name: 'a', __adt_cursor_0: `2026-10-01 10:00:00.12345${id} +03` }));
+    const body = tableResponse(query, rows, undefined, { cursorOf: sql.cursorOf });
+    expect(body['rows']).toEqual([{ id: 0, at: rows[0]!.at, name: 'a' }]);
+    const next = sqlQuery(readTableQuery(new URLSearchParams(`sort=at:desc,name:asc&paging=cursor&cursor=${body['nextCursor']}`), stamped), stamped, { dialect: 'postgres', table: 'events' });
+    expect(next.page.values[0]).toBe('2026-10-01 10:00:00.123450 +03'); // the microseconds, not the Date
+    // Offset paging and the other dialects read no extra column.
+    expect(sqlQuery(readTableQuery(new URLSearchParams('sort=at:desc'), stamped), stamped, { dialect: 'postgres', table: 'events' }).page.text).not.toContain('to_char');
+    expect(sqlQuery(query, stamped, { dialect: 'sqlite', table: 'events' }).page.text).not.toContain('__adt');
+  });
+
   it('carries big integers and keeps Prisma NULL-aware', () => {
     const query = readTableQuery(new URLSearchParams('sort=score:asc&paging=cursor'), scored);
     const prisma = prismaQuery(query, scored);
@@ -261,5 +290,40 @@ describe('counting', () => {
     expect(tableResponse(query, [{ id: 1 }], 7)).toEqual({ rows: [{ id: 1 }], totalRows: 7 });
     expect(tableResponse(query, [{ id: 1 }], 10_001, { atLeast: true })).toEqual({ rows: [{ id: 1 }], totalRowsAtLeast: 10_001 });
     expect(tableResponse(query, [{ id: 1 }])).toEqual({ rows: [{ id: 1 }] });
+  });
+});
+
+describe('DataTables page length', () => {
+  it('refuses "All" (-1) and more rows than a page may hold, instead of a page cut short', () => {
+    const ask = (length: string) => { try { return readTableQuery({ draw: '1', start: '0', length, columns: [{ data: 'customer' }] }, columns, { maxPageSize: 50 }).pageSize; } catch (error) { return (error as Error).message; } };
+    expect(ask('-1')).toBe('length -1 (all rows) is not allowed: at most 50 rows a page');
+    expect(ask('51')).toBe('length must be a whole number from 1 to 50');
+    expect(ask('50')).toBe(50);
+    const answer = tableError(new TableQueryError('length', 'x'), { draw: '7' });
+    expect(answer).toMatchObject({ status: 200, body: { draw: 7, error: 'x' } }); // what DataTables shows
+  });
+});
+
+describe('DataTables paging', () => {
+  it('skips start rows, also when start is no whole number of pages (the page length changed)', () => {
+    const query = readTableQuery({ draw: '3', start: '15', length: '10', columns: [{ data: 'customer' }] }, columns);
+    expect(sqlQuery(query, columns, { dialect: 'sqlite', table: 'orders' }).page.text).toMatch(/LIMIT 10 OFFSET 15$/);
+    expect(prismaQuery(query, columns).findMany).toMatchObject({ skip: 15, take: 10 });
+    expect(sqlQuery(readTableQuery({ page: '3', pageSize: '10' }, columns), columns, { dialect: 'sqlite', table: 'orders' }).page.text).toMatch(/LIMIT 10 OFFSET 20$/);
+  });
+});
+
+describe('DataTables requests from this package\'s client', () => {
+  it('take filters[i] and leave out the column searches, which are their copies', () => {
+    // datatable-http sends an eq filter on a yes/no column both ways (for DataTables back ends too).
+    const params = new URLSearchParams('draw=1&start=0&length=10&columns[0][data]=customer&columns[1][data]=paid&columns[1][search][value]=true'
+      + '&filters[0][field]=paid&filters[0][op]=eq&filters[0][value]=true');
+    const query = readTableQuery(params, columns);
+    expect(query.filters.map(filter => [filter.column.id, filter.operator, filter.value])).toEqual([['paid', 'eq', true]]);
+  });
+
+  it('still read a column search as contains when there are no filters[i] (DataTables itself)', () => {
+    const query = readTableQuery(new URLSearchParams('draw=1&start=0&length=10&columns[0][data]=customer&columns[0][search][value]=ali'), columns);
+    expect(query.filters.map(filter => [filter.column.id, filter.operator, filter.value])).toEqual([['customer', 'contains', 'ali']]);
   });
 });

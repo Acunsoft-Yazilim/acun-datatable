@@ -1,6 +1,6 @@
 import type { ColumnDef, ColumnType, DataTable, FilterOption, FilterRule } from '@acunsoft/datatable-core';
 import { checkTarget, element, fillButton, icon, placeMenu, type RenderedComponent, type ToolbarButton } from './dom';
-import { labelsEn, type DataTableLabels } from './labels';
+import { resolveLabels, type DataTableLabels } from './labels';
 
 /** The kind of control a filter-panel column gets. */
 export type FilterKind = 'text' | 'options' | 'range' | 'dates' | 'boolean';
@@ -282,7 +282,7 @@ function buildFilterPanel<TData>(
 export function renderFilterPanel<TData>(container: HTMLElement, table: DataTable<TData>, options: RenderFilterPanelOptions = {}): RenderedComponent {
   checkTarget(container, table);
   const doc = container.ownerDocument;
-  const labels: DataTableLabels = { ...labelsEn, ...options.labels };
+  const labels: DataTableLabels = resolveLabels(options.locale, options.labels); // locale also picks the texts, as in renderDataTable
   const controls = filterControls(table.getColumns());
   if (controls.length === 0) {
     container.replaceChildren();
@@ -306,7 +306,7 @@ export function renderFilters<TData>(container: HTMLElement, table: DataTable<TD
   const mode = options.panel ?? 'dropdown';
   if (!PANEL_MODES.includes(mode)) throw new RangeError(`panel must be one of ${PANEL_MODES.join(', ')}`);
   const doc = container.ownerDocument;
-  const labels: DataTableLabels = { ...labelsEn, ...options.labels };
+  const labels: DataTableLabels = resolveLabels(options.locale, options.labels); // locale also picks the texts, as in renderDataTable
   const controls = filterControls(table.getColumns());
   if (controls.length === 0) {
     container.replaceChildren();
@@ -391,7 +391,7 @@ export function renderFilters<TData>(container: HTMLElement, table: DataTable<TD
 export function renderFilterChips<TData>(container: HTMLElement, table: DataTable<TData>, options: Omit<RenderFiltersOptions, 'debounceMs'> = {}): RenderedComponent {
   checkTarget(container, table);
   const doc = container.ownerDocument;
-  const labels: DataTableLabels = { ...labelsEn, ...options.labels };
+  const labels: DataTableLabels = resolveLabels(options.locale, options.labels); // locale also picks the texts, as in renderDataTable
   const controls = filterControls(table.getColumns());
   const root = element(doc, 'div', { class: 'adt-filter-chips', role: 'group', 'aria-label': labels.filters });
   container.replaceChildren(root);

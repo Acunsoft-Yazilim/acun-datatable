@@ -156,8 +156,11 @@ describe('row action icons, danger, confirm and the overflow menu', () => {
     host.querySelector<HTMLButtonElement>('.adt-row-menu [data-action="delete"]')!.click();
     expect(confirm).toHaveBeenLastCalledWith('Delete Ayşe?');
     expect(remove).not.toHaveBeenCalled();
+    host.querySelector<HTMLDetailsElement>('.adt-row-menu')!.open = true;
+    host.querySelector<HTMLButtonElement>('.adt-row-menu [data-action="delete"]')!.focus();
     host.querySelector<HTMLButtonElement>('.adt-row-menu [data-action="delete"]')!.click();
     expect(remove).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(host.querySelector('.adt-row-menu summary')); // back on "More actions"
     host.querySelector<HTMLDetailsElement>('.adt-row-menu')!.open = true;
     document.body.click();
     expect(host.querySelector<HTMLDetailsElement>('.adt-row-menu')!.open).toBe(false); // a click outside closes it

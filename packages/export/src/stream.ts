@@ -34,6 +34,8 @@ export interface StreamXlsxOptions extends ReadXlsxOptions {
 
 type Bytes = Uint8Array | ArrayBuffer | Iterable<Uint8Array> | AsyncIterable<Uint8Array>;
 const PIECE = 1 << 20;
+/** The longest CSV field read (characters); Excel itself keeps at most 32,767 in a cell. */
+const MAX_FIELD = 1 << 20;
 
 async function* byteChunks(input: Bytes): AsyncGenerator<Uint8Array> {
   if (input instanceof ArrayBuffer) input = new Uint8Array(input);
@@ -54,19 +56,27 @@ async function* textChunks(input: Bytes | AsyncIterable<Uint8Array>, encoding = 
   if (rest !== '') yield rest;
 }
 
-/** The delimiter of the header line (as `parseCsv` detects it), or `undefined` until the line is complete. */
-function detect(text: string, final: boolean): ',' | ';' | '\t' | undefined {
+/**
+ * The delimiter of the header line (as `parseCsv` detects it), fed piece by
+ * piece and each piece read once: `undefined` until the line is complete, or
+ * `MAX_FIELD` long (a quote that never closes must not hold the whole file).
+ */
+function delimiterOf(): (text: string, final: boolean) => ',' | ';' | '\t' | undefined {
   let quoted = false;
-  let complete = final;
+  let read = 0;
   const counts = { ',': 0, ';': 0, '\t': 0 };
-  for (const char of text) {
-    if (char === '"') quoted = !quoted;
-    else if (!quoted && (char === '\n' || char === '\r')) { complete = true; break; }
-    else if (!quoted && char in counts) counts[char as keyof typeof counts] += 1;
-  }
-  if (!complete) return undefined;
-  const best = (Object.entries(counts) as [',' | ';' | '\t', number][]).sort((a, b) => b[1] - a[1])[0]!;
-  return best[1] === 0 ? ',' : best[0];
+  return (text, final) => {
+    let complete = final;
+    for (const char of text) {
+      if (char === '"') quoted = !quoted;
+      else if (!quoted && (char === '\n' || char === '\r')) { complete = true; break; }
+      else if (!quoted && char in counts) counts[char as keyof typeof counts] += 1;
+    }
+    read += text.length;
+    if (!complete && read < MAX_FIELD) return undefined;
+    const best = (Object.entries(counts) as [',' | ';' | '\t', number][]).sort((a, b) => b[1] - a[1])[0]!;
+    return best[1] === 0 ? ',' : best[0];
+  };
 }
 
 /**
@@ -112,6 +122,7 @@ function csvParser(delimiter: string, maxColumns: number, maxRows: number) {
           if (c === 10 || (c === 13 && text.charCodeAt(k + 1) !== 10)) line += 1;
         }
         value += text.slice(i, end);
+        if (value.length > MAX_FIELD) throw new ImportError(`a field is longer than ${MAX_FIELD} characters`, recordLine);
         i = end;
         if (i >= n) break;
         if (text.charCodeAt(i) === 13) return text.slice(i); // a \r at the end: is \n next?
@@ -140,6 +151,7 @@ function csvParser(delimiter: string, maxColumns: number, maxRows: number) {
           end += 1;
         }
         value += text.slice(i, end);
+        if (value.length > MAX_FIELD) throw new ImportError(`a field is longer than ${MAX_FIELD} characters`, recordLine);
         i = end;
       }
     }
@@ -212,6 +224,7 @@ export async function streamCsv(input: Bytes, options: StreamCsvOptions = {}): P
   const size = Math.max(1, options.chunkSize ?? 1_000);
   async function* batches(): AsyncGenerator<SheetCell[][]> {
     let feed: ReturnType<typeof csvParser> | undefined;
+    const detect = delimiterOf();
     let head = '';
     let carry = '';
     let started = false;
@@ -226,7 +239,7 @@ export async function streamCsv(input: Bytes, options: StreamCsvOptions = {}): P
       }
       if (!feed) {
         head += text;
-        const delimiter = options.delimiter ?? detect(head, final);
+        const delimiter = options.delimiter ?? detect(text, final);
         if (delimiter === undefined) continue;
         feed = csvParser(delimiter, maxColumns, maxRows);
         text = head;
@@ -255,6 +268,8 @@ async function* elements(source: AsyncIterator<string>, name: string, container?
   let inside = !container;
   let scanned = 0; // where the search for the end of an incomplete element goes on
   let final = false;
+  // No end for an element before the text (or the container) ends: no later one can end either.
+  let unclosed = false;
   for (;;) {
     if (!inside && begin) {
       begin.lastIndex = 0;
@@ -288,15 +303,18 @@ async function* elements(source: AsyncIterator<string>, name: string, container?
         scanned = 0;
         continue;
       }
+      if (unclosed) { buffer = buffer.slice(1); continue; } // not an element, and nothing to search
       close.lastIndex = Math.max(tagEnd + 1, scanned);
       const end = close.exec(buffer);
       if (!end) {
-        if (final) { buffer = buffer.slice(1); scanned = 0; continue; } // never closed: not an element
+        if (final) { unclosed = true; buffer = buffer.slice(1); scanned = 0; continue; } // never closed: not an element
         scanned = Math.max(0, buffer.length - 128); // its end can only be in what comes next
         break;
       }
       if (end[1] === name) yield buffer.slice(tagEnd + 1, end.index);
-      // else the container closes inside it: as in `readXlsx`, not an element; the container ends next.
+      // else the container closes inside it: as in `readXlsx`, not an element; the container ends next,
+      // with no end for any element before it.
+      else unclosed = true;
       buffer = buffer.slice(end[1] === name ? close.lastIndex : 1);
       scanned = 0;
     }

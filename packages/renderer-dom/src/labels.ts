@@ -2,6 +2,8 @@
 export interface DataTableLabels {
   readonly empty: string;
   readonly selectAll: string;
+  /** The header checkbox of a virtual table, which holds every matching row. */
+  readonly selectAllRows: string;
   /** Receives the row's name (see `rowLabel`), not its raw ID. */
   readonly selectRow: (name: string) => string;
   readonly pagination: string;
@@ -48,6 +50,10 @@ export interface DataTableLabels {
   readonly showColumns: string;
   /** The resize handle of a column header. */
   readonly resizeColumn: (name: string) => string;
+  /** The name of the ⊕ column's header (read by screen readers only). */
+  readonly detailsColumn: string;
+  /** A sort rule's place when several are set (read by screen readers; the ▲2 mark is hidden). */
+  readonly sortOrder: (position: number, direction: 'asc' | 'desc') => string;
   readonly moveColumnUp: (name: string) => string;
   readonly moveColumnDown: (name: string) => string;
   /** Restores the column order and widths. */
@@ -96,6 +102,7 @@ const es = counter('es');
 export const labelsEn: DataTableLabels = Object.freeze({
   empty: 'No matching rows',
   selectAll: 'Select all rows on this page',
+  selectAllRows: 'Select all rows',
   selectRow: (name: string) => `Select ${name}`,
   pagination: 'Pagination',
   previous: 'Previous',
@@ -123,6 +130,8 @@ export const labelsEn: DataTableLabels = Object.freeze({
   columns: 'Columns',
   showColumns: 'Show columns',
   resizeColumn: (name: string) => `Resize ${name}`,
+  detailsColumn: 'Details',
+  sortOrder: (position: number, direction: 'asc' | 'desc') => `sort ${position}, ${direction === 'asc' ? 'ascending' : 'descending'}`,
   moveColumnUp: (name: string) => `Move ${name} up`,
   moveColumnDown: (name: string) => `Move ${name} down`,
   resetColumns: 'Reset columns',
@@ -159,6 +168,7 @@ export const labelsEn: DataTableLabels = Object.freeze({
 export const labelsTr: DataTableLabels = Object.freeze({
   empty: 'Eşleşen kayıt yok',
   selectAll: 'Bu sayfadaki tüm satırları seç',
+  selectAllRows: 'Tüm satırları seç',
   selectRow: (name: string) => `${name} satırını seç`,
   pagination: 'Sayfalama',
   previous: 'Önceki',
@@ -186,6 +196,8 @@ export const labelsTr: DataTableLabels = Object.freeze({
   columns: 'Kolonlar',
   showColumns: 'Gösterilecek kolonlar',
   resizeColumn: (name: string) => `${name} kolon genişliği`,
+  detailsColumn: 'Ayrıntılar',
+  sortOrder: (position: number, direction: 'asc' | 'desc') => `sıralama ${position}, ${direction === 'asc' ? 'artan' : 'azalan'}`,
   moveColumnUp: (name: string) => `${name} kolonunu yukarı taşı`,
   moveColumnDown: (name: string) => `${name} kolonunu aşağı taşı`,
   resetColumns: 'Kolonları sıfırla',
@@ -222,6 +234,7 @@ export const labelsTr: DataTableLabels = Object.freeze({
 export const labelsDe: DataTableLabels = Object.freeze({
   empty: 'Keine passenden Einträge',
   selectAll: 'Alle Zeilen auf dieser Seite auswählen',
+  selectAllRows: 'Alle Zeilen auswählen',
   selectRow: (name: string) => `${name} auswählen`,
   pagination: 'Seitennavigation',
   previous: 'Zurück',
@@ -249,6 +262,8 @@ export const labelsDe: DataTableLabels = Object.freeze({
   columns: 'Spalten',
   showColumns: 'Angezeigte Spalten',
   resizeColumn: (name: string) => `Breite der Spalte ${name}`,
+  detailsColumn: 'Details',
+  sortOrder: (position: number, direction: 'asc' | 'desc') => `Sortierung ${position}, ${direction === 'asc' ? 'aufsteigend' : 'absteigend'}`,
   moveColumnUp: (name: string) => `Spalte ${name} nach oben verschieben`,
   moveColumnDown: (name: string) => `Spalte ${name} nach unten verschieben`,
   resetColumns: 'Spalten zurücksetzen',
@@ -285,6 +300,7 @@ export const labelsDe: DataTableLabels = Object.freeze({
 export const labelsFr: DataTableLabels = Object.freeze({
   empty: 'Aucune ligne correspondante',
   selectAll: 'Sélectionner toutes les lignes de cette page',
+  selectAllRows: 'Sélectionner toutes les lignes',
   selectRow: (name: string) => `Sélectionner ${name}`,
   pagination: 'Pagination',
   previous: 'Précédent',
@@ -312,6 +328,8 @@ export const labelsFr: DataTableLabels = Object.freeze({
   columns: 'Colonnes',
   showColumns: 'Colonnes affichées',
   resizeColumn: (name: string) => `Largeur de la colonne ${name}`,
+  detailsColumn: 'Détails',
+  sortOrder: (position: number, direction: 'asc' | 'desc') => `tri ${position}, ${direction === 'asc' ? 'croissant' : 'décroissant'}`,
   moveColumnUp: (name: string) => `Monter la colonne ${name}`,
   moveColumnDown: (name: string) => `Descendre la colonne ${name}`,
   resetColumns: 'Réinitialiser les colonnes',
@@ -348,6 +366,7 @@ export const labelsFr: DataTableLabels = Object.freeze({
 export const labelsEs: DataTableLabels = Object.freeze({
   empty: 'No hay filas coincidentes',
   selectAll: 'Seleccionar todas las filas de esta página',
+  selectAllRows: 'Seleccionar todas las filas',
   selectRow: (name: string) => `Seleccionar ${name}`,
   pagination: 'Paginación',
   previous: 'Anterior',
@@ -375,6 +394,8 @@ export const labelsEs: DataTableLabels = Object.freeze({
   columns: 'Columnas',
   showColumns: 'Columnas visibles',
   resizeColumn: (name: string) => `Ancho de la columna ${name}`,
+  detailsColumn: 'Detalles',
+  sortOrder: (position: number, direction: 'asc' | 'desc') => `orden ${position}, ${direction === 'asc' ? 'ascendente' : 'descendente'}`,
   moveColumnUp: (name: string) => `Subir la columna ${name}`,
   moveColumnDown: (name: string) => `Bajar la columna ${name}`,
   resetColumns: 'Restablecer columnas',

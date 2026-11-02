@@ -1,6 +1,6 @@
 {
   "name": "@acunsoft/datatable-server",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Node back end for Acun DataTable (Next.js, Express, Fastify): reads and checks the table query against a column allowlist, builds parameterized SQL (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server) or Prisma arguments, and answers in the table or DataTables format.",
   "keywords": [
     "datatable",
@@ -13,14 +13,14 @@
     "sql-server",
     "pagination"
   ],
-  "homepage": "https://kemaloskan.github.io/acun-datatable/",
+  "homepage": "https://acunsoft-yazilim.github.io/acun-datatable/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kemaloskan/acun-datatable.git",
+    "url": "git+https://github.com/Acunsoft-Yazilim/acun-datatable.git",
     "directory": "packages/server"
   },
   "bugs": {
-    "url": "https://github.com/kemaloskan/acun-datatable/issues"
+    "url": "https://github.com/Acunsoft-Yazilim/acun-datatable/issues"
   },
   "author": "Kemal OSKAN (https://github.com/kemaloskan)",
   "license": "MIT",
@@ -32,11 +32,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./import": {
       "types": "./dist/import.d.ts",
-      "import": "./dist/import.js"
+      "import": "./dist/import.js",
+      "default": "./dist/import.js"
     }
   },
   "files": [
@@ -48,7 +50,7 @@
     "build": "tsup src/index.ts src/import.ts --format esm --dts --clean --no-splitting --external @acunsoft/datatable-core --external @acunsoft/datatable-export"
   },
   "dependencies": {
-    "@acunsoft/datatable-core": "0.4.0"
+    "@acunsoft/datatable-core": "0.5.0"
   },
   "devDependencies": {
     "mssql": "12.7.2",
@@ -57,7 +59,7 @@
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",
     "vitest": "^5.0.5",
-    "@acunsoft/datatable-export": "0.4.0",
+    "@acunsoft/datatable-export": "0.5.0",
     "@acunsoft/datatable-import": "0.4.0"
   },
   "engines": {
@@ -67,7 +69,7 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@acunsoft/datatable-export": "0.4.0"
+    "@acunsoft/datatable-export": "0.5.0"
   },
   "peerDependenciesMeta": {
     "@acunsoft/datatable-export": {

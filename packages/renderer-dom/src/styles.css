@@ -127,7 +127,7 @@
 .adt-search { position: relative; display: flex; align-items: center; width: 100%; color: var(--adt-muted); }
 .adt-search .adt-icon { position: absolute; left: 0.8rem; pointer-events: none; }
 .adt-search input { width: 100%; min-width: 0; padding-left: 2.4rem; }
-.adt-search input::placeholder { color: var(--adt-muted); opacity: 0.85; }
+.adt-search input::placeholder { color: var(--adt-muted); opacity: 1; } /* the muted colour is AA (4.9:1); fainter is not */
 .adt-search input::-webkit-search-cancel-button { cursor: pointer; }
 
 /* Table */
@@ -269,6 +269,7 @@
   display: flex; flex-direction: column; border: 1px solid var(--adt-line); border-radius: var(--adt-radius);
   background: var(--adt-bg); box-shadow: 0 12px 24px -6px rgb(16 24 40 / 0.16), 0 4px 8px -4px rgb(16 24 40 / 0.08);
 }
+.adt-menu-group { display: flex; flex-direction: column; }
 .adt-menu-label { padding: 0.375rem 0.625rem 0.25rem; color: var(--adt-muted); font-size: 0.75em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 .adt-menu-item {
   display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.625rem; text-align: left;
@@ -378,6 +379,8 @@
 .adt-row-menu > summary { list-style: none; }
 .adt-row-menu > summary::-webkit-details-marker { display: none; }
 .adt-row-menu .adt-menu-list { top: 100%; text-align: left; white-space: nowrap; }
+/* placed by placeMenu(): over the page, so the table's scroll box and the cards do not cut it off */
+.adt-row-menu[open] > .adt-menu-list { position: fixed; top: var(--adt-menu-y); left: var(--adt-menu-x); right: auto; margin: 0; }
 .adt-menu-item--danger, .adt-menu-item--danger:hover { color: var(--adt-danger); }
 .adt-menu-item .adt-icon { color: var(--adt-muted); }
 .adt-menu-item--danger .adt-icon { color: inherit; }

@@ -36,7 +36,7 @@ final class LivewireQueuedTest extends TestCase
         $id = $table->get('tableTask');
         self::assertIsString($id);
         $state = TableTasks::get($id);
-        self::assertSame('ready', $state['status']);
+        self::assertSame('ready', $state['status'], json_encode($state));
         $matching = Order::query()->where('customer', 'like', '%a%')->count();
         $csv = Storage::disk('local')->get($state['path']);
         self::assertCount($matching + 1, array_filter(explode("\r\n", ltrim($csv, "\u{FEFF}")))); // the search applied, past the limit of 2
@@ -52,6 +52,19 @@ final class LivewireQueuedTest extends TestCase
         $this->withCookie($cookie, $session)->get($url)->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
         self::assertFalse(Storage::disk('local')->exists($state['path'])); // deleted once sent
         $this->withCookie($cookie, $session)->get($url)->assertNotFound();
+    }
+
+    public function test_a_model_of_the_table_travels_to_the_queue(): void
+    {
+        Storage::fake('local');
+        $this->startSession();
+        Order::query()->insert([['customer' => 'Queue Customer', 'customer_search' => 'queue customer', 'total' => 1], ['customer' => 'Queue Customer', 'customer_search' => 'queue customer', 'total' => 2]]);
+        $order = Order::query()->where('customer', 'Queue Customer')->firstOrFail(); // two orders: past the export limit of 1
+        $table = Livewire::test(\Acunsoft\DataTable\Laravel\Tests\Fixtures\OneCustomerOrdersTable::class, ['only' => $order])->call('export', 'csv');
+        $state = TableTasks::get($table->get('tableTask'));
+        self::assertSame('ready', $state['status'], json_encode($state));
+        $lines = array_values(array_filter(explode("\r\n", ltrim(Storage::disk('local')->get($state['path']), "\u{FEFF}"))));
+        self::assertSame(Order::query()->where('customer', $order->customer)->count() + 1, count($lines)); // that customer only, not every order
     }
 
     public function test_only_the_user_who_started_it_may_download(): void
@@ -115,6 +128,24 @@ final class LivewireQueuedTest extends TestCase
         }
         $table->call('dismissTableTask')->call('export', 'csv')->assertHasErrors('tableTask'); // the 11th in 10 minutes
         \Illuminate\Support\Facades\Queue::assertPushed(\Acunsoft\DataTable\Laravel\Jobs\RunTableTask::class, 10);
+    }
+
+    public function test_polling_a_task_still_running_renders_nothing(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+        $this->startSession();
+        $table = Livewire::test(QueuedOrdersTable::class)->call('export', 'csv');
+        $id = $table->get('tableTask');
+        QueuedOrdersTable::$renders = 0;
+        $table->call('checkTableTask')->call('checkTableTask');
+        self::assertSame(0, QueuedOrdersTable::$renders); // queued: no page, count or totals read again
+        TableTasks::put($id, ['status' => 'running']);
+        $table->call('checkTableTask');
+        self::assertSame(0, QueuedOrdersTable::$renders);
+        TableTasks::put($id, ['status' => 'ready', 'path' => 'acun-datatable/x.csv']);
+        $table->call('checkTableTask');
+        self::assertSame(1, QueuedOrdersTable::$renders);
+        self::assertStringContainsString('The export is ready.', $table->html());
     }
 
     public function test_the_worker_forgets_the_user_of_a_job_once_it_is_done(): void

@@ -1,6 +1,6 @@
 {
   "name": "@acunsoft/datatable-http",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "HTTP data source for @acunsoft/datatable-core: server-side paging, sorting and filtering with abort and latest-request-wins.",
   "keywords": [
     "datatable",
@@ -10,14 +10,14 @@
     "fetch",
     "laravel"
   ],
-  "homepage": "https://kemaloskan.github.io/acun-datatable/",
+  "homepage": "https://acunsoft-yazilim.github.io/acun-datatable/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kemaloskan/acun-datatable.git",
+    "url": "git+https://github.com/Acunsoft-Yazilim/acun-datatable.git",
     "directory": "packages/datasource-http"
   },
   "bugs": {
-    "url": "https://github.com/kemaloskan/acun-datatable/issues"
+    "url": "https://github.com/Acunsoft-Yazilim/acun-datatable/issues"
   },
   "author": "Kemal OSKAN (https://github.com/kemaloskan)",
   "license": "MIT",
@@ -29,7 +29,8 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "files": [
@@ -41,7 +42,7 @@
     "build": "tsup src/index.ts --format esm --dts --clean --external @acunsoft/datatable-core"
   },
   "dependencies": {
-    "@acunsoft/datatable-core": "0.4.0"
+    "@acunsoft/datatable-core": "0.5.0"
   },
   "devDependencies": {
     "tsup": "^8.0.0",

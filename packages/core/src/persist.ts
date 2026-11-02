@@ -1,4 +1,5 @@
 import type { DataTable } from './data-table';
+import type { FilterRule } from './filter-rules';
 
 /** The parts of the state `persistState` keeps. */
 export type PersistedPart = 'page' | 'pageSize' | 'sorting' | 'filters' | 'globalSearch' | 'hiddenColumns' | 'columnOrder' | 'columnWidths';
@@ -56,7 +57,7 @@ export function persistState<TData>(table: DataTable<TData>, options: PersistSta
   apply('columnWidths', () => table.setColumnWidths(Object.fromEntries(Object.entries(saved.columnWidths as Record<string, number>)
     .filter(([id]) => table.getColumns().some(column => column.id === id)))));
   apply('sorting', () => table.setSorting(saved.sorting as never));
-  apply('filters', () => table.setFilters(saved.filters as never));
+  apply('filters', () => table.setFilters((saved.filters as FilterRule[]).map(rule => (rule.value === undefined ? rule : { ...rule, value: revive(rule.value) }))));
   apply('globalSearch', () => table.setGlobalSearch(saved.globalSearch as string));
   // With cursor paging a page is only reachable through the pages before it: it is not kept.
   const cursor = table.getPaging() === 'cursor';
@@ -68,6 +69,8 @@ export function persistState<TData>(table: DataTable<TData>, options: PersistSta
     const state = table.getState();
     const out: Partial<Record<PersistedPart, unknown>> = {};
     for (const part of include) if (!(cursor && part === 'page')) out[part] = state[part];
+    // JSON would write a Date as UTC text, which comes back as a string (and a local day as the day before).
+    if (out.filters) out.filters = state.filters.map(rule => (rule.value === undefined ? rule : { ...rule, value: tag(rule.value) }));
     try { storage.setItem(key, JSON.stringify({ v: VERSION, state: out })); } catch { /* full or blocked: keep working */ }
   };
   const unsubscribe = table.subscribe((_, event) => {
@@ -79,6 +82,18 @@ export function persistState<TData>(table: DataTable<TData>, options: PersistSta
     if (event.type !== 'selection') save();
   });
   return unsubscribe;
+}
+
+/** A Date (also inside a `between` / `in` list) as its local wall time, month from 0: `{ $date: [2026, 9, 23, 0, 0, 0, 0] }`. */
+function tag(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(tag);
+  return value instanceof Date ? { $date: [value.getFullYear(), value.getMonth(), value.getDate(), value.getHours(), value.getMinutes(), value.getSeconds(), value.getMilliseconds()] } : value;
+}
+
+function revive(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(revive);
+  const parts = (value as { $date?: unknown } | null)?.$date;
+  return Array.isArray(parts) && parts.length === 7 && parts.every(Number.isInteger) ? Reflect.construct(Date, parts) : value;
 }
 
 function storageOrUndefined(): StateStorage | undefined {

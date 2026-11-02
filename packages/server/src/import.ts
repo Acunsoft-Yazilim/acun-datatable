@@ -54,6 +54,7 @@ export interface ImportSaveContext {
 /** The state of one import, as a store keeps it (JSON-safe). */
 export interface StoredImport {
   readonly id: string;
+  /** Who uploaded it, as `owner()` gave it; with `tenant`, who may see it. */
   readonly owner: string;
   readonly tenant: string | null;
   readonly name: string;
@@ -90,6 +91,13 @@ export interface ImportStore {
   /** The import an idempotency key already gave, if any. */
   getKey(key: string): Promise<string | undefined>;
   putKey(key: string, id: string, keepMs: number): Promise<void>;
+  /**
+   * Take the start of an import: true for the first caller only, false after.
+   * Two starts at once then run one import, not two. A store shared by several
+   * processes makes this atomic across them (the folder store does); without
+   * it the handler only guards its own process.
+   */
+  claim?(id: string, keepMs: number): Promise<boolean>;
 }
 
 /** Texts of refusals (the row checks use `locale`). */
@@ -180,31 +188,47 @@ export interface ImportHandler {
 
 const ID = /^imp_[A-Za-z0-9]{32}$/;
 
-/** A store in memory: one process; state and files are lost on restart. */
+/** A store in memory: one process; state and files are lost on restart. Expired entries are dropped within a minute of a write. */
 export function memoryImportStore(): ImportStore {
   const states = new Map<string, { state: StoredImport; until: number }>();
   const files = new Map<string, { bytes: Uint8Array; until: number }>();
   const keys = new Map<string, { id: string; until: number }>();
+  const claims = new Map<string, { until: number }>();
   const alive = <T extends { until: number }>(map: Map<string, T>, key: string): T | undefined => {
     const entry = map.get(key);
     if (entry && entry.until < Date.now()) { map.delete(key); return undefined; }
     return entry;
   };
+  // Uploads nobody comes back for (left at the mapping step) would keep their bytes for good.
+  let swept = Date.now();
+  const sweep = (): void => {
+    const now = Date.now();
+    if (now - swept < 60_000) return;
+    swept = now;
+    for (const map of [states, files, keys, claims] as Map<string, { until: number }>[]) {
+      for (const [key, entry] of map) if (entry.until < now) map.delete(key);
+    }
+  };
   return {
     get: async id => (alive(states, id) ? structuredClone(states.get(id)!.state) : undefined),
-    put: async (state, keepMs) => { states.set(state.id, { state: structuredClone(state), until: Date.now() + keepMs }); },
-    putFile: async (id, name, bytes, keepMs) => { files.set(`${id}/${name}`, { bytes, until: Date.now() + keepMs }); },
+    put: async (state, keepMs) => { sweep(); states.set(state.id, { state: structuredClone(state), until: Date.now() + keepMs }); },
+    putFile: async (id, name, bytes, keepMs) => { sweep(); files.set(`${id}/${name}`, { bytes, until: Date.now() + keepMs }); },
     getFile: async (id, name) => alive(files, `${id}/${name}`)?.bytes,
     deleteFile: async (id, name) => { files.delete(`${id}/${name}`); },
     getKey: async key => alive(keys, key)?.id,
-    putKey: async (key, id, keepMs) => { keys.set(key, { id, until: Date.now() + keepMs }); },
+    putKey: async (key, id, keepMs) => { sweep(); keys.set(key, { id, until: Date.now() + keepMs }); },
+    claim: async (id, keepMs) => {
+      if (alive(claims, id)) return false;
+      claims.set(id, { until: Date.now() + keepMs });
+      return true;
+    },
   };
 }
 
 /**
  * A store in a folder (`node:fs`): state, files and keys survive restarts and
- * are shared by processes on one machine. Expired entries are removed when
- * read; delete old folders from time to time (a cron, `find -mtime +1`).
+ * are shared by processes on one machine. An import's files expire with its
+ * state; delete old folders from time to time (a cron, `find -mtime +1`).
  */
 export function directoryImportStore(directory: string): ImportStore {
   const fs = import('node:fs/promises');
@@ -229,12 +253,25 @@ export function directoryImportStore(directory: string): ImportStore {
     get: id => readJson<StoredImport>(path(id, 'state.json')),
     put: (state, keepMs) => write(path(state.id, 'state.json'), JSON.stringify({ until: Date.now() + keepMs, value: state })),
     putFile: (id, name, bytes) => write(path(id, name), bytes),
+    // A file lives as long as its import: once the state has expired, its files are gone too.
     getFile: async (id, name) => {
+      if (!(await readJson<StoredImport>(path(id, 'state.json')))) return undefined;
       try { return new Uint8Array(await (await fs).readFile(path(id, name))); } catch { return undefined; }
     },
     deleteFile: async (id, name) => { await (await fs).rm(path(id, name), { force: true }); },
     getKey: async key => readJson<string>(path('keys', `${await digest(key)}.json`)),
     putKey: async (key, id, keepMs) => write(path('keys', `${await digest(key)}.json`), JSON.stringify({ until: Date.now() + keepMs, value: id })),
+    // An exclusive create ('wx') is atomic on one machine: one process wins.
+    claim: async id => {
+      const { mkdir, writeFile } = await fs;
+      await mkdir(path(id), { recursive: true });
+      try {
+        await writeFile(path(id, 'start.claim'), '', { flag: 'wx' });
+        return true;
+      } catch {
+        return false;
+      }
+    },
   };
 }
 
@@ -295,6 +332,7 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
   const chunkSize = Math.max(1, options.chunkSize ?? 1_000);
   const store = options.store ?? memoryImportStore();
   const cancelled = new Set<string>();
+  const starting = new Set<string>(); // starts being taken in this process
   const definitions = options.columns.map(column => ({ id: column.id, header: column.title ?? column.id, accessorKey: column.id, ...(column.type ? { type: column.type } : {}) })) as unknown as ColumnDef<Record<string, unknown>>[];
   const titles = new Map(options.columns.map(column => [column.id, column.title ?? column.id]));
   const required = options.columns.filter(column => column.required).map(column => column.id);
@@ -338,6 +376,9 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
   const checkStart = (body: unknown, headers: readonly string[]): Record<string, string> => {
     const problems: Record<string, string> = {};
     const mapping = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)['mapping'] : undefined;
+    const mode = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)['mode'] : undefined;
+    // Updating finds the existing records by the import key: it must be matched too.
+    const needed = options.importKey && (mode ?? modes[0]) !== 'insert' && !required.includes(options.importKey) ? [...required, options.importKey] : required;
     if (!Array.isArray(mapping) || mapping.length !== headers.length) {
       problems['mapping'] = text.mappingLength(headers.length);
     } else {
@@ -348,18 +389,22 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
         if (seen.has(entry)) { problems['mapping'] = text.mappedTwice(titles.get(entry) ?? entry); break; }
         seen.add(entry);
       }
-      const missing = required.filter(id => !seen.has(id));
+      const missing = needed.filter(id => !seen.has(id));
       if (!problems['mapping'] && missing.length > 0) problems['mapping'] = text.requiredColumns(missing.map(id => titles.get(id) ?? id).join(', '));
     }
-    const mode = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)['mode'] : undefined;
     if (mode === undefined && modes.length > 1) problems['mode'] = text.chooseMode(modes.join(', '));
     else if (mode !== undefined && !modes.includes(mode as ImportMode)) problems['mode'] = text.mode(String(mode));
     return problems;
   };
 
+  // A logger that throws must not change how an import ends.
+  const failure = (error: unknown, id: string): void => {
+    try { options.onError?.(error, id); } catch { /* ignored */ }
+  };
+
   const process = async (id: string): Promise<void> => {
     let state = await store.get(id);
-    if (!state || (state.status !== 'queued' && state.status !== 'running')) return;
+    if (!state || (state.status !== 'queued' && state.status !== 'running')) { cancelled.delete(id); return; }
     state.status = 'running';
     await store.put(state, keepMs);
     let inserted = state.inserted;
@@ -380,14 +425,20 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
       const sheet = await read(bytes, state.extension, chunkSize);
       // The user's mapping as headers the reader knows (column IDs); file columns left out get none.
       const headers = state.mapping.map(column => column ?? '');
+      // A run again (a worker's retry after a crash) goes on after the rows saved before; the
+      // error report then lists the problems of this run (the first 100 are kept in the state).
+      const saved = state.processed;
       let start = 0;
       for await (const rows of sheet.chunks) {
+        const skip = Math.min(rows.length, Math.max(0, saved - start));
+        if (skip === rows.length) { start += rows.length; continue; }
         if (cancelled.has(id) || (await store.get(id))?.status === 'cancelled') { cancelled.add(id); break; }
-        const result = importRows({ headers, rows }, definitions, { required, maxErrors: Number.MAX_SAFE_INTEGER, ...options.read });
+        const from = start + skip;
+        const result = importRows({ headers, rows: skip > 0 ? rows.slice(skip) : rows }, definitions, { required, maxErrors: Number.MAX_SAFE_INTEGER, ...options.read });
         rejected = [];
-        await options.save(result.rows.map(row => ({ line: row.line + start, values: row.values })), context);
+        await options.save(result.rows.map(row => ({ line: row.line + from, values: row.values })), context);
         const problems = [
-          ...result.errors.map((issue: ImportIssue) => ({ line: issue.line + start, ...(issue.column ? { column: issue.column } : {}), ...(issue.value ? { value: issue.value } : {}), code: issue.code, message: issue.message })),
+          ...result.errors.map((issue: ImportIssue) => ({ line: issue.line + from, ...(issue.column ? { column: issue.column } : {}), ...(issue.value ? { value: issue.value } : {}), code: issue.code, message: issue.message })),
           ...rejected,
         ];
         for (const error of problems) report.push([String(error.line), error.column ? titles.get(error.column) ?? error.column : '', error.value ?? '', error.message].map(csvCell).join(','));
@@ -410,10 +461,11 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
         state.report = true;
       }
     } catch (error) {
-      options.onError?.(error, id);
+      failure(error, id);
       state.status = 'failed';
       state.message = text.failed;
     }
+    cancelled.delete(id);
     await store.deleteFile(id, 'source');
     await store.put(state, keepMs);
   };
@@ -426,11 +478,10 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
     const who = await options.owner(request);
     if (who === null || who === '') return problem(401, text.unauthorized);
     const tenant = (await options.tenant?.(request)) ?? null;
-    const owner = `${who}|${tenant ?? ''}`;
     const load = async (id: string): Promise<StoredImport | undefined> => {
       if (!ID.test(id)) return undefined;
       const state = await store.get(id);
-      return state && state.owner === owner ? state : undefined;
+      return state && state.owner === who && state.tenant === tenant ? state : undefined;
     };
 
     if (parts.length === 0 && request.method === 'GET') {
@@ -438,14 +489,17 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
     }
     if (parts.length === 0 && request.method === 'POST') {
       const key = request.headers.get('idempotency-key') ?? '';
-      const keyId = /^[\x21-\x7e]{1,200}$/.test(key) ? `${owner}\u0000${key}` : undefined;
+      const keyId = /^[\x21-\x7e]{1,200}$/.test(key) ? `${who}\u0000${tenant ?? ''}\u0000${key}` : undefined;
       const known = keyId ? await store.getKey(keyId) : undefined;
       const again = known ? await load(known) : undefined;
       if (again) return json(200, view(again));
-      // The declared size first, so a huge body is not read at all.
+      // The declared size first, so a huge body is not read at all; a body without one
+      // (chunked) is counted while it is read and dropped past the limit.
+      const bodyLimit = maxBytes + 64 * 1024; // the file and the form around it
       const declared = Number(request.headers.get('content-length') ?? 0);
-      if (declared > maxBytes + 64 * 1024) return problem(413, text.tooLarge(maxBytes), 'file');
-      const form = await request.formData().catch(() => undefined);
+      if (declared > bodyLimit) return problem(413, text.tooLarge(maxBytes), 'file');
+      const form = await limitedFormData(request, bodyLimit);
+      if (form === 'too-large') return problem(413, text.tooLarge(maxBytes), 'file');
       const file = form?.get('file');
       if (!(file instanceof Blob)) return problem(422, text.noFile, 'file');
       if (file.size > maxBytes) return problem(413, text.tooLarge(maxBytes), 'file');
@@ -473,7 +527,7 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
       const id = randomId();
       await store.putFile(id, 'source', bytes, keepMs);
       const state: StoredImport = {
-        id, owner, tenant, name: name.slice(0, 200), extension, headers: sheet.headers.map(String), rows: count,
+        id, owner: who, tenant, name: name.slice(0, 200), extension, headers: sheet.headers.map(String), rows: count,
         preview: previewRows.map((cells, index) => ({ line: index + 2, cells: sheet.headers.map((_, i) => cellText(cells[i])) })),
         status: 'mapping', mapping: suggest(sheet.headers), mode: null, processed: 0, inserted: 0, updated: 0, skipped: 0, failed: 0,
         errors: [], errorsTruncated: false, report: false, message: null, expiresAt: new Date(Date.now() + keepMs).toISOString(),
@@ -488,8 +542,9 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
     if (parts.length === 1 && request.method === 'GET') return json(200, view(state));
     if (parts.length === 1 && request.method === 'DELETE') {
       if (FINAL.includes(state.status)) return problem(409, text.finished);
-      cancelled.add(state.id);
+      // A running import stops at its next chunk; one at the mapping step never runs.
       if (state.status === 'mapping') await store.deleteFile(state.id, 'source');
+      else cancelled.add(state.id);
       state.status = 'cancelled';
       await store.put(state, keepMs);
       return json(200, view(state));
@@ -499,19 +554,33 @@ export function createImportHandler(options: ImportHandlerOptions): ImportHandle
       const body: unknown = await request.json().catch(() => undefined);
       const problems = checkStart(body, state.headers);
       if (Object.keys(problems).length > 0) return json(422, { message: Object.values(problems)[0], errors: problems });
-      const start = body as { mapping: (string | null)[]; mode?: ImportMode };
-      state.mapping = start.mapping;
-      state.mode = start.mode ?? modes[0]!;
-      if (options.background?.({ rows: state.rows })) {
-        state.status = 'queued';
+      // One start wins: two at once (a double click, a retry) must not run the import twice. The
+      // claim is the store's (across processes); this process also holds it until the import is
+      // marked as started, for stores without one.
+      if (starting.has(state.id)) return problem(409, text.started);
+      starting.add(state.id);
+      try {
+        if (store.claim && !(await store.claim(state.id, keepMs))) return problem(409, text.started);
+        const latest = await load(state.id);
+        if (!latest || latest.status !== 'mapping') return problem(409, text.started);
+        Object.assign(state, latest);
+        const start = body as { mapping: (string | null)[]; mode?: ImportMode };
+        state.mapping = start.mapping;
+        state.mode = start.mode ?? modes[0]!;
+        if (options.background?.({ rows: state.rows })) {
+          state.status = 'queued';
+          await store.put(state, keepMs);
+          const run = () => process(state.id);
+          if (options.schedule) options.schedule(run, { id: state.id, rows: state.rows });
+          // Nothing awaits it here: a store that fails is reported, never an unhandled rejection.
+          else setTimeout(() => { run().catch(error => failure(error, state.id)); }, 0);
+          return json(200, view(state));
+        }
+        state.status = 'running';
         await store.put(state, keepMs);
-        const run = () => process(state.id);
-        if (options.schedule) options.schedule(run, { id: state.id, rows: state.rows });
-        else setTimeout(() => { void run(); }, 0);
-        return json(200, view(state));
+      } finally {
+        starting.delete(state.id);
       }
-      state.status = 'running';
-      await store.put(state, keepMs);
       await process(state.id);
       return json(200, view((await store.get(state.id)) ?? state));
     }
@@ -553,4 +622,23 @@ export function toNodeListener(handle: (request: Request) => Promise<Response>) 
     answer.headers.forEach((value, name) => response.setHeader(name, value));
     response.end(new Uint8Array(await answer.arrayBuffer()));
   };
+}
+
+/** The form of a request whose body may not pass `limit` bytes, counted as it is read (whatever Content-Length said). */
+async function limitedFormData(request: Request, limit: number): Promise<FormData | 'too-large' | undefined> {
+  if (!request.body) return request.formData().catch(() => undefined);
+  let read = 0;
+  const counted = request.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      read += chunk.byteLength;
+      if (read > limit) controller.error(new RangeError('body too large'));
+      else controller.enqueue(chunk);
+    },
+  }));
+  const copy = new Request(request.url, { method: request.method, headers: request.headers, body: counted, duplex: 'half' } as RequestInit);
+  try {
+    return await copy.formData();
+  } catch {
+    return read > limit ? 'too-large' : undefined;
+  }
 }

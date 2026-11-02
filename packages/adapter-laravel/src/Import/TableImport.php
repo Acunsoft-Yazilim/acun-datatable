@@ -160,8 +160,9 @@ abstract class TableImport
     }
 
     /**
-     * The database attributes of one valid row: each mapped column's database
-     * column. Add what the file does not hold (a tenant ID, a search column).
+     * The database attributes of one valid row: each mapped column's attribute
+     * (`total` for `->column('orders.total')`). Add what the file does not hold
+     * (a tenant ID, a search column).
      *
      * @param array<string, mixed> $values typed values by column ID
      * @return array<string, mixed>
@@ -171,7 +172,7 @@ abstract class TableImport
         $attributes = [];
         foreach ($this->columns() as $column) {
             if (array_key_exists($column->id(), $values)) {
-                $attributes[$column->databaseColumn()] = $values[$column->id()];
+                $attributes[$column->attributeName()] = $values[$column->id()];
             }
         }
 
@@ -189,14 +190,15 @@ abstract class TableImport
     {
         $query = $this->query($context) ?? throw new \LogicException(static::class.': override query() or save().');
         $key = $this->importKey();
-        $keyColumn = $key === null ? null : ($this->column($key)?->databaseColumn() ?? $key);
+        $keyColumn = $key === null ? null : ($this->column($key)?->databaseColumn() ?? $key); // orders.code: for the WHERE
+        $keyAttribute = $key === null ? null : ($this->column($key)?->attributeName() ?? $key); // code: on a record
         // The records the chunk refers to, in one query per 1,000 keys (not one per row).
         $existing = [];
         if ($keyColumn !== null) {
             $values = array_values(array_unique(array_filter(array_map(fn (array $row) => $row['values'][$key] ?? null, $rows), fn ($value) => $value !== null), SORT_REGULAR));
             foreach (array_chunk($values, 1_000) as $part) {
                 foreach ((clone $query)->whereIn($keyColumn, $part)->get() as $record) {
-                    $existing[(string) data_get($record, $keyColumn)] = $record;
+                    $existing[(string) data_get($record, $keyAttribute)] = $record;
                 }
             }
         }
@@ -335,12 +337,27 @@ abstract class TableImport
         if ($problems !== []) {
             return new JsonResponse(['message' => reset($problems), 'errors' => $problems], 422);
         }
-        $offered = $this->offeredModes();
-        $state['mapping'] = $request->json('mapping');
-        $state['mode'] = $request->json('mode') ?? $offered[0];
-        if ($this->shouldQueue($state['rows'])) {
-            $state['status'] = 'queued';
+        // One start wins: two at once (a double click, a retry) must not run the import twice. An
+        // atomic lock of the cache (file, Redis, database, Memcached) holds while it is marked started.
+        $lock = Cache::lock($this->key($id).':start', 30);
+        if (! $lock->get()) {
+            return $this->problem(409, __('acun-datatable::table.import_started'));
+        }
+        try {
+            $state = $this->load($id, $state['owner']);
+            if ($state === null || $state['status'] !== 'mapping') {
+                return $this->problem(409, __('acun-datatable::table.import_started'));
+            }
+            $offered = $this->offeredModes();
+            $state['mapping'] = $request->json('mapping');
+            $state['mode'] = $request->json('mode') ?? $offered[0];
+            $queued = $this->shouldQueue($state['rows']);
+            $state['status'] = $queued ? 'queued' : 'running';
             $this->store($state);
+        } finally {
+            $lock->release();
+        }
+        if ($queued) {
             $job = new RunTableImport(static::class, $id, $state['user'], $state['guard'], app()->getLocale());
             $pending = dispatch($job);
             if (($connection = $this->queueConnection()) !== null) {
@@ -353,8 +370,6 @@ abstract class TableImport
 
             return new JsonResponse($this->view($this->load($id, $state['owner']) ?? $state));
         }
-        $state['status'] = 'running';
-        $this->store($state);
         $this->process($id);
 
         return new JsonResponse($this->view($this->load($id, $state['owner']) ?? $state));
@@ -500,6 +515,19 @@ abstract class TableImport
         $this->store($state);
     }
 
+    /** End a started import as failed, when its job cannot run it (e.g. its user is gone). */
+    final public function fail(string $id): void
+    {
+        $state = Cache::get($this->key($id));
+        if (! is_array($state) || ! in_array($state['status'], ['queued', 'running'], true)) {
+            return;
+        }
+        $state['status'] = 'failed';
+        $state['message'] = __('acun-datatable::table.import_failed');
+        Storage::disk($this->disk())->delete($state['path']);
+        $this->store($state);
+    }
+
     // ---- Helpers -------------------------------------------------------------
 
     /** 403 when not authorized, 401 when nobody can own an import (no user, no session). */
@@ -639,7 +667,8 @@ abstract class TableImport
 
     /**
      * The start check of the protocol (never trusting the UI): one entry per
-     * header, known columns at most once, every required column, an offered mode.
+     * header, known columns at most once, every required column (and the
+     * import key to update or upsert), an offered mode.
      *
      * @param list<string> $headers
      * @return array<string, string>
@@ -648,6 +677,14 @@ abstract class TableImport
     {
         $problems = [];
         $mapping = is_array($body) ? ($body['mapping'] ?? null) : null;
+        $offered = $this->offeredModes();
+        $mode = is_array($body) ? ($body['mode'] ?? null) : null;
+        // Updating finds the existing records by the import key: it must be matched too.
+        $required = $this->required();
+        $key = $this->importKey();
+        if ($key !== null && ($mode ?? $offered[0]) !== 'insert' && ! in_array($key, $required, true)) {
+            $required[] = $key;
+        }
         if (! is_array($mapping) || ! array_is_list($mapping) || count($mapping) !== count($headers)) {
             $problems['mapping'] = __('acun-datatable::table.import_mapping_length', ['count' => count($headers)]);
         } else {
@@ -670,13 +707,11 @@ abstract class TableImport
                 }
                 $seen[$entry] = true;
             }
-            $missing = array_values(array_filter($this->required(), fn (string $id) => ! isset($seen[$id])));
+            $missing = array_values(array_filter($required, fn (string $id) => ! isset($seen[$id])));
             if (! isset($problems['mapping']) && $missing !== []) {
                 $problems['mapping'] = __('acun-datatable::table.import_required_columns', ['columns' => implode(', ', array_map(fn ($id) => $known[$id] ?? $id, $missing))]);
             }
         }
-        $offered = $this->offeredModes();
-        $mode = is_array($body) ? ($body['mode'] ?? null) : null;
         if ($mode === null && count($offered) > 1) {
             $problems['mode'] = __('acun-datatable::table.import_choose_mode', ['modes' => implode(', ', $offered)]);
         } elseif ($mode !== null && (! is_string($mode) || ! in_array($mode, $offered, true))) {

@@ -1,5 +1,5 @@
 import {
-  computed, getCurrentScope, isRef, onScopeDispose, shallowRef, toValue, watch,
+  computed, getCurrentInstance, getCurrentScope, isRef, onBeforeMount, onScopeDispose, shallowRef, toValue, watch,
   type ComputedRef, type MaybeRefOrGetter, type ShallowRef,
 } from 'vue';
 import {
@@ -21,22 +21,34 @@ export interface TableBinding<TData> {
  * Follow an existing table reactively: the table, or a ref or getter such as
  * `() => props.table` to follow whichever table it gives. Unsubscribes when
  * the calling component (or effect scope) is disposed; the table itself is
- * not destroyed.
+ * not destroyed. In a component the table is followed from `onBeforeMount`
+ * on, which never runs in server rendering: a server render reads the table
+ * once and leaves no listener behind.
  */
 export function useTable<TData>(source: MaybeRefOrGetter<DataTable<TData>>): TableBinding<TData> {
   const current = (): DataTable<TData> => toValue(source);
   const state = shallowRef(current().getState());
   const version = shallowRef(0);
   let unsubscribe: (() => void) | undefined;
+  let live = getCurrentInstance() === null; // outside a component: at once
   const follow = (table: DataTable<TData>): void => {
     unsubscribe?.();
+    unsubscribe = undefined;
     state.value = table.getState();
+    if (!live) return;
     unsubscribe = table.subscribe(next => {
       state.value = next;
       version.value += 1; // data and results change without a new state object
     });
   };
   follow(current());
+  if (!live) {
+    onBeforeMount(() => {
+      live = true;
+      follow(current());
+      version.value += 1; // whatever changed between setup and mount
+    });
+  }
   // A ref or a getter: move to a new table before anything renders it.
   const stop = isRef(source) || typeof source === 'function' ? watch(current, follow, { flush: 'sync' }) : undefined;
   if (getCurrentScope()) onScopeDispose(() => { stop?.(); unsubscribe?.(); });
