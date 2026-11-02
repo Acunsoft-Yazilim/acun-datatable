@@ -49,8 +49,10 @@ first version is published from a machine:
 1. `npm run version-packages`, review, commit and push (`chore: release 0.1.0`).
 2. `npm login` as `acunsoft` (2FA), then `npm run release` and `git push --tags`.
 3. On npmjs.com, for each package: Settings → Trusted Publisher →
-   GitHub Actions, organization or user `kemaloskan`, repository
-   `acun-datatable`, workflow `release.yml`. Then set "Publishing access" to
+   GitHub Actions, organization or user `Acunsoft-Yazilim`, repository
+   `acun-datatable`, workflow `release.yml`. (The repository moved from
+   `kemaloskan` to `Acunsoft-Yazilim`: packages set up before the move must
+   be changed to the new owner, or npm refuses the Release workflow.) Then set "Publishing access" to
    require 2FA and disallow tokens.
 
 Every later release goes through the Release workflow.

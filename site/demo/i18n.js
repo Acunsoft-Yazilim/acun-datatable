@@ -35,7 +35,7 @@ window.DEMO_I18N = {
       what: 'Excel veya CSV dosyasını sürükleyin; sütunlar eşleştirilir, önizlenir, içe aktarılır ve tablo yenilenir. Sınırları, okumayı ve kaydetmeyi backend yapar — burada sayfanın içinde çalışan örnek backend; gerçekte Laravel <code>TableImport</code>, Node <code>createImportHandler</code> ya da kendi backend\'iniz.',
       tags: ['importButton', 'sürükle-bırak', 'eşleştirme', 'ilerleme', 'hata raporu'],
       try: ['Küçük örneği indirip <strong>İçe aktar</strong> ile seçin ya da pencereye sürükleyin.', 'Eşleştirmeyi inceleyin: başlıklar kolonlara kendiliğinden eşleşir, değiştirebilirsiniz.', 'İçe aktarın: iki kayıt güncellenir, hatalı satırlar raporda listelenir.', 'Büyük örnek arka planda işlenir; ilerlemeyi izleyin, isterseniz durdurun.'],
-      links: 'Kılavuz: <a href="../#/import">Excel ve CSV içe aktarma</a> · Sözleşme: <a href="https://github.com/kemaloskan/acun-datatable/blob/main/packages/import/PROTOCOL.md">acun-import/1</a>',
+      links: 'Kılavuz: <a href="../#/import">Excel ve CSV içe aktarma</a> · Sözleşme: <a href="https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/packages/import/PROTOCOL.md">acun-import/1</a>',
     },
     virtual: {
       what: '100.000 satır tek listede, sayfa yok: yalnızca görünen satırlar çizilir. Arama ve sıralama tarayıcıda yapılır.',
@@ -99,7 +99,7 @@ window.DEMO_I18N = {
       what: 'Drop an Excel or CSV file; its columns are matched, previewed, imported, and the table refreshes. The back end does the limits, the reading and the saving — here a reference back end running in the page; for real, Laravel <code>TableImport</code>, Node <code>createImportHandler</code> or your own back end.',
       tags: ['importButton', 'drag and drop', 'mapping', 'progress', 'error report'],
       try: ['Download the small sample and choose it with <strong>Import</strong>, or drop it on the dialog.', 'Check the mapping: headers match the columns by themselves; change any of them.', 'Import: two rows are updated, the rows with mistakes are listed in the report.', 'The large sample runs in the background; watch the progress, cancel it if you like.'],
-      links: 'Guide: <a href="../#/import">Excel and CSV import</a> · Protocol: <a href="https://github.com/kemaloskan/acun-datatable/blob/main/packages/import/PROTOCOL.md">acun-import/1</a>',
+      links: 'Guide: <a href="../#/import">Excel and CSV import</a> · Protocol: <a href="https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/packages/import/PROTOCOL.md">acun-import/1</a>',
     },
     virtual: {
       what: '100,000 rows in one list, no pages: only the rows in view are drawn. Search and sorting run in the browser.',
@@ -163,7 +163,7 @@ window.DEMO_I18N = {
       what: 'Ziehen Sie eine Excel- oder CSV-Datei hinein; ihre Spalten werden zugeordnet, angezeigt, importiert, und die Tabelle aktualisiert sich. Grenzen, Lesen und Speichern übernimmt das Backend — hier ein Referenz-Backend in der Seite; im echten Einsatz Laravel <code>TableImport</code>, Node <code>createImportHandler</code> oder Ihr eigenes Backend.',
       tags: ['importButton', 'Drag and Drop', 'Zuordnung', 'Fortschritt', 'Fehlerbericht'],
       try: ['Laden Sie das kleine Beispiel herunter und wählen Sie es mit <strong>Importieren</strong> oder ziehen Sie es in den Dialog.', 'Prüfen Sie die Zuordnung: Überschriften passen von selbst zu den Spalten; ändern Sie sie bei Bedarf.', 'Importieren: zwei Zeilen werden aktualisiert, fehlerhafte Zeilen stehen im Bericht.', 'Das große Beispiel läuft im Hintergrund; verfolgen Sie den Fortschritt oder brechen Sie ab.'],
-      links: 'Anleitung: <a href="../#/import">Excel- und CSV-Import</a> · Protokoll: <a href="https://github.com/kemaloskan/acun-datatable/blob/main/packages/import/PROTOCOL.md">acun-import/1</a>',
+      links: 'Anleitung: <a href="../#/import">Excel- und CSV-Import</a> · Protokoll: <a href="https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/packages/import/PROTOCOL.md">acun-import/1</a>',
     },
     virtual: {
       what: '100.000 Zeilen in einer Liste, ohne Seiten: nur die sichtbaren Zeilen werden gezeichnet. Suche und Sortieren laufen im Browser.',
@@ -227,7 +227,7 @@ window.DEMO_I18N = {
       what: 'Déposez un fichier Excel ou CSV ; ses colonnes sont associées, prévisualisées, importées, et le tableau se met à jour. Les limites, la lecture et l’enregistrement sont faits par le back-end — ici un back-end de référence dans la page ; en vrai, Laravel <code>TableImport</code>, Node <code>createImportHandler</code> ou votre propre back-end.',
       tags: ['importButton', 'glisser-déposer', 'association', 'progression', 'rapport d’erreurs'],
       try: ['Téléchargez le petit exemple et choisissez-le avec <strong>Importer</strong>, ou déposez-le sur la fenêtre.', 'Vérifiez l’association : les titres trouvent leurs colonnes seuls ; changez-les si besoin.', 'Importez : deux lignes sont mises à jour, les lignes en erreur sont dans le rapport.', 'Le grand exemple s’exécute en arrière-plan ; suivez la progression, annulez si vous voulez.'],
-      links: 'Guide : <a href="../#/import">Import Excel et CSV</a> · Protocole : <a href="https://github.com/kemaloskan/acun-datatable/blob/main/packages/import/PROTOCOL.md">acun-import/1</a>',
+      links: 'Guide : <a href="../#/import">Import Excel et CSV</a> · Protocole : <a href="https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/packages/import/PROTOCOL.md">acun-import/1</a>',
     },
     virtual: {
       what: '100 000 lignes dans une seule liste, sans pages : seules les lignes visibles sont dessinées. La recherche et le tri se font dans le navigateur.',
@@ -291,7 +291,7 @@ window.DEMO_I18N = {
       what: 'Suelte un archivo Excel o CSV; sus columnas se relacionan, se previsualizan, se importan y la tabla se actualiza. Los límites, la lectura y el guardado los hace el back-end — aquí un back-end de referencia en la página; en una app real, Laravel <code>TableImport</code>, Node <code>createImportHandler</code> o su propio back-end.',
       tags: ['importButton', 'arrastrar y soltar', 'relación', 'progreso', 'informe de errores'],
       try: ['Descargue el ejemplo pequeño y elíjalo con <strong>Importar</strong>, o suéltelo en la ventana.', 'Revise la relación: los encabezados encuentran sus columnas solos; cámbielos si quiere.', 'Importe: dos filas se actualizan, las filas con errores aparecen en el informe.', 'El ejemplo grande se procesa en segundo plano; siga el progreso o cancélelo.'],
-      links: 'Guía: <a href="../#/import">Importar Excel y CSV</a> · Protocolo: <a href="https://github.com/kemaloskan/acun-datatable/blob/main/packages/import/PROTOCOL.md">acun-import/1</a>',
+      links: 'Guía: <a href="../#/import">Importar Excel y CSV</a> · Protocolo: <a href="https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/packages/import/PROTOCOL.md">acun-import/1</a>',
     },
     virtual: {
       what: '100.000 filas en una sola lista, sin páginas: solo se dibujan las filas visibles. La búsqueda y la ordenación se hacen en el navegador.',

@@ -2539,8 +2539,8 @@ const GUIDES = {
      ]
     ],
     "note": {
-     "tr": "Tam metin: \u003ca href=\"https://github.com/kemaloskan/acun-datatable/blob/main/packages/import/PROTOCOL.md\">PROTOCOL.md\u003c/a>.",
-     "en": "The full text: \u003ca href=\"https://github.com/kemaloskan/acun-datatable/blob/main/packages/import/PROTOCOL.md\">PROTOCOL.md\u003c/a>."
+     "tr": "Tam metin: \u003ca href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/packages/import/PROTOCOL.md\">PROTOCOL.md\u003c/a>.",
+     "en": "The full text: \u003ca href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/packages/import/PROTOCOL.md\">PROTOCOL.md\u003c/a>."
     }
    },
    {
@@ -2586,8 +2586,8 @@ const GUIDES = {
      ]
     ],
     "note": {
-     "tr": "İki backend de dosyayı parça parça okur ve kaydeder: okuma belleği satır sayısıyla büyümez (Laravel'de başlangıcın üstünde 100.000 satırda 8 MB, 1.000.000 satırda 10 MB). Yüklenen dosyanın kendisi bellekte durabilir; boyutunu sınırlayın. Ayrıntı: \u003ca href=\"https://github.com/kemaloskan/acun-datatable/blob/main/bench/results/import.md\">bench/results/import.md\u003c/a>.",
-     "en": "Both back ends read and save the file in chunks: reading memory does not grow with the rows (Laravel, above its start: 8 MB for 100,000 rows, 10 MB for 1,000,000). The uploaded file itself may be held in memory; limit its size. Details: \u003ca href=\"https://github.com/kemaloskan/acun-datatable/blob/main/bench/results/import.md\">bench/results/import.md\u003c/a>."
+     "tr": "İki backend de dosyayı parça parça okur ve kaydeder: okuma belleği satır sayısıyla büyümez (Laravel'de başlangıcın üstünde 100.000 satırda 8 MB, 1.000.000 satırda 10 MB). Yüklenen dosyanın kendisi bellekte durabilir; boyutunu sınırlayın. Ayrıntı: \u003ca href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/bench/results/import.md\">bench/results/import.md\u003c/a>.",
+     "en": "Both back ends read and save the file in chunks: reading memory does not grow with the rows (Laravel, above its start: 8 MB for 100,000 rows, 10 MB for 1,000,000). The uploaded file itself may be held in memory; limit its size. Details: \u003ca href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/bench/results/import.md\">bench/results/import.md\u003c/a>."
     }
    }
   ]
@@ -2656,8 +2656,8 @@ const PAGES = {
           [{ tr: "sınırlı sayım (10.001'e kadar)", en: "limited count (up to 10,001)" }, "0.8 ms", "1.2 ms", "1.8 ms"],
           [{ tr: "sınırlı sayım, indekssiz nadir kelime", en: "limited count, a rare word no index serves" }, "716 ms", "1.72 s", "1.85 s"],
           [{ tr: "indeksli sütunda nadir kelime", en: "a rare word in the indexed column" }, "0.1 ms", "1.63 s", "1.66 s"]],
-        note: { tr: "Ayrıntılar ve sorgu planları: <a href=\"https://github.com/kemaloskan/acun-datatable/tree/main/bench/results\">bench/results</a>. MySQL ve MariaDB 128 MB tampon havuzuyla (varsayılan) ölçüldü; tablodan çok küçük. Ayarlanmış bir sunucu başka sonuç verir.",
-                en: "Details and query plans: <a href=\"https://github.com/kemaloskan/acun-datatable/tree/main/bench/results\">bench/results</a>. MySQL and MariaDB ran with the default 128 MB buffer pool, much smaller than the table; a configured server gives other numbers." } },
+        note: { tr: "Ayrıntılar ve sorgu planları: <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/tree/main/bench/results\">bench/results</a>. MySQL ve MariaDB 128 MB tampon havuzuyla (varsayılan) ölçüldü; tablodan çok küçük. Ayarlanmış bir sunucu başka sonuç verir.",
+                en: "Details and query plans: <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/tree/main/bench/results\">bench/results</a>. MySQL and MariaDB ran with the default 128 MB buffer pool, much smaller than the table; a configured server gives other numbers." } },
       { id: "means", title: { tr: "Ne anlama geliyor?", en: "What it means" },
         desc: { tr: "İndeksle karşılanan sayfa milisaniyeler sürdü; OFFSET ile derin sayfa üç veritabanında da saniyeler. Kesin sayım veritabanları arasında sekiz kat değişti. Sınırlı sayım, filtreyi bir indeks karşılıyorsa milisaniyeler, karşılamıyorsa bir saniyeyi aştı. MySQL ve MariaDB'de LIKE ile kelime araması tabloyu taradı.",
                 en: "Pages an index served took milliseconds; a deep OFFSET page took seconds on all three. The exact count differed eightfold between the databases. The limited count took milliseconds where an index served the filter and over a second where none did. On MySQL and MariaDB a word search with LIKE scanned the table." },
@@ -2713,8 +2713,8 @@ const PAGES = {
         desc: { tr: "Görünümleri yayınladıysanız yeniden yayınlayın (table, feature, details, row-actions değişti; yeni görünümler var). Kullanıcının sıralaması artık query() içindeki orderBy()'dan önce gelir. Yeni public özellikler: openDetails, columnOrder, columnWidths, cursors, tableTask; aynı adlı kendi özelliklerinizi yeniden adlandırın. DataTables protokolünde data: null kolonları yok sayılır.",
                 en: "If you published the views, publish them again (table, feature, details and row-actions changed; there are new views). The user's sort now comes before an orderBy() in query(). New public properties: openDetails, columnOrder, columnWidths, cursors, tableTask; rename your own properties with these names. In the DataTables protocol, data: null columns are ignored." },
         code: ["bash", "php artisan vendor:publish --tag=acun-datatable-views --force"],
-        note: { tr: "Tam liste: <a href=\"https://github.com/kemaloskan/acun-datatable/blob/main/UPGRADING.md\">UPGRADING.md</a> ve <a href=\"https://github.com/kemaloskan/acun-datatable/blob/main/CHANGELOG.md\">CHANGELOG.md</a>.",
-                en: "The full list: <a href=\"https://github.com/kemaloskan/acun-datatable/blob/main/UPGRADING.md\">UPGRADING.md</a> and <a href=\"https://github.com/kemaloskan/acun-datatable/blob/main/CHANGELOG.md\">CHANGELOG.md</a>." } },
+        note: { tr: "Tam liste: <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/UPGRADING.md\">UPGRADING.md</a> ve <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/CHANGELOG.md\">CHANGELOG.md</a>.",
+                en: "The full list: <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/UPGRADING.md\">UPGRADING.md</a> and <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/CHANGELOG.md\">CHANGELOG.md</a>." } },
     ],
   },
   faq: {
@@ -2768,7 +2768,7 @@ const T = {
        prevNote:"Bu paket henüz yazılmadı; aşağıdaki kod taslak bir API'dir ve değişebilir. Kurulum komutu yoktur. Örneklerdeki çekirdek fonksiyonlar bugün kullanılabilir.",
        unpub:"npm'de yayında (0.4.0, MIT):", planned_install:"Bu paket henüz yok; kurulum komutu yayınla birlikte eklenecek.",
        copy:"kopyala", copied:"kopyalandı",
-       legal_title:"MIT lisansı · Sorumluluk reddi", legal:"Yazılım “olduğu gibi” sunulur; açık ya da örtük hiçbir garanti verilmez. Yazarlar ve Acunsoft, yazılımın kullanımından veya kullanılamamasından doğan hiçbir zarar, veri kaybı ya da talepten sorumlu değildir. Projende kullanmadan önce test etmek, güvenliğini ve yetkilendirmesini sağlamak kullanıcının sorumluluğundadır. Bağlayıcı metin <a href=\"https://github.com/kemaloskan/acun-datatable/blob/main/LICENSE\">LICENSE</a> dosyasıdır.",
+       legal_title:"MIT lisansı · Sorumluluk reddi", legal:"Yazılım “olduğu gibi” sunulur; açık ya da örtük hiçbir garanti verilmez. Yazarlar ve Acunsoft, yazılımın kullanımından veya kullanılamamasından doğan hiçbir zarar, veri kaybı ya da talepten sorumlu değildir. Projende kullanmadan önce test etmek, güvenliğini ve yetkilendirmesini sağlamak kullanıcının sorumluluğundadır. Bağlayıcı metin <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/LICENSE\">LICENSE</a> dosyasıdır.",
        go:"İncele →",
        fw_desc:{html:"Framework olmadan: tek çağrı, DOM renderer ve <acun-datatable> Web Component.",react:"Hook\'lar ve bileşenler; Next.js App Router ile test edildi.",vue:"Composable\'lar ve bileşenler; Nuxt SSR ile test edildi.",laravel:"Livewire tablosu ve JSON uç nokta; Inertia ile React veya Vue."},
        api_title:"API referansı", api_lead:"Paketlerin genel API'si: tek çağrılık AcunDataTable, çekirdek, HTTP, Node sunucusu, DOM, dışa/içe aktarma, Vue, React (npm'de 0.4.0) ve Laravel (Packagist'te 0.5.0).",
@@ -2807,7 +2807,7 @@ const T = {
        prevNote:"This package is not written yet; the code below is a draft API and may change. There is no install command. The core functions in the examples are available today.",
        unpub:"Published on npm (0.4.0, MIT):", planned_install:"This package does not exist yet; an install command will come with the release.",
        copy:"copy", copied:"copied",
-       legal_title:"MIT License · Disclaimer", legal:"The software is provided “as is”, without warranty of any kind, express or implied. The authors and Acunsoft are not liable for any damage, data loss or claim arising from the use of, or inability to use, the software. Testing it, securing it and authorizing access in your project are your responsibility. The binding text is the <a href=\"https://github.com/kemaloskan/acun-datatable/blob/main/LICENSE\">LICENSE</a> file.",
+       legal_title:"MIT License · Disclaimer", legal:"The software is provided “as is”, without warranty of any kind, express or implied. The authors and Acunsoft are not liable for any damage, data loss or claim arising from the use of, or inability to use, the software. Testing it, securing it and authorizing access in your project are your responsibility. The binding text is the <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/LICENSE\">LICENSE</a> file.",
        go:"Open →",
        fw_desc:{html:"No framework: one call, the DOM renderer and the <acun-datatable> Web Component.",react:"Hooks and components; tested with the Next.js App Router.",vue:"Composables and components; tested with Nuxt server rendering.",laravel:"A Livewire table and a JSON endpoint; Inertia with React or Vue."},
        api_title:"API reference", api_lead:"Public API of the packages: the one-call AcunDataTable, core, HTTP, Node server, DOM, export/import, Vue, React (on npm, 0.4.0) and Laravel (on Packagist, 0.5.0).",
@@ -2890,7 +2890,7 @@ function page(r) {
       `<div class="box mid"><h3>${t.w2}</h3><p>${t.w2d}</p></div><div class="arrow" aria-hidden="true">⇄</div><div class="box"><h3>${t.w3}</h3><p>${t.w3d}</p></div></div>`;
     return { toc:[['s1',t.q_title],['s2',t.c_title],['s3',t.f_title],['s4',t.w_title],['s5',t.n_title]], html:
       `<div class="hero"><h1>${t.h2_title}</h1><p class="lead">${t.h2_lead}</p>` +
-      `<div class="actions"><a class="btn" href="#/home/s1">${t.h2_start} →</a><a class="btn ghost" href="demo/">${t.h2_demo}</a><a class="btn ghost" href="https://github.com/kemaloskan/acun-datatable">${t.h2_github}</a></div>` +
+      `<div class="actions"><a class="btn" href="#/home/s1">${t.h2_start} →</a><a class="btn ghost" href="demo/">${t.h2_demo}</a><a class="btn ghost" href="https://github.com/Acunsoft-Yazilim/acun-datatable">${t.h2_github}</a></div>` +
       `<ul class="badges">${t.h2_badges.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` +
       `<div class="preview"><div class="bar"><i></i><i></i><i></i><span>new AcunDataTable('#orders', { … })</span></div><div class="stage" id="home-table"></div></div><p class="caption">${t.h2_preview}</p></div>` +
       sec('s1',1,t.q_title,t.q_desc,steps) +

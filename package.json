@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kemaloskan/acun-datatable.git"
+    "url": "git+https://github.com/Acunsoft-Yazilim/acun-datatable.git"
   },
   "workspaces": [
     "packages/core",

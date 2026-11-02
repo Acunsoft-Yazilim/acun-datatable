@@ -1,13 +1,13 @@
 # Acun DataTable
 
-[![CI](https://github.com/kemaloskan/acun-datatable/actions/workflows/ci.yml/badge.svg)](https://github.com/kemaloskan/acun-datatable/actions/workflows/ci.yml)
+[![CI](https://github.com/Acunsoft-Yazilim/acun-datatable/actions/workflows/ci.yml/badge.svg)](https://github.com/Acunsoft-Yazilim/acun-datatable/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@acunsoft/datatable-core.svg)](https://www.npmjs.com/package/@acunsoft/datatable-core)
 [![Packagist](https://img.shields.io/packagist/v/acunsoft/datatable-laravel.svg)](https://packagist.org/packages/acunsoft/datatable-laravel)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**[Documentation](https://kemaloskan.github.io/acun-datatable/)** ·
-**[Live demo](https://kemaloskan.github.io/acun-datatable/demo/)** ·
-[Performance measurements](https://kemaloskan.github.io/acun-datatable/#/performance) ·
+**[Documentation](https://acunsoft-yazilim.github.io/acun-datatable/)** ·
+**[Live demo](https://acunsoft-yazilim.github.io/acun-datatable/demo/)** ·
+[Performance measurements](https://acunsoft-yazilim.github.io/acun-datatable/#/performance) ·
 [Upgrading](UPGRADING.md)
 
 A framework-independent data table for **plain HTML / JavaScript (also as
@@ -69,7 +69,7 @@ composer require acunsoft/datatable-laravel                     # Laravel + Live
 ```
 
 The rest of this file documents the core API for contributors; the
-[documentation site](https://kemaloskan.github.io/acun-datatable/) and each
+[documentation site](https://acunsoft-yazilim.github.io/acun-datatable/) and each
 package README cover usage.
 
 ## Upgrading

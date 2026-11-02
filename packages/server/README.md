@@ -1,6 +1,6 @@
 # @acunsoft/datatable-server
 
-The Node back end of [Acun DataTable](https://kemaloskan.github.io/acun-datatable/):
+The Node back end of [Acun DataTable](https://acunsoft-yazilim.github.io/acun-datatable/):
 for Next.js route handlers, Express, Fastify or any server that has a
 `Request` or its query string. It reads the table's request, checks it
 against a column allowlist, builds **bound-parameter SQL** for PostgreSQL,
