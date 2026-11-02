@@ -3,6 +3,15 @@
 All notable changes to this repository. Each npm package also has its own
 `CHANGELOG.md`, written by Changesets.
 
+## Unreleased
+
+- **Livewire: `columns()` runs once per render.** The table view asked for
+  the columns 17 times in one render (42 in a request with two updates), so
+  a `columns()` that reads filter options from the database queried that
+  often. They are now built once while the view renders; actions and
+  updates still build them on every call, so columns that depend on
+  component state see it.
+
 ## npm 0.5.0 and `acunsoft/datatable-laravel` 0.6.0
 
 npm 0.4.0 was prepared but never published: 0.5.0 carries it (see below).
