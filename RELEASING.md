@@ -58,7 +58,7 @@ first version is published from a machine:
 Every later release goes through the Release workflow.
 
 A package added later is in the same position: `@acunsoft/datatable` and
-`@acunsoft/datatable-server` (new in 0.4.0) do not exist on npm yet, so 0.4.0
+`@acunsoft/datatable-server` (new, never published) do not exist on npm yet, so 0.5.0
 is published from a machine as above (`npm run release` publishes the eight
 packages; the six that exist accept it too), and the trusted publisher is set
 up for the two new ones afterwards.
@@ -94,7 +94,7 @@ Packagist reads as the version.
       Validated by 0.2.1, the first release from the Release workflow, with
       provenance. No `NPM_TOKEN` secret.
 - [ ] `@acunsoft/datatable` and `@acunsoft/datatable-server`: first publish
-      (0.4.0, from a machine), then their trusted publishers and publishing
+      (0.5.0, from a machine), then their trusted publishers and publishing
       access, as for the first six.
 - [x] `SPLIT_TOKEN` repository secret: a fine-grained GitHub token ("Acun
       DataTable") with "Contents: read and write" on

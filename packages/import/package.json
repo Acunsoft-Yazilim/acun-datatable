@@ -55,7 +55,7 @@
     "build": "tsup && node -e \"require('node:fs').copyFileSync('src/styles.css','dist/styles.css')\""
   },
   "devDependencies": {
-    "@acunsoft/datatable-export": "0.4.0",
+    "@acunsoft/datatable-export": "0.5.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",
     "vitest": "^5.0.5",

@@ -3,7 +3,9 @@
 All notable changes to this repository. Each npm package also has its own
 `CHANGELOG.md`, written by Changesets.
 
-## Unreleased
+## npm 0.5.0 and `acunsoft/datatable-laravel` 0.6.0
+
+npm 0.4.0 was prepared but never published: 0.5.0 carries it (see below).
 
 - **Breaking (both back ends): DataTables "All" and oversized pages are
   refused.** `length=-1` or a length past the endpoint's largest page got a
@@ -194,7 +196,7 @@ All notable changes to this repository. Each npm package also has its own
   `TableResponse` and `TableExport` take `->key('id')`; Livewire tables use
   `keyName()`.
 
-## npm 0.4.0 and `acunsoft/datatable-laravel` 0.5.0 (2026-10-25)
+## `acunsoft/datatable-laravel` 0.5.0 (2026-10-25) · npm 0.4.0 (not published, in 0.5.0)
 
 The first stable release candidate: the npm packages skip 0.3.0, which was
 prepared but never published. Read [UPGRADING.md](UPGRADING.md) first; each

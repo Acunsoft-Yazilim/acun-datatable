@@ -1,6 +1,6 @@
 # Upgrading
 
-## Next release (not released yet)
+## npm 0.5.0 · `acunsoft/datatable-laravel` 0.6.0
 
 ### `acunsoft/datatable-laravel`
 
@@ -31,7 +31,8 @@
 
 ## npm packages: 0.2.x → 0.4.0
 
-0.3.0 was prepared but not published, so 0.4.0 carries both releases. Most of
+0.3.0 and 0.4.0 were prepared but not published to npm: coming from 0.2.x,
+read this section and the one above, which 0.5.0 carries together. Most of
 it is new; the changes below are the ones that can need a change in your code.
 
 ### Must change

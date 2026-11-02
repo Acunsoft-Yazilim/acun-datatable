@@ -1,6 +1,56 @@
 # @acunsoft/datatable-react
 
+## 0.5.0
+
+### Patch Changes
+
+- 747dc4f: React and Vue draw what the DOM renderer draws:
+  
+  - A column without a width in a fixed layout (after a column was resized, or with locked virtual widths) gets `adt-th--auto`, so it keeps a width when the responsive layout shows it again.
+  - Unselecting a page or a Shift+click range is linear: with virtual scrolling, where every matching row is on the page, clearing 30,000 selected rows took about 730 ms (now as fast as the DOM renderer, which used a Set).
+  - A table removed (or unmounted) right after a scroll no longer draws once more: the pending animation frame is cancelled, in the DOM renderer too.
+  - React's modal puts the details list (`<dl>`) right in the dialog, without an extra `<div>`.
+  - The DOM renderer's error notice is `role="alert"` without `aria-live="polite"` (which made the error wait), as in React and Vue.
+  - React's and Vue's column menu closes like a menu, as the DOM renderer's: Escape (focus back on its button), a click outside; after "Reset" the focus stays on its button.
+  - React and Vue check `rowActions` as the DOM renderer does (an id, a label and `onSelect`, no id twice), and Vue refuses a wrong `size` or `fixedColumns` with an error instead of a warning (a wrong size drew `adt-size--<value>`).
+  - **Visible change:** `DataTableLayout` and `AcunDataTableLayout` show the texts of their `locale` (`tr`, `de`, `fr`, `es`), with `labels` over them, as `renderDataTable` does; before, `locale` changed only numbers and dates and the texts stayed English unless `labels` were given.
+  - React's and Vue's toolbar buttons (`button`, `toolbarButtons`) refuse an icon that is not an icon name or `{ path }`, as the DOM renderer does.
+  - Virtual scrolling without `rowHeight`: the DOM renderer measures the first real row once rows are there (a table that loads its rows started with none and kept 40px, so the scroll bar and the jumps were off); none of the three measures a loading placeholder row.
+- 4da26fd: `aria-busy` is set on the rows' box (`.adt-scroll`) instead of the whole table wrapper, which also holds the "Loading…" status: assistive technology may hold back the changes of a busy region, the announcement included.
+- 6b4f1f6: Every export also has a `default` condition, so `require()` finds the packages (Node 22's `require(esm)`, Jest in CommonJS mode, TypeScript `node16` CommonJS files); it failed with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+- 7248947: Choosing an item of a row's "⋮" menu or of the tools menu puts the focus back on the menu's button (it fell to the page with the hidden item). The tools menu's groups (e.g. "Export") are named groups for screen readers instead of hidden headings.
+- 22f60a3: The React peer dependency is `^18.2.0 || ^19.0.0` instead of an open `>=18.2.0`: a future major is not claimed before it is tested.
+- c28ae1d: A Retry that fails again shows the error again and no longer leaves an unhandled promise rejection. `AcunDataTable`: after a first load that failed before the columns were known, `reload()` and the error's new Retry button load from the start (the rows were dropped, and a server table was asked like a client one).
+- f42d4f5: Screen readers hear a column's place in a sort of several columns ("sort 2, ascending"; `aria-sort` names only the first, and the ▲2 mark is hidden) and the name of the ⊕ column's header ("Details"). New labels `sortOrder` and `detailsColumn`, in the five languages.
+- 42e84ed: Virtual tables: the header checkbox says "Select all rows" (new label `selectAllRows`, in the five languages), since it selects every matching row, not a page; `aria-rowcount` counts the totals row too.
+- a5e1cee: Fixes:
+  
+  - React: `useDataTable({ data: orders.filter(…) })` — a new array on every render — no longer renders without end. A new array of the same records is not applied again when the table itself caused the render; a new array from the app still is.
+  - `@acunsoft/datatable`: server-side exports (Excel, CSV, copy, print) ask for `exportPageSize` rows a request (new option, default 100, the back ends' default most) instead of 1,000, which the Node back end refused and Laravel's DataTables answer cut to 100 rows. A back end that answers fewer rows than asked is paged by what it answers.
+  - A filter day (`2026-10-23`) on a date-time column is the user's day: `datatable-http` sends the browser's time zone as `tz` with day filters, and `readTableQuery` takes the day there (clock changes included); `readTableQuery(…, { timeZone })` lets the server decide. Without `tz` nothing changes. An exact instant on the server's midnight is no longer taken for a whole day. `TableDay` is exported for your own query builders.
+- Updated dependencies [747dc4f]
+- Updated dependencies [4da26fd]
+- Updated dependencies [ab54803]
+- Updated dependencies [d2e6692]
+- Updated dependencies [6b4f1f6]
+- Updated dependencies [cd31740]
+- Updated dependencies [2f7bf80]
+- Updated dependencies [7248947]
+- Updated dependencies [68a586e]
+- Updated dependencies [c7f8a8a]
+- Updated dependencies [3422663]
+- Updated dependencies [c28ae1d]
+- Updated dependencies [caaaa57]
+- Updated dependencies [b7659b3]
+- Updated dependencies [f42d4f5]
+- Updated dependencies [8d46546]
+- Updated dependencies [42e84ed]
+  - @acunsoft/datatable-dom@0.5.0
+  - @acunsoft/datatable-core@0.5.0
+
 ## 0.4.0
+
+Not published on npm: these changes reach npm with 0.5.0.
 
 ### Minor Changes
 

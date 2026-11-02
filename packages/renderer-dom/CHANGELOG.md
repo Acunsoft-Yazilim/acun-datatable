@@ -1,6 +1,43 @@
 # @acunsoft/datatable-dom
 
+## 0.5.0
+
+### Patch Changes
+
+- 747dc4f: React and Vue draw what the DOM renderer draws:
+  
+  - A column without a width in a fixed layout (after a column was resized, or with locked virtual widths) gets `adt-th--auto`, so it keeps a width when the responsive layout shows it again.
+  - Unselecting a page or a Shift+click range is linear: with virtual scrolling, where every matching row is on the page, clearing 30,000 selected rows took about 730 ms (now as fast as the DOM renderer, which used a Set).
+  - A table removed (or unmounted) right after a scroll no longer draws once more: the pending animation frame is cancelled, in the DOM renderer too.
+  - React's modal puts the details list (`<dl>`) right in the dialog, without an extra `<div>`.
+  - The DOM renderer's error notice is `role="alert"` without `aria-live="polite"` (which made the error wait), as in React and Vue.
+  - React's and Vue's column menu closes like a menu, as the DOM renderer's: Escape (focus back on its button), a click outside; after "Reset" the focus stays on its button.
+  - React and Vue check `rowActions` as the DOM renderer does (an id, a label and `onSelect`, no id twice), and Vue refuses a wrong `size` or `fixedColumns` with an error instead of a warning (a wrong size drew `adt-size--<value>`).
+  - **Visible change:** `DataTableLayout` and `AcunDataTableLayout` show the texts of their `locale` (`tr`, `de`, `fr`, `es`), with `labels` over them, as `renderDataTable` does; before, `locale` changed only numbers and dates and the texts stayed English unless `labels` were given.
+  - React's and Vue's toolbar buttons (`button`, `toolbarButtons`) refuse an icon that is not an icon name or `{ path }`, as the DOM renderer does.
+  - Virtual scrolling without `rowHeight`: the DOM renderer measures the first real row once rows are there (a table that loads its rows started with none and kept 40px, so the scroll bar and the jumps were off); none of the three measures a loading placeholder row.
+- 4da26fd: `aria-busy` is set on the rows' box (`.adt-scroll`) instead of the whole table wrapper, which also holds the "Loading…" status: assistive technology may hold back the changes of a busy region, the announcement included.
+- ab54803: After `destroy()`, a detail that arrives late or an editor that closes no longer draws the removed table again; `AcunDataTable.destroy()` also takes away its loading or error placeholder.
+- d2e6692: A column resize ends (without a change) when the browser takes the pointer back, and the pointer is captured so a release outside the window still ends it; a click on the details dialog's own scrollbar no longer closes it; the search placeholder has AA contrast; `AcunDataTableOptions` documents `detail` and `responsive: 'auto'`.
+- 6b4f1f6: Every export also has a `default` condition, so `require()` finds the packages (Node 22's `require(esm)`, Jest in CommonJS mode, TypeScript `node16` CommonJS files); it failed with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+- cd31740: The page info ("Showing 1 to 25 of 500 rows") and the selection count are written only when their words change, so screen readers do not read them out again on every checkbox or column change.
+- 2f7bf80: `renderTable`, `renderPagination`, `renderFilters`, `renderFilterPanel` and the cell texts take their texts from `locale` when no `labels` are given, as `renderDataTable` does (`locale: 'tr'` changed the numbers but left the texts English, and the README's `renderFilterPanel(…, { locale: 'tr' })` showed English).
+- 7248947: Choosing an item of a row's "⋮" menu or of the tools menu puts the focus back on the menu's button (it fell to the page with the hidden item). The tools menu's groups (e.g. "Export") are named groups for screen readers instead of hidden headings.
+- 68a586e: `responsive: 'auto'` and `fixedColumns` measure the table again only when column widths may change (a re-render, the class or style of the table or a cell), not when a row is selected or expanded, nor for the pinned columns' own classes: a checkbox click no longer forces a layout per column.
+- c28ae1d: A Retry that fails again shows the error again and no longer leaves an unhandled promise rejection. `AcunDataTable`: after a first load that failed before the columns were known, `reload()` and the error's new Retry button load from the start (the rows were dropped, and a server table was asked like a client one).
+- caaaa57: A row's "⋮" menu opens whole: it was cut off by the table's scroll box on the last rows and by the cards on phones. Open, it is fixed over the page below its button (above when there is no room below), kept inside the window, and follows the button while the page or the table scrolls. `placeMenu()` does this for `.adt-row-menu`, so React and Vue get it too; styles.css has the new rule.
+- f42d4f5: Screen readers hear a column's place in a sort of several columns ("sort 2, ascending"; `aria-sort` names only the first, and the ▲2 mark is hidden) and the name of the ⊕ column's header ("Details"). New labels `sortOrder` and `detailsColumn`, in the five languages.
+- 42e84ed: Virtual tables: the header checkbox says "Select all rows" (new label `selectAllRows`, in the five languages), since it selects every matching row, not a page; `aria-rowcount` counts the totals row too.
+- Updated dependencies [6b4f1f6]
+- Updated dependencies [c7f8a8a]
+- Updated dependencies [3422663]
+- Updated dependencies [b7659b3]
+- Updated dependencies [8d46546]
+  - @acunsoft/datatable-core@0.5.0
+
 ## 0.4.0
+
+Not published on npm: these changes reach npm with 0.5.0.
 
 ### Minor Changes
 

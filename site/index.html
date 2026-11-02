@@ -444,7 +444,7 @@ state.destroy();`;
 const FW = {
   laravel:{ name:"Laravel", pkg:"acunsoft/datatable-laravel", status:"ready",
     install:"composer require acunsoft/datatable-laravel",
-    unpub:{tr:"Packagist'te yayında (0.5.0, MIT):", en:"Published on Packagist (0.5.0, MIT):"},
+    unpub:{tr:"Packagist'te yayında (0.6.0, MIT):", en:"Published on Packagist (0.6.0, MIT):"},
     api:'acunsoft/datatable-laravel',
     lead:{tr:"Laravel ve Livewire için tek Composer paketi. İki yol: sunucuda çizilen bir <strong>Livewire tablosu</strong> ya da Vue, React veya düz JavaScript için bir <strong>JSON uç noktası</strong>. İzin verilen kolonlar, Türkçe duyarlı arama, sayfa sınırları ve süreli sayım ikisinde de aynı. npm ya da bir UI kiti gerekmez.",
           en:"One Composer package for Laravel and Livewire. Two ways: a <strong>Livewire table</strong> rendered on the server, or a <strong>JSON endpoint</strong> for Vue, React or plain JavaScript. Allowlisted columns, Turkish-aware search, page limits and timed counts are the same in both. No npm or UI kit needed."},
@@ -520,7 +520,7 @@ class OrdersTable extends \\Livewire\\Component
     protected function exportFormats(): array { return ['xlsx', 'csv']; }
 }`],
       ['Blade','html',`{{-- resources/views/orders.blade.php --}}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable-dom@0.4.0/dist/styles.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable-dom@0.5.0/dist/styles.css">
 
 <livewire:orders-table />`],
       ['JSON endpoint','php',`<\?php
@@ -676,8 +676,8 @@ Object.assign(FW.html, { name: "HTML / JavaScript", topics: [
             en: "A standard custom element; no framework needed. Common options are attributes and properties alike (<code>src</code>, <code>server-side</code>, <code>language</code>, <code>page-size</code>, <code>responsive</code> …), everything else the <code>options</code>, <code>columns</code> and <code>data</code> properties. Light DOM, so <code>styles.css</code> and the page's theme apply. Safe to import on a server; it only runs in the browser." },
     parts: [
       { title: { tr: "Tek <script> etiketiyle", en: "With a single <script> tag" }, lang: "xml", code:
-`<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/styles.css">
-<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/acun-datatable.min.js"><\/script>
+`<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/acun-datatable.min.js"><\/script>
 
 <acun-datatable id="orders" src="/api/orders" server-side language="tr" page-size="25" responsive="auto"></acun-datatable>
 <script>
@@ -903,7 +903,7 @@ const GUIDES = {
      [
       "\u003cscript>",
       "xml",
-      "\u003clink rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/styles.css\">\n\u003cscript src=\"https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/acun-datatable.min.js\">\u003c/script>\n\n\u003ctable id=\"myTable\">\u003c/table>\n\u003cscript>\n  new AcunDataTable('#myTable', {\n    fixedHeader: true,\n    serverSide: true,\n    ajax: { url: '/api/products', method: 'POST' },\n  });\n\u003c/script>"
+      "\u003clink rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/styles.css\">\n\u003cscript src=\"https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/acun-datatable.min.js\">\u003c/script>\n\n\u003ctable id=\"myTable\">\u003c/table>\n\u003cscript>\n  new AcunDataTable('#myTable', {\n    fixedHeader: true,\n    serverSide: true,\n    ajax: { url: '/api/products', method: 'POST' },\n  });\n\u003c/script>"
      ]
     ]
    },
@@ -2316,8 +2316,8 @@ const GUIDES = {
    "en": "Excel and CSV import"
   },
   "lead": {
-   "tr": "İsteğe bağlı bir modül: tablo arayüzü yönetir (dosya, eşleştirme, önizleme, ilerleme, sonuç), backend'iniz dosyayı, sınırları, kuyruğu ve kaydetmeyi. Laravel ve Node yardımcıları hazırdır; kendi backend'inizle de çalışır. \u003cstrong>Henüz yayınlanmadı: bir sonraki sürümle (npm 0.5.0, Laravel 0.6.0) gelir.\u003c/strong>",
-   "en": "An optional module: the table manages the interface (file, mapping, preview, progress, result), your back end the file, the limits, the queue and the saving. Laravel and Node helpers are ready; it works with a back end of your own too. \u003cstrong>Not released yet: it comes with the next version (npm 0.5.0, Laravel 0.6.0).\u003c/strong>"
+   "tr": "İsteğe bağlı bir modül: tablo arayüzü yönetir (dosya, eşleştirme, önizleme, ilerleme, sonuç), backend'iniz dosyayı, sınırları, kuyruğu ve kaydetmeyi. Laravel ve Node yardımcıları hazırdır; kendi backend'inizle de çalışır. \u003cstrong>Tarayıcı paketi (@acunsoft/datatable-import) henüz yayınlanmadı; sonraki bir sürümle gelir. Arka uçları (Laravel TableImport, Node createImportHandler) bu sürümde var.\u003c/strong>",
+   "en": "An optional module: the table manages the interface (file, mapping, preview, progress, result), your back end the file, the limits, the queue and the saving. Laravel and Node helpers are ready; it works with a back end of your own too. \u003cstrong>The browser package (@acunsoft/datatable-import) is not released yet; it comes with a later version. Its back ends (Laravel TableImport, Node createImportHandler) are in this one.\u003c/strong>"
   },
   "sections": [
    {
@@ -2610,8 +2610,8 @@ const CHOOSE = {
 /* Where a chooser row leads, when not to a page of the same name. */
 const CHOOSE_TO = { inertia: 'laravel/inertia', nextjs: 'react/nextjs', nuxt: 'vue/nuxt', node: 'server/node', webcomponent: 'html/webcomponent' };
 const QUICK_ADD = [
-  ['<script>', 'html', `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/styles.css">
-<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/acun-datatable.min.js"><\/script>`],
+  ['<script>', 'html', `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/acun-datatable.min.js"><\/script>`],
   ['npm', 'typescript', `// npm install @acunsoft/datatable
 import { AcunDataTable } from '@acunsoft/datatable';
 import '@acunsoft/datatable/styles.css';`],
@@ -2699,9 +2699,13 @@ const PAGES = {
   },
   upgrade: {
     title: { tr: "Sürüm geçişi", en: "Upgrading" },
-    lead: { tr: "npm paketleri 0.2.x'ten 0.4.0'a, Laravel paketi 0.4'ten 0.5'e. 0.3.0 hazırlanıp yayınlanmadı; 0.4.0 ikisini birlikte getirir. Çoğu değişiklik yenidir; aşağıdakiler kodunuzda değişiklik isteyebilecek olanlar.",
-            en: "The npm packages from 0.2.x to 0.4.0, the Laravel package from 0.4 to 0.5. 0.3.0 was prepared but not published; 0.4.0 carries both. Most of it is new; below are the changes that can need a change in your code." },
+    lead: { tr: "npm paketleri 0.2.x'ten 0.5.0'a, Laravel paketi 0.4'ten 0.5'e ve 0.6'ya. 0.3.0 ve 0.4.0 hazırlanıp yayınlanmadı; 0.5.0 hepsini birlikte getirir. Çoğu değişiklik yenidir; aşağıdakiler kodunuzda değişiklik isteyebilecek olanlar.",
+            en: "The npm packages from 0.2.x to 0.5.0, the Laravel package from 0.4 to 0.5 and 0.6. 0.3.0 and 0.4.0 were prepared but not published; 0.5.0 carries them all. Most of it is new; below are the changes that can need a change in your code." },
     sections: [
+      { id: "v050", title: { tr: "npm 0.5.0 · Laravel 0.6.0: değiştirmeniz gerekenler", en: "npm 0.5.0 · Laravel 0.6.0: what you must change" },
+        desc: { tr: "Laravel: yerinde düzenleme artık modelin policy'sini ister; policy yoksa düzenleme reddedilir (403), tablo editableWithoutPolicy() ile bilerek izin vermedikçe. İki backend: DataTables'ın \"Tümü\" (length=-1) ve uç noktanın en büyük sayfasını aşan uzunluklar artık DataTables hatası alır; eskiden sayfa sessizce kısalıyor, kalan satırlar görünmüyordu. lengthMenu'yü en büyük sayfa içinde tutun.",
+                en: "Laravel: editing in place now needs the model's policy; without one an edit is refused (403) unless the table allows it on purpose with editableWithoutPolicy(). Both back ends: DataTables' \"All\" (length=-1) and lengths past the endpoint's largest page now get DataTables' error; the page used to be cut short with the other rows silently missing. Keep lengthMenu within the largest page." },
+        code: ["php", "protected function editableWithoutPolicy(): bool\n{\n    return true; // whoever sees this table may edit it\n}"] },
       { id: "npm", title: { tr: "npm: değiştirmeniz gerekenler", en: "npm: what you must change" },
         desc: { tr: "Sayfalama artık üç kontrol: sayfa numaraları (renderPagination), sayfa başı satır (renderPageSize) ve satır aralığı (renderPageInfo). Ya da hepsini yerleştiren renderDataTable / AcunDataTableLayout / DataTableLayout. pageStatus etiketleri pageInfo, pageInfoOpen ve pageInfoEmpty oldu. CSS sınıfları: adt-pagination → adt-paging, adt-status → adt-info, adt-page-size → adt-length.",
                 en: "Pagination is three controls now: page numbers (renderPagination), rows per page (renderPageSize) and the row range (renderPageInfo). Or renderDataTable / AcunDataTableLayout / DataTableLayout, which place them all. The pageStatus labels became pageInfo, pageInfoOpen and pageInfoEmpty. CSS classes: adt-pagination → adt-paging, adt-status → adt-info, adt-page-size → adt-length." },
@@ -2766,7 +2770,7 @@ const T = {
        ex1:"Sıralama ve sayfalama", ex1d:"Çok kolonlu stable sıralama, ardından 1-tabanlı sayfa.",
        ex2:"Durumu dinlemek", ex2d:"State değişikliklerinde donmuş snapshot alırsın.",
        prevNote:"Bu paket henüz yazılmadı; aşağıdaki kod taslak bir API'dir ve değişebilir. Kurulum komutu yoktur. Örneklerdeki çekirdek fonksiyonlar bugün kullanılabilir.",
-       unpub:"npm'de yayında (0.4.0, MIT):", planned_install:"Bu paket henüz yok; kurulum komutu yayınla birlikte eklenecek.",
+       unpub:"npm'de yayında (0.5.0, MIT):", planned_install:"Bu paket henüz yok; kurulum komutu yayınla birlikte eklenecek.",
        copy:"kopyala", copied:"kopyalandı",
        legal_title:"MIT lisansı · Sorumluluk reddi", legal:"Yazılım “olduğu gibi” sunulur; açık ya da örtük hiçbir garanti verilmez. Yazarlar ve Acunsoft, yazılımın kullanımından veya kullanılamamasından doğan hiçbir zarar, veri kaybı ya da talepten sorumlu değildir. Projende kullanmadan önce test etmek, güvenliğini ve yetkilendirmesini sağlamak kullanıcının sorumluluğundadır. Bağlayıcı metin <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/LICENSE\">LICENSE</a> dosyasıdır.",
        go:"İncele →",
@@ -2805,7 +2809,7 @@ const T = {
        ex1:"Sorting and pagination", ex1d:"Multi-column stable sorting, then a 1-based page.",
        ex2:"Listening to state", ex2d:"Every state change gives you a frozen snapshot.",
        prevNote:"This package is not written yet; the code below is a draft API and may change. There is no install command. The core functions in the examples are available today.",
-       unpub:"Published on npm (0.4.0, MIT):", planned_install:"This package does not exist yet; an install command will come with the release.",
+       unpub:"Published on npm (0.5.0, MIT):", planned_install:"This package does not exist yet; an install command will come with the release.",
        copy:"copy", copied:"copied",
        legal_title:"MIT License · Disclaimer", legal:"The software is provided “as is”, without warranty of any kind, express or implied. The authors and Acunsoft are not liable for any damage, data loss or claim arising from the use of, or inability to use, the software. Testing it, securing it and authorizing access in your project are your responsibility. The binding text is the <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/LICENSE\">LICENSE</a> file.",
        go:"Open →",

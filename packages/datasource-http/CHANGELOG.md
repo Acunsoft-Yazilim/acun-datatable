@@ -1,6 +1,27 @@
 # @acunsoft/datatable-http
 
+## 0.5.0
+
+### Patch Changes
+
+- 6b4f1f6: Every export also has a `default` condition, so `require()` finds the packages (Node 22's `require(esm)`, Jest in CommonJS mode, TypeScript `node16` CommonJS files); it failed with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+- c7f8a8a: Cursor paging is set once, on the table: a table created with `paging: 'cursor'` gives every query `paging: 'cursor'` (new optional `TableQuery.paging`), and `createHttpDataSource` sends `paging=cursor` for it without its own option. Before, the table and the source each needed `paging: 'cursor'`, and with only the table set the server answered page numbers and the table never got past page 1. The source's `paging` option stays for calling `getPage` yourself; with it, page 2 or later without a cursor is now refused with a clear error instead of fetching page 1 again.
+- b7659b3: A space typed after the search words no longer sends the same request again nor goes back to page 1: the search text is kept as typed, and `connectTable` does not ask for the query whose answer is on its way or on screen.
+- a5e1cee: Fixes:
+  
+  - React: `useDataTable({ data: orders.filter(…) })` — a new array on every render — no longer renders without end. A new array of the same records is not applied again when the table itself caused the render; a new array from the app still is.
+  - `@acunsoft/datatable`: server-side exports (Excel, CSV, copy, print) ask for `exportPageSize` rows a request (new option, default 100, the back ends' default most) instead of 1,000, which the Node back end refused and Laravel's DataTables answer cut to 100 rows. A back end that answers fewer rows than asked is paged by what it answers.
+  - A filter day (`2026-10-23`) on a date-time column is the user's day: `datatable-http` sends the browser's time zone as `tz` with day filters, and `readTableQuery` takes the day there (clock changes included); `readTableQuery(…, { timeZone })` lets the server decide. Without `tz` nothing changes. An exact instant on the server's midnight is no longer taken for a whole day. `TableDay` is exported for your own query builders.
+- Updated dependencies [6b4f1f6]
+- Updated dependencies [c7f8a8a]
+- Updated dependencies [3422663]
+- Updated dependencies [b7659b3]
+- Updated dependencies [8d46546]
+  - @acunsoft/datatable-core@0.5.0
+
 ## 0.4.0
+
+Not published on npm: these changes reach npm with 0.5.0.
 
 ### Minor Changes
 

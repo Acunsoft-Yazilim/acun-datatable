@@ -27,8 +27,8 @@ const table = new AcunDataTable('#myTable', {
 Or with a `<script>` tag, without a build step (`window.AcunDataTable`):
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/styles.css">
-<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.4.0/dist/acun-datatable.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/acun-datatable.min.js"></script>
 <script>
   new AcunDataTable('#myTable', { serverSide: true, ajax: '/api/products' });
 </script>
