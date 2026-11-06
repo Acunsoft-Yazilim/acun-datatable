@@ -3121,7 +3121,7 @@ function pager(r) {
   const t = T[lang], order = pageOrder(), i = order.indexOf(r), prev = order[i - 1], next = order[i + 1];
   const card = (id, cls, label) => `<a class="${cls}" href="#/${id}" data-go="${id}"><span class="k">${label}</span><span class="t">${esc(pageTitle(id))}</span></a>`;
   const issue = 'https://github.com/Acunsoft-Yazilim/acun-datatable/issues/new?' + new URLSearchParams({
-    title: `Docs: ${pageTitle(r)}`, body: `Page: https://acunsoft-yazilim.github.io/acun-datatable/#/${r}\n\n` }).toString();
+    title: `Docs: ${pageTitle(r)}`, body: `Page: https://datatable.acunui.com/#/${r}\n\n` }).toString();
   return `<nav class="pager" aria-label="${t.pager}">${prev ? card(prev, 'prev', t.prev) : ''}${next ? card(next, 'next', t.next) : ''}</nav>` +
     `<p class="report"><a href="${esc(issue)}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>${t.report}</a></p>`;
 }

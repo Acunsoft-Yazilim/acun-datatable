@@ -5,9 +5,9 @@
 [![Packagist](https://img.shields.io/packagist/v/acunsoft/datatable-laravel.svg)](https://packagist.org/packages/acunsoft/datatable-laravel)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**[Documentation](https://acunsoft-yazilim.github.io/acun-datatable/)** ·
-**[Live demo](https://acunsoft-yazilim.github.io/acun-datatable/demo/)** ·
-[Performance measurements](https://acunsoft-yazilim.github.io/acun-datatable/#/performance) ·
+**[Documentation](https://datatable.acunui.com/)** ·
+**[Live demo](https://datatable.acunui.com/demo/)** ·
+[Performance measurements](https://datatable.acunui.com/#/performance) ·
 [Upgrading](UPGRADING.md)
 
 A framework-independent data table for **plain HTML / JavaScript (also as
@@ -69,7 +69,7 @@ composer require acunsoft/datatable-laravel                     # Laravel + Live
 ```
 
 The rest of this file documents the core API for contributors; the
-[documentation site](https://acunsoft-yazilim.github.io/acun-datatable/) and each
+[documentation site](https://datatable.acunui.com/) and each
 package README cover usage.
 
 ## Upgrading
