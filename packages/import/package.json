@@ -1,7 +1,6 @@
 {
   "name": "@acunsoft/datatable-import",
   "version": "0.4.0",
-  "private": true,
   "description": "Excel and CSV import for ACUN DataTable, as an optional module: the import protocol (acun-import/1), its client and a test kit for any back end. The back end reads the file and owns limits, queues and storage.",
   "keywords": [
     "datatable",

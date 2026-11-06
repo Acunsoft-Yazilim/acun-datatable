@@ -13,7 +13,8 @@
       "@acunsoft/datatable-export",
       "@acunsoft/datatable-vue",
       "@acunsoft/datatable-react",
-      "@acunsoft/datatable"
+      "@acunsoft/datatable",
+      "@acunsoft/datatable-import"
     ]
   ],
   "linked": [],

@@ -5,6 +5,12 @@ All notable changes to this repository. Each npm package also has its own
 
 ## Unreleased
 
+- **Import released: `@acunsoft/datatable-import`.** The import dialog
+  (file and drag and drop, column mapping with a preview, progress, results,
+  error report), the import protocol `acun-import/1` with its client, and a
+  test kit for any back end. Its back ends were already out (Laravel
+  `TableImport`, Node `@acunsoft/datatable-server/import`); the "not released
+  yet" notes are gone from the READMEs, the docs and the demo.
 - **The table takes the page's font everywhere.** Browsers give buttons,
   inputs and selects a font of their own, so the edit pencil, the column
   move buttons and the dialogs' close buttons showed the browser's font

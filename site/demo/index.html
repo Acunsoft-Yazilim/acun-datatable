@@ -645,8 +645,7 @@ class OrdersTable extends \\Livewire\\Component
     if (!response.ok) throw new Error((await response.json()).message);
   },
 });`,
-    import: (lang, L) => `// Not released yet: comes with the next version.
-// npm install @acunsoft/datatable @acunsoft/datatable-import
+    import: (lang, L) => `// npm install @acunsoft/datatable @acunsoft/datatable-import
 import { importButton } from '@acunsoft/datatable-import';
 import '@acunsoft/datatable-import/styles.css';
 
