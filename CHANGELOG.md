@@ -5,6 +5,11 @@ All notable changes to this repository. Each npm package also has its own
 
 ## Unreleased
 
+- **The table takes the page's font everywhere.** Browsers give buttons,
+  inputs and selects a font of their own, so the edit pencil, the column
+  move buttons and the dialogs' close buttons showed the browser's font
+  instead of the theme's; print used `system-ui`. Every control now takes
+  the page's font, and print (JavaScript and Livewire) uses it too.
 - **Livewire: `columns()` runs once per render.** The table view asked for
   the columns 17 times in one render (42 in a request with two updates), so
   a `columns()` that reads filter options from the database queried that
