@@ -36,6 +36,8 @@ export interface CellRenderProps<TData> {
 export interface DataTableProps<TData> {
   readonly table: DataTable<TData>;
   readonly caption?: string;
+  /** `false` keeps the caption for screen readers only. Default `true`. */
+  readonly captionVisible?: boolean;
   readonly selectable?: boolean;
   /** Locale for default number and date text. Default `'en'`. */
   readonly locale?: string;
@@ -429,7 +431,7 @@ export function DataTable<TData>(props: DataTableProps<TData>): ReactElement {
     notice,
     // aria-busy on the rows' box, not around the notice (a busy region's changes may be held back).
     h('div', { className: 'adt-scroll', onScroll: virtual ? onScroll : undefined, 'aria-busy': props.status ? busy : undefined }, h('table', { className: tableClassName, 'aria-rowcount': all ? all.length + 1 + (columns.some(column => column.aggregate !== undefined) ? 1 : 0) : undefined },
-      props.caption !== undefined ? h('caption', null, props.caption) : null,
+      props.caption !== undefined ? h('caption', props.captionVisible === false ? { className: 'adt-sr-only' } : null, props.caption) : null,
       h('thead', null, h('tr', null, head)),
       h('tbody', skeleton ? { 'aria-hidden': true } : null, body),
       // Footer totals of the columns with `aggregate` (every matching row).

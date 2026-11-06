@@ -145,7 +145,8 @@ final class LivewireLayoutTest extends TestCase
         self::assertMatchesRegularExpression('/<button type="button" class="adt-action adt-action--icon" data-action="view"\s+aria-label="View: Ayşe Yılmaz"\s+title="View"/', $html);
         self::assertMatchesRegularExpression('/<summary class="adt-action adt-action--icon" aria-label="More actions: Ayşe Yılmaz"/', $html);
         self::assertMatchesRegularExpression('/<button type="button" class="adt-menu-item adt-menu-item--danger" data-action="remove"/', $html);
-        self::assertStringContainsString('wire:confirm="Sure?"', $html);
+        // A danger() action confirms in the danger tone.
+        self::assertMatchesRegularExpression('/data-action="remove"\s+aria-label="Remove: Ayşe Yılmaz"\s+data-confirm="Sure\?"\s+data-confirm-tone="danger"\s+x-data x-on:click="\$el\.closest\(\'details\'\)\.open = false;[^"]*\.then\(ok => ok && \$wire\.runRowAction\(\'remove\', \'1\'\)\)"/', $html);
         $table->call('runRowAction', 'remove', '1');
         self::assertNull(Order::query()->find(1));
         $this->expectException(\InvalidArgumentException::class);

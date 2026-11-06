@@ -18,13 +18,14 @@ export interface ServerColumnSpec {
   readonly nullable?: boolean;
   /** May be used in `filters`. */
   readonly filterable?: boolean;
-  /** Part of the global search. Default: filterable text columns. */
+  /** Part of the global search. Default: filterable text columns and columns with `search`. */
   readonly searchable?: boolean;
   /**
    * A folded copy of the column (lower case, accents removed: `ayse` for
    * `Ayşe`) to search instead, so search ignores case, accents and Turkish
    * letters and can use a plain or trigram index. The term is folded the
-   * same way (`foldText`).
+   * same way (`foldText`). Makes the column searchable unless
+   * `searchable: false`.
    */
   readonly search?: string;
 }
@@ -69,7 +70,7 @@ export function defineColumns(spec: Readonly<Record<string, ServerColumnSpec>>):
       sortable: column.sortable === true,
       nullable: column.nullable === true,
       filterable,
-      searchable: column.searchable ?? (filterable && type === 'text'),
+      searchable: column.searchable ?? ((filterable && type === 'text') || column.search !== undefined),
       search: column.search === undefined ? undefined : checkIdentifier(column.search, `column "${id}".search`),
     });
   }));

@@ -27,6 +27,8 @@ final class WorkbenchServiceProvider extends ServiceProvider
         'filters' => Fixtures\FilterOrdersTable::class,
         'import' => Fixtures\ImportOrdersTable::class,
         'layout' => Fixtures\LayoutOrdersTable::class,
+        'defaults' => Fixtures\DefaultsOrdersTable::class,
+        'selectable' => Fixtures\SqlSelectableOrdersTable::class,
     ];
 
     public function register(): void

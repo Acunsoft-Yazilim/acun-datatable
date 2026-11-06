@@ -70,7 +70,7 @@ on every table event through `useSyncExternalStore`.
 | `Filters` · `FilterChips` · `Tools` | `table`, `labels`, `locale` · `Filters`: `panel`, `button` · `Tools`: `items`, `button` |
 | `FilterPanel` | `table`, `labels`, `locale`: only the filter fields, for your own drawer, modal or sidebar |
 | `ColumnToggle` | `table`, `labels`, `reorderable`, `button` (`{ label, icon, iconOnly, className }`) |
-| `DataTable` | `table`, `caption`, `selectable`, `locale`, `labels`, `format`, `cells`, `detail`, `empty`, `rowLabel`, `rowActions`, `maxInlineActions`, `status`, `skeleton`, `onEdit`, `virtual`, `fixedColumns`, `resizableColumns`, `reorderableColumns`, `responsive`, `size`, `stickyHeader`, `scrollY`, `multiSort` |
+| `DataTable` | `table`, `caption`, `captionVisible`, `selectable`, `locale`, `labels`, `format`, `cells`, `detail`, `empty`, `rowLabel`, `rowActions`, `maxInlineActions`, `status`, `skeleton`, `onEdit`, `virtual`, `fixedColumns`, `resizableColumns`, `reorderableColumns`, `responsive`, `size`, `stickyHeader`, `scrollY`, `multiSort` |
 | `Pagination` | `table`, `siblings`, `boundaries`, `firstLast`, `locale`, `labels` |
 | `PageSize` | `table`, `pageSizes`, `labels` |
 | `PageInfo` | `table`, `labels` |

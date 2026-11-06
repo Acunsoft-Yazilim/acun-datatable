@@ -14,6 +14,9 @@ final class QueuedOrdersTable extends \Livewire\Component
 
     public static int $renders = 0;
 
+    /** Lets a test keep the selection after the queued bulk action. */
+    public bool $keepSelection = false;
+
     public function rendered(): void
     {
         self::$renders++;
@@ -54,6 +57,6 @@ final class QueuedOrdersTable extends \Livewire\Component
 
     protected function bulkActions(): array
     {
-        return [Action::make('activate')->label('Activate')->queued()->handle(fn ($selected) => $selected->update(['active' => true]))];
+        return [Action::make('activate')->label('Activate')->queued()->keepSelection($this->keepSelection)->handle(fn ($selected) => $selected->update(['active' => true]))];
     }
 }

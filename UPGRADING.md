@@ -1,5 +1,25 @@
 # Upgrading
 
+## Unreleased · `acunsoft/datatable-laravel`
+
+Nothing must change; check these if they apply to you:
+
+1. **Published views.** The confirmation of `Action::confirm()` moved from
+   `wire:confirm` to `data-confirm*` attributes and `livewire.confirm` (the
+   handler of `setConfirm()`, ACUN UI's dialog, else the browser's). Views
+   you published keep `wire:confirm` and the browser's dialog; publish again
+   (`--tag=acun-datatable-views`) for the new dialog, `captionVisible()` and
+   the missing checkbox on rows `isSelectable()` refuses (the server refuses
+   them either way; `internal()` columns are left out by the component, so
+   old views already hide them). Your own tests that look for `wire:confirm`
+   in the HTML now find `data-confirm="…"`.
+2. **`selectedQuery()` is ordered as the table** (its sort, the key last).
+   MySQL refuses `ORDER BY` in an `UPDATE` or `DELETE` with a join: there,
+   call `$selected->reorder()->update(...)`.
+3. **`searchUsing()` makes a column searchable** (and, in
+   `@acunsoft/datatable-server`, a column with `search`). One that should
+   stay out of the search box needs `searchable(false)` (`searchable: false`).
+
 ## npm 0.5.0 · `acunsoft/datatable-laravel` 0.6.0
 
 ### `acunsoft/datatable-laravel`

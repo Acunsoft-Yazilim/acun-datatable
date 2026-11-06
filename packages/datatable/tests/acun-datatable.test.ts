@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AcunDataTable } from '../src/index';
+import { AcunDataTable, setConfirm } from '../src/index';
 
 let host: HTMLElement;
 beforeEach(() => {
@@ -110,6 +110,27 @@ describe('AcunDataTable', () => {
     expect(() => new AcunDataTable('#missing')).toThrow('no element matches #missing');
     expect(() => new AcunDataTable('#orders', { serverSide: true })).toThrow('serverSide needs ajax');
     expect(() => new AcunDataTable('#orders', { serverSide: true, ajax: '/x', pagination: false })).toThrow('pagination cannot be turned off');
+  });
+});
+
+describe('caption and confirmation', () => {
+  it('keeps the caption for screen readers only and asks the dialog of setConfirm', async () => {
+    const remove = vi.fn();
+    setConfirm(() => Promise.resolve(true));
+    try {
+      const dt = new AcunDataTable('#orders', {
+        data: orders.slice(0, 2), caption: 'Siparişler', captionVisible: false,
+        rowActions: [{ id: 'delete', label: 'Sil', confirm: 'Silinsin mi?', onSelect: remove }],
+      });
+      await dt.ready;
+      expect(document.querySelector('caption')!.className).toBe('adt-sr-only');
+      document.querySelector<HTMLButtonElement>('tbody [data-action="delete"]')!.click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(remove).toHaveBeenCalledOnce();
+      dt.destroy();
+    } finally {
+      setConfirm(null);
+    }
   });
 });
 

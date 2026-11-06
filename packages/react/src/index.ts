@@ -5,6 +5,6 @@ export {
   type FiltersMenuProps, type FiltersProps, type PageInfoProps, type PageSizeProps, type PaginationProps, type SearchProps, type ToolsProps,
 } from './components.js';
 export {
-  LABELS, labelsDe, labelsEn, labelsEs, labelsFr, labelsTr, resolveLabels, type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction,
-  type FilterPanelMode, type ToolbarButton, type ToolbarButtons,
+  LABELS, labelsDe, labelsEn, labelsEs, labelsFr, labelsTr, resolveLabels, setConfirm, type BulkAction, type BulkSelection, type CellFormatter, type DataTableLabels, type RowAction,
+  type ConfirmHandler, type ConfirmRequest, type FilterPanelMode, type ToolbarButton, type ToolbarButtons,
 } from '@acunsoft/datatable-dom';

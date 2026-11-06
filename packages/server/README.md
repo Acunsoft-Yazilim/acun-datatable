@@ -51,7 +51,7 @@ or `createHttpDataSource({ url: '/api/orders' })` with the React or Vue package.
 
 - **`defineColumns`** is the allowlist. Only its IDs may be sorted
   (`sortable`), filtered (`filterable`) or searched (`searchable`, by default
-  the filterable text columns); only its `sql` identifiers (checked as plain
+  the filterable text columns and those with a folded `search` copy); only its `sql` identifiers (checked as plain
   identifiers) reach the SQL text. Requests never name a column of their own.
 - **`readTableQuery`** reads `URLSearchParams` (GET), `FormData` (POST form)
   or a JSON body, in this package family's format (`page`, `pageSize`,

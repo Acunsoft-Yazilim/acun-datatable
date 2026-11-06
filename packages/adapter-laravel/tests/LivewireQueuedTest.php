@@ -101,6 +101,15 @@ final class LivewireQueuedTest extends TestCase
         self::assertNull($table->get('tableTask'));
     }
 
+    public function test_a_queued_bulk_action_with_keep_selection_keeps_it(): void
+    {
+        Order::query()->update(['active' => false]);
+        $this->startSession();
+        $table = Livewire::test(QueuedOrdersTable::class, ['keepSelection' => true])->call('toggleRow', 1)->call('toggleRow', 3)->call('runBulkAction', 'activate');
+        self::assertSame([1, 3], Order::query()->where('active', true)->orderBy('id')->pluck('id')->all());
+        self::assertSame(['1', '3'], $table->get('selected'));
+    }
+
     public function test_old_files_nobody_downloaded_are_pruned(): void
     {
         Storage::fake('local');

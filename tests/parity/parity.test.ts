@@ -28,6 +28,7 @@ interface Scenario {
 }
 const scenarios: Record<string, Scenario> = {
   plain: { options: { caption: 'Siparişler' } },
+  'caption for screen readers only': { options: { caption: 'Siparişler', captionVisible: false }, has: '<caption class="adt-sr-only">' },
   selectable: { options: { selectable: true } },
   'some selected': { options: { selectable: true }, then: (_host, table) => table.selectRow('2') },
   collapse: { options: { responsive: 'collapse' } },

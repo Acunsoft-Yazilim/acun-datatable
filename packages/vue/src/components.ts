@@ -92,6 +92,8 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
   props: {
     table: tableProp,
     caption: { type: String, default: undefined },
+    /** `false` keeps the caption for screen readers only. */
+    captionVisible: { type: Boolean, default: true },
     selectable: { type: Boolean, default: false },
     locale: { type: String, default: 'en' },
     labels: labelsProp,
@@ -516,7 +518,7 @@ export const AcunDataTable = /*#__PURE__*/ defineComponent({
         notice,
         // aria-busy on the rows' box, not around the notice (a busy region's changes may be held back).
         h('div', { class: 'adt-scroll', onScroll: virtual ? onScroll : undefined, 'aria-busy': props.status ? String(busy) : undefined }, [h('table', { class: tableClassName, 'aria-rowcount': all ? all.length + 1 + (columns.some(column => column.aggregate !== undefined) ? 1 : 0) : undefined }, [
-          props.caption !== undefined ? h('caption', props.caption) : null,
+          props.caption !== undefined ? h('caption', props.captionVisible ? null : { class: 'adt-sr-only' }, props.caption) : null,
           h('thead', [h('tr', head)]),
           h('tbody', skeleton ? { 'aria-hidden': 'true' } : null, body),
           // Footer totals of the columns with `aggregate` (every matching row).

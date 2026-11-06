@@ -34,7 +34,10 @@ trait RunsActions
         return $result;
     }
 
-    /** Run a bulk action on the selection, then clear the selection. */
+    /**
+     * Run a bulk action on the selection, then clear the selection (unless
+     * the action has `keepSelection()`).
+     */
     public function runBulkAction(string $action): mixed
     {
         $found = $this->findAction($this->dataTableBulkActions(), $action);
@@ -42,14 +45,16 @@ trait RunsActions
             return null;
         }
         if ($found->isQueued()) {
-            if ($this->queueTableTask('bulk', $found->id())) {
+            if ($this->queueTableTask('bulk', $found->id()) && ! $found->keepsSelection()) {
                 $this->clearSelection();
             }
 
             return null;
         }
         $result = $found->run($this->selectedQuery());
-        $this->clearSelection();
+        if (! $found->keepsSelection()) {
+            $this->clearSelection();
+        }
         unset($this->rows);
 
         return $result;

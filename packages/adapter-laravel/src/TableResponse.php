@@ -225,7 +225,9 @@ final class TableResponse implements Responsable
             $data['id'] = $row->id;
         }
         foreach ($this->columns as $column) {
-            $data[$column->id()] = data_get($row, $column->attributeName());
+            if (! $column->isInternal()) { // only for sorting, filters and search
+                $data[$column->id()] = $column->valueOf($row);
+            }
         }
 
         return $data;

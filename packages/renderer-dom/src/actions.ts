@@ -1,4 +1,5 @@
 import type { DataTable, Row, RowId, TableQuery } from '@acunsoft/datatable-core';
+import { askConfirm, type ConfirmRequest } from './confirm';
 import { checkTarget, element, icon, placeMenu, setText, type ICONS, type RenderedComponent } from './dom';
 import { labelsEn, type DataTableLabels } from './labels';
 
@@ -19,17 +20,43 @@ export interface RowAction<TData> {
   readonly iconOnly?: boolean;
   /** A destructive action, shown in the danger colour. */
   readonly danger?: boolean;
-  /** Ask before running (the browser's confirm), e.g. `row => \`Delete ${row.original.name}?\``. */
-  readonly confirm?: string | ((row: Row<TData>) => string);
+  /**
+   * Ask before running, e.g. `row => \`Delete ${row.original.name}?\`` or
+   * `{ title: 'Delete order', text: 'Delete this order?', confirmLabel: 'Delete' }`.
+   * The dialog is the one of `setConfirm()`, else ACUN UI's `AcunUI.confirm()`,
+   * else the browser's `confirm()`; a `danger` action asks in the danger tone.
+   */
+  readonly confirm?: string | ConfirmRequest | ((row: Row<TData>) => string | ConfirmRequest);
 }
 
 export type ActionIcon = keyof typeof ICONS | { readonly path: string };
 
-/** Ask an action's confirm question, if any; true when it may run. */
+/**
+ * Ask an action's confirm question, if any, with the browser's `confirm()`;
+ * true when it may run.
+ *
+ * @deprecated The renderers ask through `askConfirm()` (the dialog of
+ * `setConfirm()`, ACUN UI's, or the browser's), which may answer later.
+ */
 export function confirmed<TData>(action: RowAction<TData>, row: Row<TData>, view: { confirm(message: string): boolean } = globalThis as never): boolean {
-  if (action.confirm === undefined) return true;
-  const question = typeof action.confirm === 'function' ? action.confirm(row) : action.confirm;
-  return typeof view.confirm !== 'function' || view.confirm(question);
+  const asked = confirmOf(action, row);
+  return asked === undefined || typeof view.confirm !== 'function' || view.confirm(asked.text);
+}
+
+/** An action's confirmation for a row, if it has one; a `danger` action asks in the danger tone unless it says otherwise. */
+function confirmOf<TData>(action: RowAction<TData>, row: Row<TData>): ConfirmRequest | undefined {
+  const asked = typeof action.confirm === 'function' ? action.confirm(row) : action.confirm;
+  if (asked === undefined) return undefined;
+  const request = typeof asked === 'string' ? { text: asked } : asked;
+  return action.danger && !request.tone ? { ...request, tone: 'danger' } : request;
+}
+
+/** Run a row action: at once without `confirm` or with an answer at once, else once the dialog says yes. */
+function runAction<TData>(action: RowAction<TData>, row: Row<TData>, view: { confirm(message: string): boolean }): void {
+  const asked = confirmOf(action, row);
+  const answer = asked === undefined || askConfirm(asked, view);
+  if (answer === true) action.onSelect(row);
+  else if (answer !== false) void answer.then(ok => { if (ok) action.onSelect(row); });
 }
 
 /** Split a row's visible actions into the buttons shown in the row and those in its "⋮" menu. */
@@ -43,7 +70,7 @@ export function splitActions<TData>(actions: readonly RowAction<TData>[], row: R
   return { inline: visible.slice(0, keep), menu: visible.slice(keep) };
 }
 
-/** One row action as the three renderers draw it; `run` asks the confirm question and calls `onSelect` unless disabled. */
+/** One row action as the three renderers draw it; `run` asks the confirmation (see `askConfirm`) and calls `onSelect` unless disabled. */
 export interface ActionView<TData> {
   readonly action: RowAction<TData>;
   readonly className: string;
@@ -74,7 +101,7 @@ export function rowActionsView<TData>(
       ariaLabel: labels.rowAction(action.label, name),
       title: iconOnly ? action.label : undefined,
       text: iconOnly ? undefined : action.label,
-      run: () => { if (!disabled && confirmed(action, row, view)) action.onSelect(row); },
+      run: () => { if (!disabled) runAction(action, row, view); },
     };
   };
   return {

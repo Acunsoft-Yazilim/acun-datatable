@@ -25,6 +25,11 @@ final class Action
 {
     private string $label;
     private ?string $confirm = null;
+    private ?string $confirmTitle = null;
+    private ?string $confirmLabel = null;
+    private ?string $cancelLabel = null;
+    private ?string $tone = null;
+    private bool $keepSelection = false;
     private ?Closure $visible = null;
     private ?Closure $handler = null;
     private ?string $icon = null;
@@ -52,10 +57,23 @@ final class Action
         return $this->with('label', $label);
     }
 
-    /** Ask before running (`wire:confirm`), e.g. for deleting. */
-    public function confirm(string $question): self
+    /**
+     * Ask before running, e.g. for deleting:
+     * `->confirm('Bu sipariş silinsin mi?', title: 'Siparişi sil', confirmLabel: 'Sil')`.
+     * The dialog is the one registered with `setConfirm()` of
+     * @acunsoft/datatable-dom, else ACUN UI's `AcunUI.confirm()` when it is
+     * on the page, else the browser's `confirm()` (which shows only the
+     * question). `tone` is `danger` or `default`; default: `danger` for a
+     * `danger()` action. Labels left out are the dialog's own.
+     */
+    public function confirm(string $question, ?string $title = null, ?string $confirmLabel = null, ?string $cancelLabel = null, ?string $tone = null): self
     {
-        return $this->with('confirm', $question);
+        if ($tone !== null && ! in_array($tone, ['default', 'danger'], true)) {
+            throw new InvalidArgumentException("Action [{$this->id}] confirm tone must be default or danger.");
+        }
+
+        return $this->with('confirm', $question)->with('confirmTitle', $title)->with('confirmLabel', $confirmLabel)
+            ->with('cancelLabel', $cancelLabel)->with('tone', $tone);
     }
 
     /**
@@ -104,6 +122,18 @@ final class Action
 
     public function isQueued(): bool { return $this->queued; }
 
+    /**
+     * A bulk action that keeps the selection after its handler ran (by
+     * default it is cleared), e.g. one that only opens your own dialog and
+     * does the work later: clear it then with `$this->clearSelection()`.
+     */
+    public function keepSelection(bool $keep = true): self
+    {
+        return $this->with('keepSelection', $keep);
+    }
+
+    public function keepsSelection(): bool { return $this->keepSelection; }
+
     public function handle(Closure $handler): self
     {
         return $this->with('handler', $handler);
@@ -112,6 +142,33 @@ final class Action
     public function id(): string { return $this->id; }
     public function labelText(): string { return $this->label; }
     public function confirmText(): ?string { return $this->confirm; }
+    public function confirmTitle(): ?string { return $this->confirmTitle; }
+    public function confirmLabel(): ?string { return $this->confirmLabel; }
+    public function cancelLabel(): ?string { return $this->cancelLabel; }
+
+    /** `danger` or `default`: the one given to `confirm()`, else `danger` for a `danger()` action. */
+    public function confirmTone(): string { return $this->tone ?? ($this->danger ? 'danger' : 'default'); }
+
+    /**
+     * The `data-confirm*` attributes the Livewire views put on the button
+     * (escaped by the view): question, title, labels and tone.
+     *
+     * @return array<string, string>
+     */
+    public function confirmAttributes(): array
+    {
+        if ($this->confirm === null) {
+            return [];
+        }
+
+        return array_filter([
+            'data-confirm' => $this->confirm,
+            'data-confirm-title' => $this->confirmTitle,
+            'data-confirm-label' => $this->confirmLabel,
+            'data-confirm-cancel' => $this->cancelLabel,
+            'data-confirm-tone' => $this->confirmTone(),
+        ], fn (?string $value) => $value !== null);
+    }
     public function iconPath(): ?string { return $this->icon === null ? null : Support\Icons::path($this->icon); }
     public function isIconOnly(): bool { return $this->iconOnly && $this->icon !== null; }
     public function isDanger(): bool { return $this->danger; }

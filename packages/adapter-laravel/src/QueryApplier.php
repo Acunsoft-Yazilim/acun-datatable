@@ -318,7 +318,9 @@ final class QueryApplier
         }
         $probe = self::countable($base)->limit($limit + 1)->offset(0);
         if (! self::rowsFollowColumns($base)) {
+            // Without the select list, also without its bindings (`withSum()` with a condition, a select subquery).
             $probe->columns = null;
+            $probe->bindings['select'] = [];
             $probe->selectRaw('1 as adt_match');
         }
         $counted = $base->newQuery()->fromSub($probe, 'adt_matches')->count();
@@ -364,6 +366,7 @@ final class QueryApplier
             }." as adt_total_{$index}";
         }
         $base->columns = null;
+        $base->bindings['select'] = []; // the select list's bindings go with it (`withSum()` with a condition)
         $row = (array) $base->selectRaw(implode(', ', $selects))->first();
         $totals = [];
         foreach ($columns as $index => $column) {

@@ -187,6 +187,20 @@ trait ConfiguresTable
         return false;
     }
 
+    /**
+     * The sort before the user picks one, e.g. `['favorites' => 'desc']` or
+     * `['status' => 'asc', 'created' => 'desc']` (column IDs of sortable
+     * columns, `internal()` ones too). It is applied but not written to the
+     * URL; only a sort the user chooses is (`?sort=` when they clear it).
+     * Default: none.
+     *
+     * @return array<string, 'asc'|'desc'>
+     */
+    protected function defaultSort(): array
+    {
+        return [];
+    }
+
     /** Shift+click adds a second sort column. Return false to always sort by one column. */
     protected function multiSort(): bool
     {
@@ -327,15 +341,26 @@ trait ConfiguresTable
         return 1000;
     }
 
-    /** Off by default: return true to show the selection column. */
+    /**
+     * Off by default: return true to show the selection column. Which rows
+     * may be chosen: define `isSelectable($row): bool` (and `selectableRows($query)`
+     * for "all matching"), see {@see SelectsRows}.
+     */
     protected function selectable(): bool
     {
         return false;
     }
 
+    /** The table's `<caption>`, its name for screen readers. Default: none. */
     protected function caption(): ?string
     {
         return null;
+    }
+
+    /** Whether the caption shows on screen; `false` keeps it for screen readers only. Default true. */
+    protected function captionVisible(): bool
+    {
+        return true;
     }
 
     /** @return list<string> export buttons to show: `'xlsx'` and/or `'csv'`. None by default. */
@@ -383,7 +408,7 @@ trait ConfiguresTable
     /** The row's name for screen readers ("Select Ayşe"): the first column's text by default. */
     protected function rowLabel(mixed $row): string
     {
-        foreach ($this->dataTableColumns() as $column) {
+        foreach ($this->displayColumns() as $column) {
             $text = \Acunsoft\DataTable\Laravel\Support\Format::cell($column, $row);
             if (trim($text) !== '') {
                 return $text;

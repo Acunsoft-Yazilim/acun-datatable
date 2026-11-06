@@ -134,10 +134,11 @@ final class TableExport
     {
         $rows = $this->rows(); // "too large" before any file is made
         $writer = new XlsxWriter($path, $sheetName ?? 'Sheet1');
+        $columns = $this->written();
         try {
-            $writer->header(array_map(fn (Column $column) => $column->headerText(), $this->columns));
+            $writer->header(array_map(fn (Column $column) => $column->headerText(), $columns));
             foreach ($rows as $row) {
-                $writer->row(array_map(fn (Column $column) => $this->cell($column, $row), $this->columns));
+                $writer->row(array_map(fn (Column $column) => $this->cell($column, $row), $columns));
             }
             $writer->close();
         } finally {
@@ -159,10 +160,11 @@ final class TableExport
     private function writeCsv($out, iterable $rows, string $delimiter, bool $guardFormulas): void
     {
         fwrite($out, "\u{FEFF}");
-        fputcsv($out, array_map(fn (Column $column) => self::guard($column->headerText(), $guardFormulas), $this->columns), $delimiter, '"', '', "\r\n");
+        $columns = $this->written();
+        fputcsv($out, array_map(fn (Column $column) => self::guard($column->headerText(), $guardFormulas), $columns), $delimiter, '"', '', "\r\n");
         foreach ($rows as $row) {
             $fields = [];
-            foreach ($this->columns as $column) {
+            foreach ($columns as $column) {
                 [$kind, $value] = $this->cell($column, $row);
                 $fields[] = match ($kind) {
                     'null' => '',
@@ -192,6 +194,12 @@ final class TableExport
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'X-Content-Type-Options' => 'nosniff',
         ]))->setContentDisposition('attachment', self::asciiName($filename), $filename)->deleteFileAfterSend();
+    }
+
+    /** @return list<Column> the columns written to the file: every column but `internal()` ones (those only sort, filter and search) */
+    private function written(): array
+    {
+        return array_values(array_filter($this->columns, fn (Column $column) => ! $column->isInternal()));
     }
 
     /** @return iterable<mixed> */
@@ -225,7 +233,7 @@ final class TableExport
     /** @return array{0: string, 1: mixed} */
     private function cell(Column $column, mixed $row): array
     {
-        $value = data_get($row, $column->attributeName());
+        $value = $column->valueOf($row);
         $type = $column->valueType();
         if ($type === null && $column->formatter() !== null) {
             return ['text', Format::cell($column, $row)];

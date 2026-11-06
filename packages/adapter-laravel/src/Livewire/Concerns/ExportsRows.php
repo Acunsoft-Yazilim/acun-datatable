@@ -27,7 +27,7 @@ trait ExportsRows
         }
         $query = $this->dataTableQuery();
         $selected = $this->selectable() && $this->selectedCount() > 0;
-        $export = TableExport::for($selected ? $this->selectedQuery() : $this->query())
+        $export = TableExport::for($selected ? $this->selectionQuery(sorted: false) : $this->query())
             ->columns($this->dataTableVisibleColumns())
             ->key($this->keyName())
             ->limit($this->exportLimit())

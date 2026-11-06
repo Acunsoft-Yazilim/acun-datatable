@@ -3,6 +3,79 @@
 All notable changes to this repository. Each npm package also has its own
 `CHANGELOG.md`, written by Changesets.
 
+## Unreleased
+
+### `acunsoft/datatable-laravel`
+
+- **`defaultSort()`**: the sort before the user picks one, e.g.
+  `['favorites' => 'desc']`. It is applied but not written into the URL;
+  only a sort the user chooses is (`?sort=` once they clear it, so the
+  default does not come back on reload). Setting `$this->sort` in `mount()`
+  works as before.
+- **Hidden columns stay out of the URL at their default.** `Column::hidden()`
+  columns were written as `hidden[0]=…&hidden[1]=…` on the first load; now
+  the URL holds them only when the user changed them (hiding and showing a
+  column again gives the same list, in declaration order).
+- **`Column::internal()`**: a column that is never shown (no header or cell,
+  not in the columns menu, the URL's hidden list, the details, exports or the
+  JSON endpoint's rows) and still sorts, filters and searches.
+- **Computed columns: `Column::computed($id, fn ($row) => …)` and
+  `->value(fn ($row) => …)`.** The cell's value comes from the closure in the
+  views, exports and JSON rows, so a column ID that is also a model method
+  (`subtotal()`) is no longer read as a relation (which threw). Sorting,
+  filters, search and totals still use `column()`.
+- **Pluggable confirmation dialog.** `Action::confirm()` takes an optional
+  `title:`, `confirmLabel:`, `cancelLabel:` and `tone:` (`danger` by default
+  for a `danger()` action). The views no longer use `wire:confirm`: the
+  button carries `data-confirm*` attributes and asks the handler registered
+  with `setConfirm()` of `@acunsoft/datatable-dom`, else ACUN UI's
+  `AcunUI.confirm()` when it is loaded, else the browser's `confirm()` (as
+  before). `confirm('…')` keeps working; published views keep `wire:confirm`.
+- **Rows that cannot be selected: `isSelectable($row)`** (and
+  `selectableRows($query)`, the same rule in SQL, for "select all matching").
+  No checkbox on such rows; the page checkbox, ranges and keys sent by the
+  browser skip them; the server checks them again for `selectedQuery()`,
+  bulk actions and exports. Without `selectableRows()`, a table with
+  `isSelectable()` does not offer "all matching".
+- **`searchUsing()` makes a column searchable** unless `searchable(false)`
+  says otherwise (it needed `filterable()` or `searchable()` too).
+- **`Action::keepSelection()`**: a bulk action that keeps the selection after
+  its handler (e.g. one that opens a dialog and works later); the default
+  still clears it.
+- **`selectedQuery()` follows the table's sort** (the allowed sorting of the
+  rows, the key last), so keys taken from it, e.g. for a CSV of every
+  matching row, come in the order on screen. MySQL refuses `ORDER BY` in an
+  `UPDATE`/`DELETE` with a join: call `->reorder()` first there.
+- **`captionVisible()`**: `false` keeps `caption()` for screen readers only.
+- **Fixed: counting a query whose select list has bindings.** With
+  `withSum(['lines as paid' => fn ($q) => $q->whereIn('status', [...])], 'total')`
+  (or a select subquery with bindings) the count probe dropped the columns
+  but kept their bindings, so the page failed ("column index out of range"
+  on SQLite, wrong bindings on MySQL); footer totals had the same fault.
+
+### npm (`@acunsoft/datatable-dom`, `-react`, `-vue`, `-server`, `@acunsoft/datatable`)
+
+- **`setConfirm(handler)` and `askConfirm(request)`**: a row action's
+  `confirm` asks the registered handler, else ACUN UI's `AcunUI.confirm()`
+  (feature-detected), else the browser's `confirm()` as before. A handler
+  gets `{ title, text, confirmLabel, cancelLabel, tone }` and answers
+  `true` / `false` or a promise of it; one that throws or rejects counts as
+  "cancel". `confirm` also takes such an object (or a function returning
+  one); `danger` actions ask in the danger tone. The handler lives in one
+  global slot, shared by every copy of the package and by the Livewire views;
+  React, Vue and `@acunsoft/datatable` re-export `setConfirm`
+  (`AcunDataTable.setConfirm` in the `<script>` build). `confirmed()` is
+  deprecated (it only asks the browser).
+- **`@acunsoft/datatable-server`: a column with a folded `search` copy is
+  searchable** unless `searchable: false`, as `searchUsing()` in Laravel now
+  (it needed `filterable` too).
+- **`captionVisible: false`** (DOM `renderTable`, React `DataTable`, Vue
+  `AcunDataTable`, `AcunDataTable` options) keeps the caption for screen
+  readers only.
+- Size budgets raised on purpose for the dialog code: `acun-datatable.min.js`
+  49,800 → 50,100 B, `renderDataTable` alone 25,000 → 25,200 B,
+  `AcunDataTable` alone 45,400 → 45,700 B.
+
 ## `acunsoft/datatable-laravel` 0.6.1
 
 The Laravel side of npm 0.6.0; no change is needed in your code.

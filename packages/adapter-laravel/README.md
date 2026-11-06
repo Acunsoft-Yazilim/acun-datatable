@@ -95,15 +95,33 @@ What you get:
 - **Search, sorting, filters and page size in the URL**, with the same names as
   the HTTP wire format: `?search=ayse&sort=total:desc&filters[0][field]=…&pageSize=50&page=2`.
   Links and the back button work. One table per page (names are not prefixed).
+  The URL holds only what the user changed: the default page size, sort and
+  hidden columns are left out.
 - **Sorting:** a header click cycles ascending → descending → none;
   **Shift**+click adds a column to a multi-column sort. The primary sorted
-  header gets `aria-sort`.
+  header gets `aria-sort`. `defaultSort()` sorts before the user does, without
+  writing it into the URL:
+
+  ```php
+  protected function defaultSort(): array
+  {
+      return ['favorites' => 'desc']; // column IDs of sortable columns; several in order
+  }
+  ```
+
+  A sort the user picks goes into the URL (`?sort=` once they clear it, so
+  the default does not come back on reload). Setting `$this->sort` in
+  `mount()` still works, but writes it into the URL.
 - **Filters** from your own controls: `wire:click="setFilter('total', 'gt', '100')"`,
   `removeFilter($index)`, `clearFilters()`. Same operators and rules as above.
 - **Selection** (`selectable()`): row checkboxes, a page checkbox (tri-state),
   "select all N matching rows", and `$this->selectedQuery()` for bulk actions:
-  `$this->selectedQuery()->update(['status' => 'archived'])`. A new search or
-  filter clears the selection.
+  `$this->selectedQuery()->update(['status' => 'archived'])`. It returns the
+  rows in the table's order (its sort, the key last), so keys taken from it
+  come as on screen; MySQL refuses `ORDER BY` in an `UPDATE`/`DELETE` with a
+  join, so call `->reorder()` first there. A new search or filter clears the
+  selection. Which rows may be chosen: see
+  [Rows that cannot be selected](#rows-that-cannot-be-selected).
 - **Pagination** with Previous/Next, `Page 2 of 7 · 160 rows` and a rows-per-page
   select (`pageSizeOptions()`, default `[10, 25, 50, 100]`).
 - **Cell text** from `Column::format(fn ($value, $row) => '…')` or a locale-aware
@@ -122,10 +140,42 @@ columns; the hidden IDs are kept in the URL (`hidden[]=note`).
 ```php
 Column::make('customer')->hideable(false),   // always shown
 Column::make('note')->hidden(),               // hidden until the user shows it
+Column::make('rank')->column('sort_rank')->sortable()->internal(), // never shown
 ```
 
-Hidden columns still sort, filter and search. Unknown or protected IDs in the
-URL are ignored, and at least one column always stays visible.
+Hidden columns still sort, filter and search. The columns hidden at first are
+not written into the URL; only a change the user makes is (`hidden[]=…`).
+Unknown or protected IDs in the URL are ignored, and at least one column
+always stays visible.
+
+`internal()` declares a column that is **never shown**: no header or cell, not
+in the columns menu, the URL's hidden list, the details, exports or the JSON
+endpoint's rows. It still sorts (e.g. in `defaultSort()`), filters and
+searches — a sort key or a folded search column, for example.
+(`hidden()` with `hideable(false)` shows the column, since nobody could show
+it otherwise.)
+
+### Computed columns
+
+The table reads a cell's value from the row's attribute (`column()`, default
+the ID). When the value is computed — or the ID is also the name of a model
+method, which Eloquent would read as a relation and fail — give it a closure:
+
+```php
+Column::computed('subtotal', fn (Order $order) => $order->subtotal())->header('Ara toplam')->type('decimal'),
+Column::make('total')->value(fn (Order $order) => $order->total_with_tax)->sortable(), // sorts by `total`
+```
+
+The views, `format()`, exports and the JSON rows use the closure's value;
+sorting, filters, search and totals still use `column()`, so a computed
+column stays out of SQL unless you make it `sortable()` / `filterable()` on a
+real column. A computed column cannot be `editable()`.
+
+### Caption
+
+`caption()` names the table (`<caption>`); `captionVisible(): bool` returning
+`false` keeps it for screen readers only (`adt-sr-only`), e.g. when the page
+heading already shows the name. Default: visible.
 
 ### Row and bulk actions
 
@@ -165,11 +215,56 @@ protected function bulkActions(): array
   looked up again inside `query()`, so a forged key cannot reach other rows.
   `visible()` is checked when rendering **and** before running.
 - A **bulk action** appears in the selection bar; its handler receives the
-  selected rows as a query inside `query()` (also for "all matching" selection).
-  The selection is cleared afterwards.
-- `confirm()` adds `wire:confirm`. Whatever the handler returns (a redirect, a
+  selected rows as a query inside `query()` (also for "all matching" selection),
+  in the table's order. The selection is cleared afterwards, unless the action
+  has `keepSelection()` — for a handler that only opens your own dialog and
+  does the work later; call `$this->clearSelection()` when it is done.
+- `confirm()` asks before running. Whatever the handler returns (a redirect, a
   download) goes back to Livewire. Authorize inside the handler; `visible()`
   only decides what is shown.
+
+**The confirmation dialog.** `confirm()` takes an optional title, button texts
+and tone:
+
+```php
+Action::make('delete')->label('Sil')->danger()
+    ->confirm('Bu sipariş silinsin mi?', title: 'Siparişi sil', confirmLabel: 'Sil', cancelLabel: 'Vazgeç')
+```
+
+The views put them on the button as `data-confirm`, `data-confirm-title`,
+`data-confirm-label`, `data-confirm-cancel` and `data-confirm-tone` (`danger`
+for a `danger()` action unless `tone:` says `default`), and ask, in this
+order: a handler registered with `setConfirm()` of `@acunsoft/datatable-dom`
+(any copy on the page), else ACUN UI's `AcunUI.confirm()` when ACUN UI is
+loaded, else the browser's `confirm()` with the question. A handler gets
+`{ title, text, confirmLabel, cancelLabel, tone }` and answers with a promise
+of `true` / `false`. Without the npm packages, register one yourself:
+`window[Symbol.for('acunsoft.datatable.confirm')] = request => myDialog(request)`.
+
+### Rows that cannot be selected
+
+Define `isSelectable($row): bool` on the component to keep some rows out of
+the selection (the parameter type is yours, e.g. `Order $order`). Such rows
+get no checkbox; the page checkbox, Shift+click ranges and keys sent by the
+browser skip them, and the server checks them again for `selectedQuery()`,
+bulk actions and exports (a row that changed meanwhile is left out).
+
+```php
+protected function isSelectable(Order $order): bool
+{
+    return $order->status !== 'shipped';
+}
+
+/** The same rule in SQL: needed for "select all N matching rows". */
+protected function selectableRows(Builder $query): Builder
+{
+    return $query->where('status', '!=', 'shipped');
+}
+```
+
+"Select all matching" counts and chooses only the rows `selectableRows()`
+allows; a table with `isSelectable()` but without `selectableRows()` does not
+offer it (a PHP rule cannot be applied to millions of rows).
 
 ### Layout, pagination and the tools menu
 
@@ -501,7 +596,7 @@ php artisan vendor:publish --tag=acun-datatable-views
 ```
 
 or give your component its own `render()` and `@include('acun-datatable::livewire.table')`
-inside your layout. Override `caption()`, `pageSizeOptions()`, `maxSelected()`
+inside your layout. Override `caption()`, `captionVisible()`, `pageSizeOptions()`, `maxSelected()`
 (explicit keys, default 1000), `rowLabel($row)` (the checkbox name for screen
 readers, default the first column's text) and `keyName()` (query-builder tables)
 as needed.
@@ -515,11 +610,13 @@ as needed.
 | `column('created_at')` | database column (default: the ID); a plain identifier, set by you, never by the request |
 | `type('decimal')` | `text`, `number`, `decimal`, `date` (a calendar day), `datetime` (an instant), `boolean` |
 | `sortable()` / `filterable()` | allow sorting / filtering; filterable columns are also searchable |
-| `searchable(false)` | keep a filterable column out of the global search |
-| `searchUsing('customer_search')` | match search and `contains`/`startsWith` against a folded copy (see below) |
+| `searchable(false)` | keep a filterable (or `searchUsing()`) column out of the global search |
+| `searchUsing('customer_search')` | match search and `contains`/`startsWith` against a folded copy (see below); makes the column searchable unless `searchable(false)` |
 | `header('Müşteri')` | display text (used by the Livewire views) |
 | `format(fn ($value, $row) => '…')` | cell text in the Livewire views (plain text, escaped) |
 | `hideable(false)` / `hidden()` | Livewire column menu: never hidden / hidden at first |
+| `internal()` | never shown (views, menu, URL, exports, JSON rows); still sorts, filters and searches |
+| `Column::computed($id, fn ($row) => …)` / `value(fn ($row) => …)` | the cell's value from a closure instead of the attribute (views, exports, JSON) |
 | `view('orders.status-badge')` | Livewire cell rendered by your Blade view (`$row`, `$value`, `$text`, `$column`), e.g. a badge or an avatar; exports keep the text |
 | `priority(1)` | narrow screens with `responsive()` `collapse` / `modal`: 1 always, 2 below 640px, 3 below 960px; with `auto`, the order columns hide in when they do not fit |
 

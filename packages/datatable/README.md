@@ -174,7 +174,8 @@ Route::match(['get', 'post'], '/api/products', fn () => TableResponse::for(Produ
 | `virtual` | `false`; `true` or `{ rowHeight, overscan }`: every row in one scrolling list, only those in view drawn | `scroller` |
 | `responsive` | `'cards'`; also `'scroll'`, `'collapse'`, `'modal'`, `'auto'` (measured, like DataTables Responsive) | `responsive` |
 | `size` | `'md'`; also `'sm'`, `'lg'` | |
-| `selectable`, `rowActions`, `bulkActions` | | `select`, buttons |
+| `caption`, `captionVisible` | `captionVisible: false` keeps the caption for screen readers only | |
+| `selectable`, `rowActions`, `bulkActions` | a row action's `confirm` asks through `setConfirm()`, ACUN UI's `AcunUI.confirm()` or the browser (see `@acunsoft/datatable-dom`) | `select`, buttons |
 | `detail` | | child rows (`row().child()`) |
 | `onEdit` + `columns[].editable` | | Editor inline editing |
 | `columnToggle` | `true` | `colvis` |
@@ -200,6 +201,8 @@ for a table in the browser; page, sorting, search and selection stay), `search(t
 element; returns a function that removes them) and `destroy()` (an original
 `<table>` is put back). `table` is
 the headless `@acunsoft/datatable-core` table for everything else.
+`setConfirm(handler)` (`AcunDataTable.setConfirm` in the `<script>` build)
+sets the confirmation dialog of every table on the page.
 
 ## License
 

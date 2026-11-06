@@ -171,6 +171,8 @@ export interface AcunDataTableOptions {
   readonly responsive?: ResponsiveMode;
   readonly size?: TableSize;
   readonly caption?: string;
+  /** `false` keeps the caption for screen readers only. Default `true`. */
+  readonly captionVisible?: boolean;
   /** Checkboxes to select rows. */
   readonly selectable?: boolean;
   readonly rowActions?: readonly RowAction<Data>[];
@@ -534,6 +536,7 @@ export class AcunDataTable {
       },
       ...(Object.keys(format).length > 0 ? { format } : {}),
       ...(options.caption !== undefined ? { caption: options.caption } : {}),
+      ...(options.captionVisible === false ? { captionVisible: false } : {}),
       ...(options.selectable ? { selectable: true } : {}),
       ...(options.rowActions ? { rowActions: options.rowActions } : {}),
       ...(options.bulkActions ? { bulkActions: options.bulkActions } : {}),

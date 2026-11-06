@@ -189,3 +189,66 @@ test('the table and its print take the page font', async ({ page }) => {
   await page.locator('.adt-print-button').click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { font?: string }).font)).toBe('Georgia, serif');
 });
+
+test('the default sort and hidden columns stay out of the URL; what the user changes goes in', async ({ page }) => {
+  await open(page, '/tables/defaults');
+  const total = page.getByRole('columnheader', { name: 'Total', exact: true });
+  await expect(total).toHaveAttribute('aria-sort', 'descending'); // defaultSort()
+  await expect(page.getByRole('columnheader', { name: 'City' })).toHaveCount(0); // Column::hidden()
+  expect(new URL(page.url()).search).toBe('');
+  await page.getByRole('button', { name: 'Total', exact: true }).click(); // descending → none
+  await expect(total).not.toHaveAttribute('aria-sort');
+  await expect.poll(() => new URL(page.url()).search).toBe('?sort=');
+  await page.reload();
+  await expect(page.locator('.adt-info')).toBeVisible();
+  await expect(total).not.toHaveAttribute('aria-sort'); // the cleared sort, not the default again
+  await page.locator('details.adt-columns:not(.adt-menu) > summary').click();
+  await page.getByRole('checkbox', { name: 'City' }).check();
+  await expect.poll(() => decodeURIComponent(new URL(page.url()).search)).toBe('?sort=&hidden[0]=note');
+  await page.getByRole('checkbox', { name: 'City' }).uncheck();
+  await expect.poll(() => new URL(page.url()).search).toBe('?sort=');
+});
+
+test('a confirmation goes to a registered handler, else ACUN UI, else the browser', async ({ page }) => {
+  await page.addInitScript(() => {
+    const own = window as unknown as { asked: unknown[]; answer: boolean; AcunUI: unknown };
+    own.asked = [];
+    own.answer = false;
+    own.AcunUI = { confirm: (request: unknown) => { own.asked.push(request); return Promise.resolve(own.answer); } };
+  });
+  await open(page, '/tables/layout');
+  const remove = async () => {
+    const menu = page.locator('tbody .adt-row-menu').first();
+    await menu.locator('summary').click();
+    await menu.locator('[data-action="remove"]').click();
+  };
+  await remove();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { asked: unknown[] }).asked)).toEqual([{ text: 'Sure?', tone: 'danger' }]);
+  await expect(page.locator('.adt-info')).toHaveText('Total: 30 orders, 1 to 25'); // cancelled
+  await page.evaluate(() => { (window as unknown as { answer: boolean }).answer = true; });
+  await remove();
+  await expect(page.locator('.adt-info')).toHaveText('Total: 29 orders, 1 to 25');
+  // A handler registered with setConfirm() (the same global slot) comes first.
+  await page.evaluate(() => { (window as unknown as Record<symbol, unknown>)[Symbol.for('acunsoft.datatable.confirm')] = () => Promise.resolve(false); });
+  await remove();
+  await page.waitForTimeout(300);
+  await expect(page.locator('.adt-info')).toHaveText('Total: 29 orders, 1 to 25');
+  expect(await page.evaluate(() => (window as unknown as { asked: unknown[] }).asked)).toHaveLength(2);
+  // Neither: the browser's own confirm, with the question.
+  await page.evaluate(() => {
+    delete (window as unknown as Record<symbol, unknown>)[Symbol.for('acunsoft.datatable.confirm')];
+    delete (window as unknown as { AcunUI?: unknown }).AcunUI;
+  });
+  page.once('dialog', dialog => { expect(dialog.message()).toBe('Sure?'); void dialog.accept(); });
+  await remove();
+  await expect(page.locator('.adt-info')).toHaveText('Total: 28 orders, 1 to 25');
+});
+
+test('rows that may not be chosen have no checkbox and are skipped by the page and all matching', async ({ page }) => {
+  await open(page, '/tables/selectable');
+  await expect(page.locator('tbody .adt-row td.adt-select input')).toHaveCount(12); // the inactive orders on page 1
+  await page.getByRole('checkbox', { name: 'Select all rows on this page' }).check();
+  await expect(page.locator('.adt-selection-count')).toHaveText('12 selected');
+  await page.getByRole('button', { name: 'Select all 14 matching rows' }).click();
+  await expect(page.locator('.adt-selection-count')).toHaveText('14 selected');
+});

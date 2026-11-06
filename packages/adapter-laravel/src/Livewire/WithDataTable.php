@@ -60,7 +60,7 @@ trait WithDataTable
     #[Url(except: '')]
     public string $search = '';
 
-    /** `field:dir,…`, e.g. `total:desc,customer:asc`. */
+    /** `field:dir,…`, e.g. `total:desc,customer:asc`; starts as `defaultSort()`, in the URL only while it differs. */
     #[Url(except: '')]
     public string $sort = '';
 
@@ -71,7 +71,12 @@ trait WithDataTable
     /** Rows per page; in the URL as `pageSize` while it differs from `defaultPageSize()`. */
     public int $pageSize = 25;
 
-    /** @var array<int, mixed> IDs of hidden columns (presentation only: they still sort, filter and search) */
+    /**
+     * IDs of hidden columns (presentation only: they still sort, filter and
+     * search); starts as the `Column::hidden()` ones, in the URL only while it differs.
+     *
+     * @var array<int, mixed>
+     */
     #[Url(as: 'hidden', except: [])]
     public array $hiddenColumns = [];
 
@@ -225,17 +230,65 @@ trait WithDataTable
         return $this->dataTableQuery()->sorting;
     }
 
-    /** Apply `Column::hidden()` unless the URL already says which columns are hidden. */
+    /**
+     * Apply `defaultSort()` and `Column::hidden()` unless the URL (or the
+     * component's own `mount()`) already says otherwise. The defaults become
+     * the URL's "except" values, so the URL holds only what the user changed.
+     */
     public function mountWithDataTable(): void
     {
         if (! request()->query->has('pageSize')) {
             $this->pageSize = $this->defaultPageSize();
         }
+        $sort = $this->defaultSortText();
+        if ($sort !== '') {
+            if ($this->sort === '' && ! $this->inUrl('sort')) {
+                $this->sort = $sort;
+            }
+            $this->urlDefault('sort', $sort);
+        }
+        $hidden = $this->defaultHiddenColumnIds();
         if ($this->hiddenColumns === []) {
-            $this->hiddenColumns = array_values(array_map(
-                fn (Column $column) => $column->id(),
-                array_filter($this->dataTableColumns(), fn (Column $column) => $column->isHiddenByDefault()),
-            ));
+            $this->hiddenColumns = $hidden;
+        }
+        $this->urlDefault('hiddenColumns', $hidden);
+    }
+
+    /** `defaultSort()` as the `sort` property's text, e.g. `favorites:desc`; rules that do not fit are dropped. */
+    private function defaultSortText(): string
+    {
+        $rules = [];
+        foreach ($this->defaultSort() as $field => $direction) {
+            $column = is_string($field) ? $this->dataTableColumn($field) : null;
+            if ($column !== null && $column->isSortable() && in_array($direction, ['asc', 'desc'], true)) {
+                $rules[] = "{$field}:{$direction}";
+            }
+        }
+
+        return implode(',', array_slice($rules, 0, TableQuery::MAX_SORT_RULES));
+    }
+
+    /** Whether the page's URL names this property (`#[Url]`), as Livewire reads it (the referer on a lazy load). */
+    private function inUrl(string $property): bool
+    {
+        foreach ($this->getAttributes() as $attribute) {
+            if ($attribute instanceof \Livewire\Features\SupportQueryString\BaseUrl && $attribute->getName() === $property) {
+                $missing = "\0adt-missing";
+
+                return $attribute->getFromUrlQueryString($attribute->urlName(), $missing) !== $missing;
+            }
+        }
+
+        return false;
+    }
+
+    /** Leave this value of an `#[Url]` property out of the URL (Livewire's `except`), set while mounting. */
+    private function urlDefault(string $property, mixed $value): void
+    {
+        foreach ($this->getAttributes() as $attribute) {
+            if ($attribute instanceof \Livewire\Features\SupportQueryString\BaseUrl && $attribute->getName() === $property) {
+                $attribute->except = $value;
+            }
         }
     }
 
@@ -453,7 +506,7 @@ trait WithDataTable
     public function updatedWithDataTable(string $name): void
     {
         match (explode('.', $name)[0]) {
-            'selected' => $this->selected = $this->selectedKeys(),
+            'selected' => $this->selected = $this->selectableKeys($this->selectedKeys()),
             'openDetails' => $this->openDetails = $this->openDetailKeys(),
             'sort' => $this->sortChanged(), // set directly (wire:model, $wire.set), as sortBy() does
             default => null,

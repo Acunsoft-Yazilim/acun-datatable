@@ -3,7 +3,7 @@ import { createApp, createSSRApp, defineComponent, h, nextTick, ref, shallowRef,
 import { renderToString } from 'vue/server-renderer';
 import { createDataTable, type ColumnDef, type Row } from '@acunsoft/datatable-core';
 import {
-  AcunBulkActions, AcunColumnToggle, AcunDataTable, AcunDataTableLayout, AcunFilterChips, AcunFilterPanel, AcunFilters, AcunPageInfo, AcunPageSize, AcunPagination, AcunSearch, AcunTools, labelsTr, useDataTable, type BulkSelection,
+  AcunBulkActions, AcunColumnToggle, AcunDataTable, AcunDataTableLayout, AcunFilterChips, AcunFilterPanel, AcunFilters, AcunPageInfo, AcunPageSize, AcunPagination, AcunSearch, AcunTools, labelsTr, setConfirm, useDataTable, type BulkSelection,
 } from '../src/index';
 
 type Order = { id: number; customer: string; total: string; locked?: boolean };
@@ -320,6 +320,26 @@ describe('row action menu', () => {
     host.querySelector<HTMLButtonElement>('tbody tr:first-child .adt-row-menu [data-action="delete"]')!.click();
     expect(confirm).toHaveBeenCalledWith('Sure?');
     expect(remove).toHaveBeenCalledOnce();
+  });
+});
+
+describe('the confirmation of setConfirm and the caption', () => {
+  it('asks the registered handler, runs once it says yes, and hides the caption on request', async () => {
+    const remove = vi.fn();
+    const asked: unknown[] = [];
+    setConfirm(request => { asked.push(request); return Promise.resolve(true); });
+    try {
+      await mount(() => h(AcunDataTable, { table: make(), caption: 'Siparişler', captionVisible: false, rowActions: [
+        { id: 'delete', label: 'Delete', danger: true, confirm: { title: 'Sil', text: 'Sure?' }, onSelect: remove },
+      ] }));
+      host.querySelector<HTMLButtonElement>('tbody tr:first-child [data-action="delete"]')!.click();
+      expect(asked).toEqual([{ title: 'Sil', text: 'Sure?', tone: 'danger' }]);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(remove).toHaveBeenCalledOnce();
+      expect(host.querySelector('caption')!.className).toBe('adt-sr-only');
+    } finally {
+      setConfirm(null);
+    }
   });
 });
 

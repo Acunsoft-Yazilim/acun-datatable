@@ -75,13 +75,14 @@
         @break
 
     @case('columns')
-        @if (count($allColumns) > 1 && (collect($allColumns)->contains(fn ($column) => $column->isHideable()) || $this->reorderableColumns() || $this->resizableColumns()))
+        @php $menuColumns = $this->orderedColumns(); /* internal() columns are never listed */ @endphp
+        @if (count($menuColumns) > 1 && (collect($menuColumns)->contains(fn ($column) => $column->isHideable()) || $this->reorderableColumns() || $this->resizableColumns()))
             <details class="adt-columns" wire:ignore.self x-data @click.outside="$el.open = false" @keydown.escape="$el.open = false; $el.querySelector('summary').focus()" @toggle="@include('acun-datatable::livewire.menu-place')">
                 @php $button = $this->toolbarButton('columns', $this->tableText('columns'), 'columns'); @endphp
                 <summary @if ($button['class'] !== '') class="{{ $button['class'] }}" @endif @if ($button['iconOnly']) title="{{ $button['label'] }}" @endif>
                     @include('acun-datatable::livewire.toolbar-button')
                 </summary>
-                @php $ordered = $this->orderedColumns(); $reorderable = $this->reorderableColumns(); @endphp
+                @php $ordered = $menuColumns; $reorderable = $this->reorderableColumns(); @endphp
                 <fieldset>
                     <legend>{{ $this->tableText('show_columns') }}</legend>
                     @foreach ($ordered as $position => $column)

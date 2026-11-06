@@ -29,6 +29,9 @@ final class Column
     private ?Closure $formatter = null;
     private bool $hideable = true;
     private bool $hidden = false;
+    private bool $internal = false;
+    /** @var Closure(mixed): mixed|null where the cell's value comes from instead of the row's attribute */
+    private ?Closure $value = null;
     private ?int $priority = null;
     private ?string $view = null;
     private bool $filter = false;
@@ -52,6 +55,18 @@ final class Column
         }
 
         return new self($id);
+    }
+
+    /**
+     * A column whose value is computed from the row: `fn ($row) => …`, e.g.
+     * `Column::computed('subtotal', fn (Order $order) => $order->subtotal())`.
+     * Shortcut for `make($id)->value($value)`; see `value()`.
+     *
+     * @param Closure(mixed $row): mixed $value
+     */
+    public static function computed(string $id, Closure $value): self
+    {
+        return self::make($id)->value($value);
     }
 
     /** The database column, e.g. `created_at` or `orders.total`. Defaults to the ID. */
@@ -90,6 +105,25 @@ final class Column
         return $this->with('nullable', $nullable);
     }
 
+    /**
+     * Where the cell's value comes from: `fn (mixed $row): mixed`, instead of
+     * the row's attribute named by `column()` (which Eloquent would read as a
+     * relation when the model has a method of that name). The views, exports
+     * and the JSON rows use it; sorting, filters, search and totals still use
+     * `column()`, so a computed column stays out of SQL unless you name a
+     * real column for them. A computed column cannot be `editable()`.
+     *
+     * @param Closure(mixed $row): mixed $value
+     */
+    public function value(Closure $value): self
+    {
+        if ($this->editRules !== null) {
+            throw new InvalidArgumentException("Column [{$this->id}] is editable(); a computed value() cannot be edited.");
+        }
+
+        return $this->with('value', $value);
+    }
+
     /** Filterable columns are also searchable unless `searchable(false)` says otherwise. */
     public function filterable(bool $filterable = true): self
     {
@@ -104,7 +138,8 @@ final class Column
     /**
      * Search and `contains`/`startsWith` against a column that stores
      * `Text::fold()` of the text, for the same accent- and Turkish-insensitive
-     * matching as the browser regardless of the database collation.
+     * matching as the browser regardless of the database collation. Makes the
+     * column searchable unless `searchable(false)` says otherwise.
      */
     public function searchUsing(string $foldedColumn): self
     {
@@ -130,6 +165,17 @@ final class Column
     public function hidden(bool $hidden = true): self
     {
         return $this->with('hidden', $hidden);
+    }
+
+    /**
+     * Never shown (Livewire): no cell, no header, not in the columns menu,
+     * the URL's hidden list, the details or exports; the JSON endpoint leaves
+     * it out of the rows. It still sorts (e.g. `defaultSort()`), filters and
+     * searches, e.g. a folded search column or a sort key.
+     */
+    public function internal(bool $internal = true): self
+    {
+        return $this->with('internal', $internal);
     }
 
     /**
@@ -212,6 +258,10 @@ final class Column
      */
     public function editable(array|string $rules = []): self
     {
+        if ($this->value !== null) {
+            throw new InvalidArgumentException("Column [{$this->id}] has a computed value(); it cannot be editable().");
+        }
+
         return $this->with('editRules', is_string($rules) ? explode('|', $rules) : array_values($rules));
     }
 
@@ -250,8 +300,16 @@ final class Column
     public function priorityAt(int $index): int { return $this->priority ?? ($index === 0 ? 1 : 2); }
 
     public function formatter(): ?Closure { return $this->formatter; }
-    public function isHideable(): bool { return $this->hideable; }
-    public function isHiddenByDefault(): bool { return $this->hidden && $this->hideable; }
+    public function isHideable(): bool { return $this->hideable && ! $this->internal; }
+    public function isHiddenByDefault(): bool { return $this->hidden && $this->isHideable(); }
+    public function isInternal(): bool { return $this->internal; }
+    public function isComputed(): bool { return $this->value !== null; }
+
+    /** The cell's value on a row: `value()`'s result, else the row's attribute (`attributeName()`). */
+    public function valueOf(mixed $row): mixed
+    {
+        return $this->value === null ? data_get($row, $this->attributeName()) : ($this->value)($row);
+    }
     public function id(): string { return $this->id; }
     public function databaseColumn(): string { return $this->column; }
 
@@ -267,7 +325,7 @@ final class Column
     public function isSortable(): bool { return $this->sortable; }
     public function isNullable(): bool { return $this->nullable; }
     public function isFilterable(): bool { return $this->filterable; }
-    public function isSearchable(): bool { return $this->searchable ?? $this->filterable; }
+    public function isSearchable(): bool { return $this->searchable ?? ($this->filterable || $this->searchColumn !== null); }
     public function foldedColumn(): ?string { return $this->searchColumn; }
 
     private static function identifier(string $column): string

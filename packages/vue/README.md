@@ -77,7 +77,7 @@ const bulk = [{ id: 'archive', label: 'Arşivle', onSelect: ({ ids }) => archive
 | `AcunFilters` · `AcunFilterChips` · `AcunTools` | `table`, `labels`, `locale` · `AcunFilters`: `panel`, `button` · `AcunTools`: `items`, `button` |
 | `AcunFilterPanel` | `table`, `labels`, `locale`: only the filter fields, for your own drawer, modal or sidebar |
 | `AcunColumnToggle` | `table`, `labels`, `reorderable`, `button` (`{ label, icon, iconOnly, className }`) |
-| `AcunDataTable` | `table`, `caption`, `selectable`, `locale`, `labels`, `format`, `rowLabel`, `rowActions`, `maxInlineActions`, `status`, `skeleton`, `onEdit`, `virtual`, `fixedColumns`, `resizableColumns`, `reorderableColumns`, `responsive`, `size`, `stickyHeader`, `scrollY`, `multiSort` |
+| `AcunDataTable` | `table`, `caption`, `captionVisible`, `selectable`, `locale`, `labels`, `format`, `rowLabel`, `rowActions`, `maxInlineActions`, `status`, `skeleton`, `onEdit`, `virtual`, `fixedColumns`, `resizableColumns`, `reorderableColumns`, `responsive`, `size`, `stickyHeader`, `scrollY`, `multiSort` |
 | `AcunPagination` | `table`, `siblings`, `boundaries`, `firstLast`, `locale`, `labels` |
 | `AcunPageSize` | `table`, `pageSizes`, `labels` |
 | `AcunPageInfo` | `table`, `labels` |

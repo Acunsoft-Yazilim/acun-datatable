@@ -22,9 +22,16 @@ trait ManagesColumns
         }
         $hidden = $this->hiddenColumnIds();
         $next = in_array($id, $hidden, true) ? array_values(array_diff($hidden, [$id])) : [...$hidden, $id];
-        if (count($next) < count($this->dataTableColumns())) {
-            $this->hiddenColumns = $next;
+        if (count($next) < count($this->displayColumns())) {
+            // In declaration order, so hiding and showing again gives the same URL (none, at the defaults).
+            $this->hiddenColumns = array_values(array_filter(array_map(fn (Column $column) => $column->id(), $this->displayColumns()), fn (string $known) => in_array($known, $next, true)));
         }
+    }
+
+    /** @return list<Column> the columns that can be shown, in declaration order: all but `internal()` ones */
+    protected function displayColumns(): array
+    {
+        return array_values(array_filter($this->dataTableColumns(), fn (Column $column) => ! $column->isInternal()));
     }
 
     /** @return list<Column> the columns to show, in declaration order */
@@ -35,11 +42,11 @@ trait ManagesColumns
         return array_values(array_filter($this->orderedColumns(), fn (Column $column) => ! in_array($column->id(), $hidden, true)));
     }
 
-    /** @return list<Column> every column in display order */
+    /** @return list<Column> every column that can be shown (not `internal()`), in display order */
     protected function orderedColumns(): array
     {
         $byId = [];
-        foreach ($this->dataTableColumns() as $column) {
+        foreach ($this->displayColumns() as $column) {
             $byId[$column->id()] = $column;
         }
         $ordered = [];
@@ -61,7 +68,7 @@ trait ManagesColumns
             return [];
         }
         $widths = [];
-        foreach ([...array_map(fn (Column $column) => $column->id(), $this->dataTableColumns()), '__actions'] as $id) {
+        foreach ([...array_map(fn (Column $column) => $column->id(), $this->displayColumns()), '__actions'] as $id) {
             $width = $this->columnWidths[$id] ?? null;
             if (is_int($width) || is_float($width) || (is_string($width) && ctype_digit($width))) {
                 $widths[$id] = max(48, min(2000, (int) round((float) $width)));
@@ -104,7 +111,7 @@ trait ManagesColumns
         if (! $this->resizableColumns()) {
             return;
         }
-        $known = [...array_map(fn (Column $column) => $column->id(), $this->dataTableColumns()), '__actions'];
+        $known = [...array_map(fn (Column $column) => $column->id(), $this->displayColumns()), '__actions'];
         $next = $this->columnWidthsPx();
         foreach ($widths as $id => $width) {
             if (! in_array($id, $known, true)) {
@@ -129,7 +136,7 @@ trait ManagesColumns
     /** Whether the order or widths differ from the defaults. */
     protected function columnsChanged(): bool
     {
-        $natural = array_map(fn (Column $column) => $column->id(), $this->dataTableColumns());
+        $natural = array_map(fn (Column $column) => $column->id(), $this->displayColumns());
 
         return $this->columnWidthsPx() !== [] || array_map(fn (Column $column) => $column->id(), $this->orderedColumns()) !== $natural;
     }
@@ -138,12 +145,19 @@ trait ManagesColumns
     protected function hiddenColumnIds(): array
     {
         $hidden = [];
-        foreach ($this->dataTableColumns() as $column) {
+        $shown = $this->displayColumns();
+        foreach ($shown as $column) {
             if ($column->isHideable() && in_array($column->id(), $this->hiddenColumns, true)) {
                 $hidden[] = $column->id();
             }
         }
 
-        return count($hidden) >= count($this->dataTableColumns()) ? [] : $hidden;
+        return count($hidden) >= count($shown) ? [] : $hidden;
+    }
+
+    /** @return list<string> the columns hidden at first (`Column::hidden()`), in declaration order */
+    protected function defaultHiddenColumnIds(): array
+    {
+        return array_values(array_map(fn (Column $column) => $column->id(), array_filter($this->displayColumns(), fn (Column $column) => $column->isHiddenByDefault())));
     }
 }

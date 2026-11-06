@@ -31,6 +31,8 @@ export interface StatusSource {
 export interface RenderTableOptions<TData> {
   /** Visible table caption; recommended for accessibility. */
   readonly caption?: string;
+  /** `false` keeps the caption for screen readers only (`adt-sr-only`). Default `true`. */
+  readonly captionVisible?: boolean;
   /** Adds a checkbox column. Default `false`. */
   readonly selectable?: boolean;
   /** Locale for default number and date text. Default `'en'`. */
@@ -419,7 +421,7 @@ export function renderTable<TData>(
     const tableEl = element(doc, 'table', { class: tableClass({ collapsible, levels, detail: detailOf !== undefined, userWidths, locked: lock !== undefined }) });
     // Every row of a virtual table: the header row, the rows, and the totals row when there is one.
     if (page.all) tableEl.setAttribute('aria-rowcount', String(page.all.length + 1 + (columns.some(column => column.aggregate !== undefined) ? 1 : 0)));
-    if (options.caption !== undefined) tableEl.append(element(doc, 'caption', {}, options.caption));
+    if (options.caption !== undefined) tableEl.append(element(doc, 'caption', options.captionVisible === false ? { class: 'adt-sr-only' } : {}, options.caption));
 
     const headRow = element(doc, 'tr');
     if (expandable) {

@@ -23,6 +23,7 @@ export {
   DEFAULT_LAYOUT, renderDataTable,
   type DataTableLayout, type LayoutFeature, type LayoutSlot, type RenderDataTableOptions,
 } from './layout';
+export { askConfirm, setConfirm, type ConfirmHandler, type ConfirmRequest } from './confirm';
 export {
   confirmed, renderBulkActions, splitActions,
   type ActionIcon, type BulkAction, type BulkSelection, type RenderBulkActionsOptions, type RowAction,

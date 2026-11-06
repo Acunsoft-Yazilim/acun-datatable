@@ -17,6 +17,7 @@
     $exactTotal = $rows->totalIsExact();
     $rowActions = $this->dataTableRowActions();
     $bulkActions = $selectable ? $this->dataTableBulkActions() : [];
+    $selectablePage = $selectable ? $this->selectablePageKeys() : []; // rows isSelectable() refuses get no checkbox
     $responsive = in_array($this->responsive(), ['cards', 'scroll', 'collapse', 'modal', 'auto'], true) ? $this->responsive() : 'cards';
     $collapsible = in_array($responsive, ['collapse', 'modal', 'auto'], true);
     $hiddenBelow = in_array($responsive, ['collapse', 'auto'], true); // hidden columns open below the row
@@ -75,26 +76,30 @@
             <span class="adt-selection-count">{{ $selectedText }}</span>
             @foreach ($bulkActions as $action)
                 <button type="button" class="adt-bulk-action" data-action="{{ $action->id() }}"
-                    wire:click="runBulkAction({{ \Illuminate\Support\Js::from($action->id()) }})"
-                    @if ($action->confirmText() !== null) wire:confirm="{{ $action->confirmText() }}" @endif>{{ $action->labelText() }}</button>
+                    @if ($action->confirmText() !== null) @foreach ($action->confirmAttributes() as $attribute => $text) {{ $attribute }}="{{ $text }}" @endforeach
+                        x-data x-on:click="@include('acun-datatable::livewire.confirm').then(ok => ok && $wire.runBulkAction({{ \Illuminate\Support\Js::from($action->id()) }}))"
+                    @else wire:click="runBulkAction({{ \Illuminate\Support\Js::from($action->id()) }})" @endif>{{ $action->labelText() }}</button>
             @endforeach
-            @if (! $this->allMatching && ($rows->total() > $selectedCount || ! $exactTotal))
-                <button type="button" wire:click="selectAllMatching">{{ $exactTotal
-                    ? $this->tableText('select_matching', $rows->total(), ['total' => \Acunsoft\DataTable\Laravel\Support\Format::count($rows->total())])
-                    : $this->tableText('select_matching_many', ['total' => \Acunsoft\DataTable\Laravel\Support\Format::count($rows->total())]) }}</button>
+            @php
+                [$matchingTotal, $matchingExact] = $this->allMatching || ! $this->canSelectAllMatching() ? [0, true] : $this->matchingSelectableCount();
+                $offerMatching = ! $this->allMatching && $this->canSelectAllMatching() && ($matchingTotal > $selectedCount || ! $matchingExact);
+                $matchingText = $offerMatching ? ($matchingExact
+                    ? $this->tableText('select_matching', $matchingTotal, ['total' => \Acunsoft\DataTable\Laravel\Support\Format::count($matchingTotal)])
+                    : $this->tableText('select_matching_many', ['total' => \Acunsoft\DataTable\Laravel\Support\Format::count($matchingTotal)])) : '';
+            @endphp
+            @if ($offerMatching)
+                <button type="button" wire:click="selectAllMatching">{{ $matchingText }}</button>
             @endif
             <button type="button" class="adt-clear-selection" wire:click="clearSelection">{{ $this->tableText('clear_selection') }}</button>
             {{-- Phones: the same choices as one select (styles.css shows it instead of the buttons there). --}}
             <select class="adt-control adt-selection-menu" aria-label="{{ $this->tableText('bulk_actions') }}" x-data
-                x-on:change="const option = $el.selectedOptions[0]; $el.value = ''; if (option.value === '__matching') $wire.selectAllMatching(); else if (option.value === '__clear') $wire.clearSelection();@if (count($bulkActions) > 0) else if (! option.dataset.confirm || window.confirm(option.dataset.confirm)) $wire.runBulkAction(option.value)@endif">
+                x-on:change="const option = $el.selectedOptions[0]; $el.value = ''; if (option.value === '__matching') $wire.selectAllMatching(); else if (option.value === '__clear') $wire.clearSelection();@if (count($bulkActions) > 0) else if (! option.dataset.confirm) $wire.runBulkAction(option.value); else @include('acun-datatable::livewire.confirm', ['from' => 'option']).then(ok => ok && $wire.runBulkAction(option.value))@endif">
                 <option value="" disabled selected>{{ $this->tableText('actions') }}</option>
                 @foreach ($bulkActions as $action)
-                    <option value="{{ $action->id() }}" @if ($action->confirmText() !== null) data-confirm="{{ $action->confirmText() }}" @endif>{{ $action->labelText() }}</option>
+                    <option value="{{ $action->id() }}" @foreach ($action->confirmAttributes() as $attribute => $text) {{ $attribute }}="{{ $text }}" @endforeach>{{ $action->labelText() }}</option>
                 @endforeach
-                @if (! $this->allMatching && ($rows->total() > $selectedCount || ! $exactTotal))
-                    <option value="__matching">{{ $exactTotal
-                        ? $this->tableText('select_matching', $rows->total(), ['total' => \Acunsoft\DataTable\Laravel\Support\Format::count($rows->total())])
-                        : $this->tableText('select_matching_many', ['total' => \Acunsoft\DataTable\Laravel\Support\Format::count($rows->total())]) }}</option>
+                @if ($offerMatching)
+                    <option value="__matching">{{ $matchingText }}</option>
                 @endif
                 <option value="__clear">{{ $this->tableText('clear_selection') }}</option>
             </select>
@@ -112,7 +117,11 @@
                 @if (isset($widths['__actions'])) style="--adt-actions-width: {{ $widths['__actions'] }}px" @endif
                 @if ($selectable) x-data="{ anchor: null }" @endif>
                 @if ($this->caption() !== null)
-                    <caption>{{ $this->caption() }}</caption>
+                    @if ($this->captionVisible())
+                        <caption>{{ $this->caption() }}</caption>
+                    @else
+                        <caption class="adt-sr-only">{{ $this->caption() }}</caption>
+                    @endif
                 @endif
                 <thead>
                     <tr>
@@ -121,7 +130,7 @@
                         @endif
                         @if ($selectable)
                             <th scope="col" class="adt-select">
-                                @if ($rows->isNotEmpty())
+                                @if ($selectablePage !== [])
                                     {{-- The text shows only in cards (phones), where the header row is gone. --}}
                                     <label class="adt-select-all"><input type="checkbox"
                                         aria-label="{{ $this->tableText('select_all') }}"
@@ -164,7 +173,8 @@
                 @forelse ($rows->items() as $row)
                     @php
                         $key = $this->rowKey($row);
-                        $selected = $selectable && $this->isSelected($key);
+                        $canSelect = $selectable && in_array($key, $selectablePage, true);
+                        $selected = $canSelect && $this->isSelected($key);
                         $name = $this->rowLabel($row);
                         $detailId = 'adt-'.$this->getId().'-detail-'.$loop->index;
                         $detailOpen = $detailView !== null && $this->detailIsOpen($key);
@@ -207,11 +217,13 @@
                             @endif
                             @if ($selectable)
                                 <td class="adt-select">
-                                    <input type="checkbox"
-                                        aria-label="{{ $this->tableText('select_row', ['name' => $name]) }}"
-                                        {{-- Shift+click selects (or clears) the rows between the last clicked one and this one. --}}
-                                        x-on:click="const key = {{ \Illuminate\Support\Js::from($key) }}; ($event.shiftKey && anchor !== null && anchor !== key) ? $wire.selectRange(anchor, key, $el.checked) : $wire.toggleRow(key); anchor = key"
-                                        @checked($selected)>
+                                    @if ($canSelect)
+                                        <input type="checkbox"
+                                            aria-label="{{ $this->tableText('select_row', ['name' => $name]) }}"
+                                            {{-- Shift+click selects (or clears) the rows between the last clicked one and this one. --}}
+                                            x-on:click="const key = {{ \Illuminate\Support\Js::from($key) }}; ($event.shiftKey && anchor !== null && anchor !== key) ? $wire.selectRange(anchor, key, $el.checked) : $wire.toggleRow(key); anchor = key"
+                                            @checked($selected)>
+                                    @endif
                                 </td>
                             @endif
                             @foreach ($columns as $index => $column)

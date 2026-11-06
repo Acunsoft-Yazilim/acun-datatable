@@ -200,6 +200,18 @@ describe('tableResponse and tableError', () => {
   });
 });
 
+describe('defineColumns', () => {
+  it('makes a column with a folded search copy searchable unless searchable is false', () => {
+    const [folded, off, plain, untyped] = defineColumns({
+      customer: { search: 'customer_search' },
+      email: { search: 'email_search', searchable: false },
+      note: {},
+      total: { type: 'decimal', filterable: true },
+    });
+    expect([folded!.searchable, off!.searchable, plain!.searchable, untyped!.searchable]).toEqual([true, false, false, false]);
+  });
+});
+
 describe('NULL values, big integers and odd requests', () => {
   const scored = defineColumns({ score: { type: 'number', sortable: true, nullable: true }, name: { sortable: true, filterable: true } });
   const scores = [5, null, 3, null, 5, 1, null, 3, 8, null, 2];

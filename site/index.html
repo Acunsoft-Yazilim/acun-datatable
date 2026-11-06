@@ -397,6 +397,8 @@ const API = [
     ["responsive: 'cards' | 'scroll' | 'collapse' | 'modal' · size: 'sm' | 'md' | 'lg'", {tr:"Dar ekran: kart, yana kaydırma, açılır satır (⊕) veya ayrıntı penceresi (<dialog>); boyut satır, yazı ve kontrolleri birlikte değiştirir.", en:"Narrow screens: cards, sideways scrolling, collapsible rows (⊕) or a details <dialog>; size changes rows, text and controls together."}],
     ["renderColumnToggle(container, table, options?)", {tr:"\"Kolonlar\" menüsü: her kolon için etiketli bir onay kutusu; son görünen kolon gizlenemez.", en:"\"Columns\" menu: a labelled checkbox per column; the last visible column cannot be hidden."}],
     ["renderBulkActions(container, table, { actions })", {tr:"Seçim varken görünen çubuk: \"3 seçili\", toplu işlem butonları, seçimi temizle. renderTable'a rowActions ile satır butonları eklenir.", en:"A bar shown while rows are selected: \"3 selected\", bulk action buttons, clear selection. renderTable's rowActions adds per-row buttons."}],
+    ["setConfirm(handler) · askConfirm(request) · rowActions[].confirm", {tr:"Onay penceresi: setConfirm ile kaydedilen işleyici, yoksa sayfada ACUN UI varsa AcunUI.confirm(), yoksa tarayıcının confirm()'ü. İşleyici { title, text, confirmLabel, cancelLabel, tone } alır, true/false (ya da Promise) döndürür; Livewire görünümleri de aynısını kullanır.", en:"The confirmation dialog: the handler registered with setConfirm, else ACUN UI's AcunUI.confirm() when it is on the page, else the browser's confirm(). A handler gets { title, text, confirmLabel, cancelLabel, tone } and answers true/false (or a Promise); the Livewire views use the same."}],
+    ["caption · captionVisible: false", {tr:"Tablonun adı (<caption>); captionVisible: false ile yalnızca ekran okuyucular için (React ve Vue'da da aynı özellik).", en:"The table's name (<caption>); captionVisible: false keeps it for screen readers only (the same prop in React and Vue)."}],
     ["renderPagination(container, table, options?)", {tr:"Numaralı sayfalar: ‹ 1 … 4 5 6 … 20 ›; buton sayısı sabit kalır, aktif sayfa aria-current ile işaretlenir; isteğe bağlı ilk/son.", en:"Numbered pages: ‹ 1 … 4 5 6 … 20 ›; the button count stays fixed, the current page has aria-current; optional first/last."}],
     ["renderPageSize · renderPageInfo", {tr:"Sayfa başı satır seçimi ve canlı kayıt aralığı metni (Toplam: 5.000 kaydın 1 ile 25 arasını gösteriyor).", en:"Rows-per-page select and the live row range (Showing 1 to 25 of 5,000 rows)."}],
     ["renderSearch(container, table, options?)", {tr:"İkonlu, gecikmeli arama kutusu; Enter hemen uygular.", en:"Debounced search box with an icon; Enter applies at once."}],
@@ -423,16 +425,19 @@ const API = [
     ["importRows(sheet, columns, options)", {tr:"Başlık eşleme, Türkçe sayı ve tarih biçimleri, satır numaralı hatalar; tahmin yok.", en:"Header matching, Turkish number and date formats, line-numbered errors; no guessing."}],
   ]],
   ['acunsoft/datatable-laravel', [
-    ["Column::make($id)->column()->type()->sortable()->filterable()", {tr:"İzin listesi: yalnızca tanımlı kolonlar SQL'e ulaşır. searchUsing() katlanmış kolonla Türkçe duyarlı arama, format() hücre metni.", en:"The allowlist: only declared columns reach SQL. searchUsing() for Turkish-aware search on a folded column, format() for cell text."}],
+    ["Column::make($id)->column()->type()->sortable()->filterable()", {tr:"İzin listesi: yalnızca tanımlı kolonlar SQL'e ulaşır. searchUsing() katlanmış kolonla Türkçe duyarlı arama (kolonu aranabilir yapar), format() hücre metni.", en:"The allowlist: only declared columns reach SQL. searchUsing() for Turkish-aware search on a folded column (makes it searchable), format() for cell text."}],
+    ["Column::computed($id, fn ($row) => …) · ->value(fn ($row) => …) · ->internal()", {tr:"Değeri bir fonksiyondan gelen kolon (modeldeki aynı adlı metot ilişki sanılmaz); hiç gösterilmeyen ama sıralayan, filtreleyen ve arayan kolon.", en:"A column whose value comes from a closure (a model method of the same name is not taken for a relation); a column never shown that still sorts, filters and searches."}],
     ["->filter() · ->options(['paid' => 'Ödendi']) · filterBy($field, $values) · clearPanelFilters()", {tr:"Filtre paneli: kolon türüne göre kontrol veya seçenekler; etkin filtreler etiket olarak.", en:"The filter panel: a control per column type or choices; active filters as chips."}],
     ["->view('orders.status-badge') · ->priority(1|2|3) · ->hideable() · ->hidden()", {tr:"Hücreyi kendi Blade görünümünle çiz (rozet, avatar; dışa aktarma metni kullanır); dar ekran önceliği; kolon menüsü.", en:"Render the cell with your Blade view (badge, avatar; exports keep the text); narrow-screen priority; column menu."}],
     ["tableLayout() · pagingOptions() · texts()", {tr:"Üst/alt çubuk yerleşimi (pageSize, search, columns, tools, info, paging veya kendi Blade görünümün); sayfalayıcı ayarları; tabloya özel metinler.", en:"Top/bottom bar layout (pageSize, search, columns, tools, info, paging or your own Blade view); pager options; texts for one table."}],
     ["responsive() · tableSize()", {tr:"cards, scroll, collapse veya modal; sm, md veya lg.", en:"cards, scroll, collapse or modal; sm, md or lg."}],
     ["pageSizeOptions() · defaultPageSize() · stickyHeader() · scrollY() · multiSort()", {tr:"Sayfa başı seçenekleri ve başlangıç değeri; sabit başlık; içte kaydırma; tek kolonlu sıralama.", en:"Rows-per-page choices and starting size; fixed header; scrolling inside; single-column sorting."}],
+    ["defaultSort() · captionVisible()", {tr:"Kullanıcı seçmeden önceki sıralama, ör. ['favorites' => 'desc'] (URL'ye yazılmaz; yalnızca kullanıcının değişikliği yazılır); başlığı yalnızca ekran okuyuculara bırakmak.", en:"The sort before the user picks one, e.g. ['favorites' => 'desc'] (not written into the URL; only the user's change is); a caption for screen readers only."}],
     ["countLimit() · countTimeout() · maxResultWindow()", {tr:"Tam sayım: 10.000'e kadar her zaman, ötesinde 250 ms bütçeyle (PostgreSQL, MySQL, MariaDB), aşarsa \"10.000+\"; 100.000 satırdan derin sayfa yok.", en:"Exact counts: always up to 10,000, beyond that within 250 ms (PostgreSQL, MySQL, MariaDB), else \"10,000+\"; no pages deeper than 100,000 rows."}],
     ["use WithDataTable  (Livewire)", {tr:"columns() ve query() tanımlanır; arama, sıralama, filtre ve sayfa boyutu URL'de; seçim ve selectedQuery() toplu işlemler için.", en:"Declare columns() and query(); search, sorting, filters and page size in the URL; selection and selectedQuery() for bulk actions."}],
     ["setFilter($field, $op, $value) · removeFilter($i) · clearFilters()", {tr:"Livewire eylemleri; geçersiz kurallar eklenmez.", en:"Livewire actions; invalid rules are not added."}],
-    ["rowActions() · bulkActions() · Action::make($id)->label()->confirm()->visible()->handle()", {tr:"Satır ve toplu işlemler; satır query() içinde yeniden aranır, görünürlük çalıştırmadan önce tekrar kontrol edilir.", en:"Row and bulk actions; the row is looked up inside query() again and visibility is checked again before running."}],
+    ["rowActions() · bulkActions() · Action::make($id)->label()->confirm()->visible()->handle()", {tr:"Satır ve toplu işlemler; satır query() içinde yeniden aranır, görünürlük çalıştırmadan önce tekrar kontrol edilir. confirm($soru, title:, confirmLabel:, cancelLabel:, tone:) onay penceresini doldurur; keepSelection() seçimi işlemden sonra korur.", en:"Row and bulk actions; the row is looked up inside query() again and visibility is checked again before running. confirm($question, title:, confirmLabel:, cancelLabel:, tone:) fills the confirmation dialog; keepSelection() keeps the selection after the action."}],
+    ["isSelectable($row) · selectableRows($query)", {tr:"Seçilemeyen satırlar: onay kutusu çizilmez, sayfa ve \"eşleşen tümü\" seçimi onları atlar; sunucu selectedQuery(), toplu işlem ve dışa aktarmada yeniden kontrol eder. \"Eşleşen tümü\" için kuralın SQL hâli (selectableRows) gerekir.", en:"Rows that cannot be selected: no checkbox, the page and \"all matching\" skip them; the server checks again for selectedQuery(), bulk actions and exports. \"All matching\" needs the rule in SQL (selectableRows)."}],
     ["sortBy($field, $additive) · toggleRow($key) · togglePage() · selectAllMatching()", {tr:"Başlık tıklaması ve seçim eylemleri (Shift+tık çok kolonlu sıralama).", en:"Header-click and selection actions (Shift+click for multi-column sorting)."}],
     ["TableResponse::for($query)->columns([...])->maxPageSize(100)", {tr:"@acunsoft/datatable-http için JSON uç nokta: {rows, totalRows} (sayılamayacak kadar büyükse totalRowsAtLeast); hatalı sorguda 422.", en:"JSON endpoint for @acunsoft/datatable-http: {rows, totalRows} (totalRowsAtLeast when too large to count in time); 422 on an invalid query."}],
     ["exportFormats() · printable() · use WithTableImport · importRow($values, $line)", {tr:"Araçlar menüsü: Excel/CSV dışa aktarma, yazdırma ve tek işlemde (transaction) içe aktarma; sorunlar satır numarasıyla listelenir.", en:"The tools menu: Excel/CSV export, print and import in one transaction; problems are listed with their line."}],
@@ -599,12 +604,44 @@ Route::get('/orders/data', fn () => TableResponse::for(\\App\\Models\\Order::que
 
 @include('acun-datatable::livewire.table')` },
       { title:{tr:"Toplu işlem", en:"Bulk action"},
-        desc:{tr:"selectedQuery() seçili satırları query() içinde döndürür; \"eşleşen tümü\" seçiminde de çalışır.", en:"selectedQuery() returns the selected rows inside query(); it also works for \"all matching\" selection."}, lang:"php", code:
+        desc:{tr:"selectedQuery() seçili satırları query() içinde, tablodaki sırayla (sıralama, en son anahtar) döndürür; \"eşleşen tümü\" seçiminde de çalışır.", en:"selectedQuery() returns the selected rows inside query(), in the table's order (its sort, the key last); it also works for \"all matching\" selection."}, lang:"php", code:
 `public function archive(): void
 {
     $this->authorize('update', Order::class);
     $this->selectedQuery()->update(['status' => 'archived']);
     $this->clearSelection();
+}` },
+      { title:{tr:"Varsayılan sıralama, gizli ve hesaplanan kolonlar", en:"Default sort, never-shown and computed columns"},
+        desc:{tr:"defaultSort() ve başta gizli kolonlar URL'ye yazılmaz; URL yalnızca kullanıcının değiştirdiğini tutar. internal() kolonu hiç gösterilmez ama sıralar ve arar; computed() değeri bir fonksiyondan okur.", en:"defaultSort() and the columns hidden at first are not written into the URL; it holds only what the user changed. An internal() column is never shown but sorts and searches; computed() reads its value from a closure."}, lang:"php", code:
+`protected function columns(): array
+{
+    return [
+        Column::make('customer')->header('Müşteri')->sortable()->searchUsing('customer_search'),
+        Column::make('email')->header('E-posta')->hidden(),          // hidden at first, not in the URL
+        Column::computed('subtotal', fn (Order $order) => $order->subtotal())->header('Ara toplam')->type('decimal'),
+        Column::make('favorites')->column('favorite_count')->sortable()->internal(), // never shown
+    ];
+}
+
+protected function defaultSort(): array { return ['favorites' => 'desc']; }
+protected function caption(): ?string { return 'Siparişler'; }
+protected function captionVisible(): bool { return false; } // for screen readers only` },
+      { title:{tr:"Onay penceresi", en:"Confirmation dialog"},
+        desc:{tr:"Sayfada ACUN UI varsa onun onay penceresi açılır; yoksa tarayıcının confirm()'ü. @acunsoft/datatable-dom'un setConfirm() işleviyle kendi pencerenizi kaydedebilirsiniz; danger() işlemler tehlike tonunda sorulur.", en:"With ACUN UI on the page its confirmation dialog opens; without it, the browser's confirm(). Register your own with setConfirm() of @acunsoft/datatable-dom; danger() actions ask in the danger tone."}, lang:"php", code:
+`Action::make('delete')->label('Sil')->danger()
+    ->confirm('Bu sipariş silinsin mi?', title: 'Siparişi sil', confirmLabel: 'Sil', cancelLabel: 'Vazgeç')
+    ->handle(fn (Order $order) => $order->delete());
+
+// In the browser, without ACUN UI: setConfirm(request => myDialog(request)) // Promise<boolean>` },
+      { title:{tr:"Seçilemeyen satırlar", en:"Rows that cannot be selected"},
+        desc:{tr:"isSelectable() onay kutusunu gizler ve sunucuda da uygulanır; selectableRows() aynı kuralın SQL hâlidir ve \"eşleşen tümü\" seçimini açar. keepSelection() seçimi, işi sonra yapan bir işlem için korur.", en:"isSelectable() hides the checkbox and is enforced on the server too; selectableRows() is the same rule in SQL and enables \"all matching\". keepSelection() keeps the selection for an action that does its work later."}, lang:"php", code:
+`protected function isSelectable(Order $order): bool { return $order->status !== 'shipped'; }
+
+protected function selectableRows(Builder $query): Builder { return $query->where('status', '!=', 'shipped'); }
+
+protected function bulkActions(): array
+{
+    return [Action::make('review')->label('İncele')->keepSelection()->handle(fn () => $this->dispatch('open-review'))];
 }` },
       { title:{tr:"Yerleşim ve metinler", en:"Layout and texts"},
         desc:{tr:"Yalnızca değiştirdiğin çubuk bölgelerini döndür; diğerleri varsayılan kalır. Bir isim kendi Blade görünümünü dahil eder (değişkenler: $rows, $columns, $this).", en:"Return only the bar slots you change; the others keep their defaults. Any other name includes your own Blade view ($rows, $columns, $this)."}, lang:"php", code:

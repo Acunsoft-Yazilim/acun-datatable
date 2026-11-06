@@ -4,7 +4,7 @@ import { act } from './act';
 import { createRoot, type Root } from 'react-dom/client';
 import { createDataTable, type ColumnDef, type Row } from '@acunsoft/datatable-core';
 import {
-  BulkActions, ColumnToggle, DataTable, DataTableLayout, FilterChips, FilterPanel, Filters, PageInfo, PageSize, Pagination, Search, Tools, labelsTr, useDataTable, type BulkSelection,
+  BulkActions, ColumnToggle, DataTable, DataTableLayout, FilterChips, FilterPanel, Filters, PageInfo, PageSize, Pagination, Search, Tools, labelsTr, setConfirm, useDataTable, type BulkSelection,
 } from '../src/index';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -348,6 +348,26 @@ describe('row action menu', () => {
     click(host.querySelector('tbody tr:first-child .adt-row-menu [data-action="delete"]'));
     expect(confirm).toHaveBeenCalledWith('Sure?');
     expect(remove).not.toHaveBeenCalled(); // answered no
+  });
+});
+
+describe('the confirmation of setConfirm and the caption', () => {
+  it('asks the registered handler, runs once it says yes, and hides the caption on request', async () => {
+    const remove = vi.fn();
+    const asked: unknown[] = [];
+    setConfirm(request => { asked.push(request); return Promise.resolve(true); });
+    try {
+      render(h(DataTable<Order>, { table: make(), caption: 'Siparişler', captionVisible: false, rowActions: [
+        { id: 'delete', label: 'Delete', danger: true, confirm: { title: 'Sil', text: 'Sure?' }, onSelect: remove },
+      ] }));
+      click(host.querySelector('tbody tr:first-child [data-action="delete"]'));
+      expect(asked).toEqual([{ title: 'Sil', text: 'Sure?', tone: 'danger' }]);
+      await act(async () => { await Promise.resolve(); });
+      expect(remove).toHaveBeenCalledOnce();
+      expect(host.querySelector('caption')!.className).toBe('adt-sr-only');
+    } finally {
+      setConfirm(null);
+    }
   });
 });
 

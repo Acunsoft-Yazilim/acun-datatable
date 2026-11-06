@@ -46,7 +46,8 @@ renderTable(el, table, { status: runner, labels: labelsTr });
 
 ## `renderTable(container, table, options?)`
 
-- `<table>` with an optional `<caption>`, `<th scope="col">` headers and one
+- `<table>` with an optional `<caption>` (`captionVisible: false` keeps it for
+  screen readers only), `<th scope="col">` headers and one
   `<tr>` per row of the current page; an empty state row spans all columns.
 - **Sorting:** sortable headers are `<button type="button">`. A click cycles
   ascending → descending → none; **Shift**+click adds or changes a secondary
@@ -130,7 +131,8 @@ renderBulkActions(document.querySelector('#bulk')!, table, {
 - **Icons, danger and confirm:** `icon: 'view' | 'edit' | 'delete' | 'copy' |
   'check' | 'download'` or `{ path }` (your own 24×24 SVG path), `iconOnly`
   (the label becomes the accessible name and tooltip), `danger` (red) and
-  `confirm: 'Delete?'` or `row => …` (asked with the browser's confirm).
+  `confirm: 'Delete?'`, `{ title, text, confirmLabel, cancelLabel, tone }`
+  or `row => …` returning either (see "Confirmation dialog" below).
 - **`maxInlineActions: 2`** keeps the first actions as buttons and moves the
   rest into a "⋮" menu (Escape or a click outside closes it).
 - **Selection:** Shift+click on a row checkbox selects or clears the range
@@ -140,6 +142,29 @@ renderBulkActions(document.querySelector('#bulk')!, table, {
   apply the action on the server with the same filters.
 - Authorization and the actual change are up to your handler; the renderer
   never deletes anything itself.
+
+### Confirmation dialog
+
+An action with `confirm` asks, in this order: the handler you register with
+`setConfirm()`, else ACUN UI's `AcunUI.confirm()` when ACUN UI is on the page
+(feature-detected), else the browser's `confirm()` (which shows only `text`).
+A handler gets `{ title, text, confirmLabel, cancelLabel, tone }` (`tone` is
+`'danger'` for a `danger` action unless the confirm says otherwise; labels
+left out are the dialog's own) and answers `true` / `false`, at once or as a
+promise; one that throws or rejects counts as "cancel".
+
+```ts
+import { setConfirm } from '@acunsoft/datatable-dom';
+
+setConfirm(({ title, text, confirmLabel, tone }) => myDialog.ask({ title, text, confirmLabel, tone })); // Promise<boolean>
+setConfirm(null); // back to ACUN UI or the browser
+```
+
+The handler is kept in one global slot (`Symbol.for('acunsoft.datatable.confirm')`),
+so every copy of the package on the page, React, Vue, `@acunsoft/datatable`
+(`AcunDataTable.setConfirm` in the `<script>` build) and the Livewire views
+of `acunsoft/datatable-laravel` use it. `askConfirm(request)` asks the same
+way from your own code.
 
 ## `renderColumnToggle(container, table, options?)`
 

@@ -6,6 +6,7 @@ namespace Acunsoft\DataTable\Laravel\Tests;
 
 use Acunsoft\DataTable\Laravel\Action;
 use Acunsoft\DataTable\Laravel\DataTableServiceProvider;
+use Acunsoft\DataTable\Laravel\Tests\Fixtures\ConfirmOrdersTable;
 use Acunsoft\DataTable\Laravel\Tests\Fixtures\Order;
 use Acunsoft\DataTable\Laravel\Tests\Fixtures\OrdersTable;
 use Livewire\Livewire;
@@ -24,8 +25,36 @@ final class LivewireActionsTest extends TestCase
         self::assertStringContainsString('<th scope="col" class="adt-th adt-actions">Actions</th>', $html);
         self::assertStringContainsString('aria-label="Activate: Ali Kaya"', $html);
         self::assertStringNotContainsString('aria-label="Activate: Ayşe Yılmaz"', $html); // already active: hidden
-        self::assertStringContainsString('wire:click="runRowAction(\'delete\', \'1\')"', $html);
-        self::assertStringContainsString('wire:confirm="Delete this order?"', $html);
+        self::assertStringContainsString('wire:click="runRowAction(\'activate\', \'2\')"', $html); // no confirm: runs on click
+        // With confirm(): the question (and tone) as data attributes, asked through the pluggable confirm, then run.
+        self::assertMatchesRegularExpression('/data-action="delete"\s+aria-label="Delete: Ayşe Yılmaz"\s+data-confirm="Delete this order\?"\s+data-confirm-tone="default"\s+x-data x-on:click="[^"]*Symbol\.for\(\'acunsoft\.datatable\.confirm\'\)[^"]*window\.AcunUI[^"]*window\.confirm\(ask\.text\)[^"]*\.then\(ok => ok && \$wire\.runRowAction\(\'delete\', \'1\'\)\)"/', $html);
+        self::assertStringNotContainsString('wire:confirm', $html); // never the browser's confirm directly
+    }
+
+    public function test_a_confirmation_carries_its_title_labels_and_tone_escaped(): void
+    {
+        $html = preg_replace('/<!--.*?-->/s', '', Livewire::test(ConfirmOrdersTable::class)->call('toggleRow', '1')->html());
+        self::assertMatchesRegularExpression('/data-action="delete"\s+aria-label="Delete: Ayşe Yılmaz"\s+data-confirm="Delete &quot;this&quot; order\?"\s+data-confirm-title="Delete order"\s+data-confirm-label="Delete"\s+data-confirm-cancel="Keep"\s+data-confirm-tone="danger"\s+x-data x-on:click=/', $html);
+        // A danger() bulk action: the danger tone without saying so; labels left out are the dialog's own.
+        self::assertMatchesRegularExpression('/data-action="archive"\s+data-confirm="Archive them\?"\s+data-confirm-title="Archive"\s+data-confirm-tone="danger"\s+x-data/', $html);
+        self::assertMatchesRegularExpression('/<option value="archive"\s+data-confirm="Archive them\?"\s+data-confirm-title="Archive"\s+data-confirm-tone="danger"\s*>/', $html);
+        // The same keys the DOM renderer's confirm handler gets.
+        foreach (["ask.title = data.confirmTitle", "ask.confirmLabel = data.confirmLabel", "ask.cancelLabel = data.confirmCancel", "ask.tone = data.confirmTone"] as $part) {
+            self::assertStringContainsString($part, $html);
+        }
+    }
+
+    public function test_confirm_options_and_their_defaults(): void
+    {
+        $plain = Action::make('delete')->confirm('Sure?');
+        self::assertSame(['data-confirm' => 'Sure?', 'data-confirm-tone' => 'default'], $plain->confirmAttributes());
+        self::assertSame('danger', $plain->danger()->confirmTone());
+        self::assertSame('default', $plain->danger()->confirm('Sure?', tone: 'default')->confirmTone());
+        self::assertSame([], Action::make('edit')->confirmAttributes());
+        $full = Action::make('delete')->confirm('Sure?', 'Delete', 'Yes', 'No');
+        self::assertSame(['Sure?', 'Delete', 'Yes', 'No'], [$full->confirmText(), $full->confirmTitle(), $full->confirmLabel(), $full->cancelLabel()]);
+        $this->expectException(\InvalidArgumentException::class);
+        Action::make('delete')->confirm('Sure?', tone: 'loud');
     }
 
     public function test_a_row_action_runs_on_the_row_and_refreshes_the_table(): void
@@ -54,11 +83,12 @@ final class LivewireActionsTest extends TestCase
     public function test_bulk_actions_run_on_the_selection_and_clear_it(): void
     {
         $table = Livewire::test(OrdersTable::class)->call('toggleRow', '1')->call('toggleRow', '3');
-        self::assertStringContainsString('wire:click="runBulkAction(\'archive\')"', $table->html());
-        self::assertStringContainsString('wire:confirm="Archive the selected orders?"', $table->html());
+        self::assertMatchesRegularExpression('/data-action="archive"\s+data-confirm="Archive the selected orders\?"\s+data-confirm-tone="default"\s+x-data x-on:click="[^"]*\.then\(ok => ok && \$wire\.runBulkAction\(\'archive\'\)\)"/', $table->html());
+        self::assertStringNotContainsString('wire:confirm', $table->html());
         // Phones: the same choices as a select, the confirmation kept.
         self::assertStringContainsString('class="adt-control adt-selection-menu"', $table->html());
-        self::assertMatchesRegularExpression('/<option value="archive"\s+data-confirm="Archive the selected orders\?"\s*>Archive/', $table->html());
+        self::assertMatchesRegularExpression('/<option value="archive"\s+data-confirm="Archive the selected orders\?"\s+data-confirm-tone="default"\s*>Archive/', $table->html());
+        self::assertMatchesRegularExpression('/else if \(! option\.dataset\.confirm\) \$wire\.runBulkAction\(option\.value\); else [^"]*\}\)\(option\)\s*\.then\(ok => ok && \$wire\.runBulkAction\(option\.value\)\)/', $table->html());
         self::assertStringContainsString('<option value="__clear">Clear selection</option>', $table->html());
         $table->call('runBulkAction', 'archive')->assertSet('selected', []);
         self::assertSame([1, 3], Order::query()->where('note', 'archived')->orderBy('id')->pluck('id')->all());
