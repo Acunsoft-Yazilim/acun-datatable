@@ -1,7 +1,8 @@
 // Hydration of server-rendered HTML (Next.js, Remix): no mismatch in any layout,
 // and the table works afterwards — sorting, paging, selection, open rows.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, createElement as h, type ReactElement } from 'react';
+import { createElement as h, type ReactElement } from 'react';
+import { act } from './act';
 import { hydrateRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { createDataTable, type ColumnDef } from '@acunsoft/datatable-core';

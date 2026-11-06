@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDataTable, type ColumnDef } from '@acunsoft/datatable-core';
 import { editText, labelsTr, parseEdit, renderTable, type CellEdit } from '../src/index';
+import { editSlot } from '../src/internal';
 
 type Order = { id: number; customer: string; total: string; qty: number; day: string; paid: boolean; status: string };
 const columns: readonly ColumnDef<Order>[] = [
@@ -123,5 +124,74 @@ describe('editing in place', () => {
     renderTable(host, createDataTable<Order>({ data, columns }));
     expect(host.querySelector('.adt-edit')).toBeNull();
     expect(() => renderTable(host, createDataTable<Order>({ data, columns }), { onEdit: 'x' as never })).toThrow('onEdit must be a function');
+  });
+});
+
+describe('editSlot (the editor across re-renders, shared by the three renderers)', () => {
+  const table = createDataTable<Order>({ data, columns });
+  const rows = () => table.getPage().rows;
+  const cell = () => {
+    const td = document.createElement('td');
+    td.setAttribute('data-adt-edit-host', '');
+    host.append(td);
+    return td;
+  };
+  const target = { rowId: rows()[0]!.id, columnId: 'customer' };
+  const base = (end: (refocus?: string) => void) => ({ rows: rows(), virtual: false, columns: table.getColumns(), onEdit: () => undefined, end });
+
+  it('mounts and focuses a new editor, moves it into a re-drawn cell, and ends with the button to refocus', async () => {
+    const slot = editSlot<Order>();
+    const end = vi.fn();
+    const first = cell();
+    slot.sync({ ...base(end), target, host: first });
+    const editor = first.querySelector('.adt-editor')!;
+    expect(document.activeElement).toBe(control());
+    first.remove();
+    const second = cell();
+    slot.sync({ ...base(end), target, host: second });
+    expect(second.firstElementChild).toBe(editor); // the same editor, not a new one
+    control().value = 'Ayşe K.';
+    key(control(), 'Enter');
+    await flush();
+    expect(end).toHaveBeenCalledWith(`${target.rowId}:customer`);
+    expect(editor.isConnected).toBe(false);
+  });
+
+  it('ends when its row left the page, but keeps a row only scrolled out of view when virtual', () => {
+    const slot = editSlot<Order>();
+    const end = vi.fn();
+    slot.sync({ ...base(end), target, host: cell() });
+    const editor = host.querySelector('.adt-editor')!;
+    slot.sync({ ...base(end), target, host: null, virtual: true });
+    expect(end).not.toHaveBeenCalled();
+    expect(editor.isConnected).toBe(true); // left where it was until its row comes back
+    slot.sync({ ...base(end), target, host: null, rows: [] });
+    expect(end).toHaveBeenCalledWith(); // no button to refocus: the row is gone
+    expect(editor.isConnected).toBe(false);
+  });
+
+  it('closed by pressing another control: ends once the pointer is released, unless another edit began', async () => {
+    const slot = editSlot<Order>();
+    const end = vi.fn();
+    slot.sync({ ...base(end), target, host: cell() });
+    document.dispatchEvent(new Event('pointerdown'));
+    key(control(), 'Escape');
+    expect(end).not.toHaveBeenCalled(); // the closed editor stays while the click goes on
+    document.dispatchEvent(new Event('pointerup'));
+    await flush();
+    expect(end).toHaveBeenCalledWith(undefined); // focus is where the click put it
+
+    end.mockClear();
+    slot.sync({ ...base(end), target, host: cell() });
+    document.dispatchEvent(new Event('pointerdown'));
+    key(control(), 'Escape');
+    const other = cell();
+    slot.sync({ ...base(end), target: { rowId: rows()[1]!.id, columnId: 'total' }, host: other });
+    document.dispatchEvent(new Event('pointerup'));
+    await flush();
+    expect(end).not.toHaveBeenCalled(); // the first editor's close is stale
+    expect(other.querySelector('.adt-editor')).not.toBeNull();
+    slot.destroy();
+    expect(host.querySelector('.adt-editor')).toBeNull();
   });
 });

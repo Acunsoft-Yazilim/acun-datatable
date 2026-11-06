@@ -7,7 +7,7 @@ import { checkFixedColumns, pinColumns, type FixedColumns } from './pin';
 import { columnTools } from './column-tools';
 import { autoResponsive } from './auto-responsive';
 import { checkVirtual, virtualWindow } from './virtual';
-import { afterPointerRelease, cellEditor, isEditable, type CellEditor, type EditHandler } from './edit';
+import { editSlot, isEditable, type EditHandler, type EditTarget } from './edit';
 import {
   actionsCellClass, cellClass, clickRowCheckbox, measureRowHeight, closeRowMenusOnOutsideClick, rangeOf, selectAllState, togglePageSelection, columnSpan, frameThrottle, headerClass, hideDialog, layoutKey, numeric, priorityLevels, priorityOf, resizeHandle,
   responsiveFlags, showDialog, showSkeleton, skeletonRows, sortView, tableClass, totalCells, wrapClass,
@@ -343,33 +343,19 @@ export function renderTable<TData>(
     showDialog(dialog);
   };
 
-  // The cell being edited in place (the editor element moves into each re-render).
-  let editing: { rowId: string; columnId: string; editor: CellEditor } | undefined;
+  // The cell being edited in place: drawn empty, the shared editor moves into each re-render.
+  let editing: EditTarget | undefined;
+  const editor = editSlot<TData>();
   const onEdit = options.onEdit;
   if (onEdit !== undefined && typeof onEdit !== 'function') throw new TypeError('onEdit must be a function');
   const startEdit = (row: Row<TData>, column: ColumnDef<TData>): void => {
-    editing?.editor.destroy();
-    const focusKey = `edit:${row.id}:${column.id}`;
-    const editor = cellEditor(doc, {
-      row, column, value: cellValue(column, row), labels, onEdit: onEdit!,
-      onClose: () => {
-        if (editing?.editor !== editor) return;
-        editing = undefined;
-        // Closed by pressing another control: the closed editor stays in its cell until that click is done.
-        afterPointerRelease(doc, waited => {
-          editor.destroy();
-          if (waited) {
-            if (!editing) render();
-            return;
-          }
-          render();
-          root.querySelector<HTMLElement>(`[data-adt-focus="${CSS.escape(focusKey)}"]`)?.focus();
-        });
-      },
-    });
-    editing = { rowId: row.id, columnId: column.id, editor };
+    editing = { rowId: row.id, columnId: column.id };
     render();
-    editor.focus();
+  };
+  const endEdit = (refocus?: string): void => {
+    editing = undefined;
+    render();
+    if (refocus !== undefined) root.querySelector<HTMLElement>(`[data-adt-focus="${CSS.escape(`edit:${refocus}`)}"]`)?.focus();
   };
 
   // The row a Shift+click range starts from.
@@ -487,7 +473,7 @@ export function renderTable<TData>(
     head.append(headRow);
 
     const body = element(doc, 'tbody');
-    let placed = false;
+    let editHost: HTMLTableCellElement | undefined;
     const span = columnSpan(columns.length, { selectable, actions: rowActions.length > 0, expandable });
     if (skeletonShown) {
       // Same cells as a row, so the layout does not jump when the rows arrive.
@@ -563,8 +549,8 @@ export function renderTable<TData>(
         const className = cellClass(column, index, collapsible, editable, isEditing);
         const td = element(doc, 'td', { 'data-label': column.header, ...(className ? { class: className } : {}) });
         if (isEditing) {
-          td.append(editing!.editor.element);
-          placed = true;
+          td.setAttribute('data-adt-edit-host', '');
+          editHost = td;
         } else {
           fill(td, column, row, cells[index]!);
           if (editable) {
@@ -601,9 +587,6 @@ export function renderTable<TData>(
     if (page.view && page.view.after > 0) body.append(spacer(page.view.after));
     if (dialogRow !== undefined && !pageIds.includes(dialogRow)) closeDialog(); // its row left the page
     for (const id of details.keys()) if (!expanded.has(id) && dialogRow !== id) details.delete(id); // closed rows load again
-    // Its row left the page (or, scrolled virtually, the matching rows): the edit ends. A row
-    // only scrolled out of view keeps its editor for when it comes back.
-    if (editing && !placed && !(page.all && pageIds.includes(editing.rowId))) { editing.editor.destroy(); editing = undefined; }
     tableEl.append(head, body);
     // Footer totals of the columns with `aggregate` (every matching row, not just the page).
     if (columns.some(column => column.aggregate !== undefined)) {
@@ -622,6 +605,14 @@ export function renderTable<TData>(
       tableEl.append(foot);
     }
     scroller.replaceChildren(tableEl);
+    // In the document now, so a new editor can take focus. An edit whose row left the page ends
+    // here (nothing to draw again); one closed later draws its cell again.
+    let syncing = true;
+    editor.sync({
+      target: editing, host: editHost, rows: page.all ?? page.rows, virtual: page.all !== undefined, columns: table.getColumns(), labels, onEdit,
+      end: refocus => { if (syncing) editing = undefined; else endEdit(refocus); },
+    });
+    syncing = false;
     if (virtual) {
       const cells = [...(tableEl.tHead?.rows[0]?.cells ?? [])];
       if (lock) {
@@ -722,7 +713,7 @@ export function renderTable<TData>(
       unsubscribe();
       unsubscribeStatus();
       closeDialog();
-      editing?.editor.destroy();
+      editor.destroy();
       scroller.removeEventListener('scroll', onScroll);
       frames.cancel(); // a scroll just before: no drawing after destroy
       resized?.disconnect();

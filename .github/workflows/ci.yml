@@ -60,7 +60,7 @@ jobs:
       # still need them on a fresh runner).
       - run: npx playwright install --with-deps chromium firefox webkit
       # The Livewire browser tests run the Laravel package's workbench app (testbench serve).
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite, zip
@@ -126,7 +126,7 @@ jobs:
         working-directory: packages/adapter-laravel
     steps:
       - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: ${{ matrix.php }}
           extensions: intl, mbstring, pdo_sqlite, zip
@@ -141,6 +141,51 @@ jobs:
           restore-keys: composer-${{ runner.os }}-
       - run: composer update --no-interaction --no-progress --prefer-dist
       - run: composer test
+
+  lowest:
+    # The oldest supported versions, which the other jobs never install:
+    # React 18.2 and Vue 3.4 (the peer dependency floors), and the lowest
+    # Laravel 12, Livewire 4, Testbench and PHPUnit that Composer installs on
+    # the oldest PHP. Composer skips versions with a security advisory, so
+    # that is the oldest safe release rather than x.0.0.
+    runs-on: ubuntu-latest
+    name: lowest supported versions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      # Only on this runner: the committed manifests and lockfile stay on the newest versions.
+      - name: Install React 18.2 and Vue 3.4
+        run: |
+          npm pkg set devDependencies.react=18.2.0 devDependencies.react-dom=18.2.0 devDependencies.vue=3.4.0
+          npm pkg set devDependencies.react=18.2.0 devDependencies.react-dom=18.2.0 'devDependencies.@types/react=^18.2.0' 'devDependencies.@types/react-dom=^18.2.0' -w @acunsoft/datatable-react
+          npm pkg set devDependencies.vue=3.4.0 -w @acunsoft/datatable-vue
+          npm install --no-audit --no-fund
+          npm ls react react-dom vue
+      - run: npm run build
+      - run: npm run check -w @acunsoft/datatable-react -w @acunsoft/datatable-vue
+      - run: npm run test -w @acunsoft/datatable-react -w @acunsoft/datatable-vue
+      - run: npx vitest run -c tests/parity/vitest.config.mts
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.2'
+          extensions: intl, mbstring, pdo_sqlite, zip
+          coverage: none
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-lowest-${{ runner.os }}-${{ hashFiles('packages/adapter-laravel/composer.json') }}
+          restore-keys: composer-lowest-${{ runner.os }}-
+      - name: Laravel, Livewire and Testbench at their lowest
+        working-directory: packages/adapter-laravel
+        run: |
+          composer update --prefer-lowest --prefer-stable --no-interaction --no-progress --prefer-dist
+          composer show | grep -E '^(laravel/framework|livewire/livewire|orchestra/testbench|phpunit/phpunit) '
+          composer test
 
   databases:
     # Exact counts with a time limit on real servers (statement_timeout,
@@ -168,7 +213,7 @@ jobs:
         options: --health-cmd "healthcheck.sh --connect" --health-interval 5s --health-retries 20
     steps:
       - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           extensions: intl, mbstring, pdo_sqlite, pdo_pgsql, pdo_mysql, zip

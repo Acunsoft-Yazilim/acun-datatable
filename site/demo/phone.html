@@ -8,8 +8,8 @@
 <script>document.documentElement.setAttribute('data-theme', new URLSearchParams(location.search).get('theme') === 'dark' ? 'dark' : 'light');</script>
 <style>:root { color-scheme: light; background: #f4f5f8; } :root[data-theme="dark"] { color-scheme: dark; background: #0b0d12; }</style>
 <link rel="stylesheet" href="styles.css">
-<script src="acun-datatable.min.js"></script>
-<script src="i18n.js"></script>
+<script src="acun-datatable.min.js" defer></script>
+<script src="i18n.js" defer></script>
 <style>
   :root { color-scheme: light; --bg: #f4f5f8; --fg: #141b2d; }
   :root[data-theme="dark"] { color-scheme: dark; --bg: #0b0d12; --fg: #e6e8ec; }
@@ -25,7 +25,7 @@
 <h1 id="title"></h1>
 <div id="orders"></div>
 <script>
-(() => {
+document.addEventListener('DOMContentLoaded', () => {
   // The demo page changes the mode, language or theme by message instead of reloading this
   // frame: the table is rebuilt in place, so the screen never goes blank (no flash in dark mode).
   const names = ['Ayşe Yılmaz', 'Ali Kaya', 'İrem Şahin', 'Çağrı Öztürk', 'Zeynep Doğan', 'Ümit Kılıç', 'Deniz Ak', 'Gülşen Erdoğan', 'Hakan Çelik', 'Şule Aydın'];
@@ -64,7 +64,7 @@
     if (event.source !== window.parent || event.data?.type !== 'adt-phone') return;
     render(event.data);
   });
-})();
+});
 </script>
 </body>
 </html>

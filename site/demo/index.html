@@ -16,8 +16,9 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%236d3fff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="import.css">
-<script src="acun-datatable.min.js"></script>
-<script src="i18n.js"></script>
+<!-- Deferred: the page is parsed while they load; the script at the end runs after them. -->
+<script src="acun-datatable.min.js" defer></script>
+<script src="i18n.js" defer></script>
 <style>
   :root {
     --page-bg: #f4f5f8; --page-fg: #141b2d; --page-muted: #5b6273; --page-line: #e3e6eb; --page-card: #ffffff;
@@ -31,6 +32,8 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--page-fg); background: var(--page-bg); }
+  /* Every text comes from the script: shown once it is filled in, not as an empty frame that then jumps. */
+  html:not([data-ready]) body { visibility: hidden; }
   a { color: var(--page-accent); }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
   /* The table's fixed header stops under the page's own sticky bar. */
@@ -177,7 +180,7 @@
 <footer data-t="footer"></footer>
 
 <script>
-(() => {
+document.addEventListener('DOMContentLoaded', () => {
   // ---------- Sample data (deterministic) ----------
   const FIRST = ['Ayşe', 'Ali', 'Can', 'Deniz', 'Ece', 'Fatma', 'Gül', 'Hakan', 'İrem', 'Kaan', 'Lale', 'Mert', 'Nur', 'Oğuz', 'Özge', 'Selin', 'Şule', 'Tolga', 'Ümit', 'Zeynep'];
   const LAST = ['Yılmaz', 'Kaya', 'Demir', 'Şahin', 'Çelik', 'Yıldız', 'Öztürk', 'Aydın', 'Arslan', 'Doğan', 'Kılıç', 'Koç'];
@@ -254,7 +257,9 @@
     active: random() > 0.2,
     updated: `2026-${pad(1 + Math.floor(random() * 10))}-${pad(1 + Math.floor(random() * 28))}`,
   }));
-  const people = Array.from({ length: 100_000 }, (_, i) => ({ id: i + 1, name: `${pick(FIRST)} ${pick(LAST)}`, city: pick(CITIES), score: Math.floor(random() * 1000), joined: `2026-${pad(1 + Math.floor(random() * 10))}-${pad(1 + Math.floor(random() * 28))}` }));
+  // Made when the virtual scenario opens (about 100 ms on a slow phone); nothing draws from `random` after it, so the rows stay the same.
+  let people;
+  const peopleRows = () => (people ??= Array.from({ length: 100_000 }, (_, i) => ({ id: i + 1, name: `${pick(FIRST)} ${pick(LAST)}`, city: pick(CITIES), score: Math.floor(random() * 1000), joined: `2026-${pad(1 + Math.floor(random() * 10))}-${pad(1 + Math.floor(random() * 28))}` })));
 
   // ---------- Texts: the page follows the table's language (i18n.js) ----------
   const { el } = AcunDataTable;
@@ -326,7 +331,7 @@
     }),
     virtual: () => new AcunDataTable('#virtual', {
       ...settings(),
-      data: people,
+      data: peopleRows(),
       virtual: true,
       scrollY: '520px',
       columns: [
@@ -767,7 +772,9 @@ const table = new AcunDataTable('#customers', {
   const first = location.hash.replace(/^#\/?/, '');
   show(builders[first] ? first : 'server'); // #/columns, #/edit, #/virtual, #/mobile, #/frameworks open that scenario
   window.demoTables = tables; // for the browser tests
-})();
+});
+// A separate listener: the page is shown even if the one above fails.
+document.addEventListener('DOMContentLoaded', () => document.documentElement.setAttribute('data-ready', ''));
 </script>
 </body>
 </html>
