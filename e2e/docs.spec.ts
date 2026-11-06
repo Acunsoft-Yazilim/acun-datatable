@@ -98,3 +98,15 @@ test('every page ends with the previous and next page in menu order, and where t
   await page.goto('/site/index.html#/home');
   await expect(pager.getByRole('link')).toHaveCount(1); // the first page has no previous one
 });
+
+test('each framework page starts with its requirements and says when the first table is ready', async ({ page }) => {
+  for (const [route, first] of [['html', 'Tarayıcı'], ['react', 'React'], ['vue', 'Vue'], ['laravel', 'PHP']] as const) {
+    await page.goto(`/site/index.html#/${route}`);
+    await expect(page.locator('section').first()).toHaveAttribute('id', 'req');
+    await expect(page.locator('#req .req b').first()).toHaveText(first);
+    await expect(page.locator('#usage .note.ok')).toContainText('Hazırsınız.');
+  }
+  await page.goto('/site/index.html#/home');
+  await expect(page.locator('#s1 .steps > li')).toHaveCount(4);
+  await expect(page.locator('#s1 .note.ok')).toContainText('Hazırsınız.');
+});

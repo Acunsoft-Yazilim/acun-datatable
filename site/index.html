@@ -170,6 +170,14 @@
   .gtable td code{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
   .note{border:1px solid var(--line);border-left:3px solid var(--brand);background:var(--surface-subtle);border-radius:var(--radius);padding:11px 15px;color:var(--muted);font-size:14px;line-height:1.6;margin:12px 0}
   .note.warn{border-left-color:#c48214}
+  .note.ok{border-left-color:#1f9d55}
+  .note.ok strong{color:var(--ink)}
+  .req{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:var(--radius)}
+  .req li{display:grid;grid-template-columns:170px 1fr;gap:16px;padding:10px 16px;border-top:1px solid var(--line);font-size:14px}
+  .req li:first-child{border-top:0}
+  .req b{color:var(--ink);font-weight:600}
+  .req span{color:var(--muted)}
+  @media (max-width:640px){.req li{grid-template-columns:1fr;gap:2px}}
   .note a{color:var(--brand-text);font-weight:600;text-decoration:none}
   .note a:hover{text-decoration:underline}
   /* home */
@@ -2672,6 +2680,29 @@ const QUICK_TABLE = `<table id="orders">
 <script>
   new AcunDataTable('#orders', { language: 'tr' });
 <\/script>`;
+const QUICK_LOOK = `new AcunDataTable('#orders', {
+  language: 'tr',          // en, tr, de, fr, es
+  size: 'sm',              // sm | md | lg
+  responsive: 'collapse',  // cards | scroll | collapse | modal | auto
+});
+// Light or dark: data-theme="light" | "dark" | "auto" on the table or the page`;
+/* What each framework needs: the packages' peer and engine ranges, and what the tests run on. */
+const REQ = {
+  html: [[{tr:'Tarayıcı',en:'Browser'},{tr:"Güncel Chrome, Edge, Firefox ya da Safari (ES2022). Testler Chromium, Firefox ve WebKit'te çalışır.",en:'Current Chrome, Edge, Firefox or Safari (ES2022). The tests run in Chromium, Firefox and WebKit.'}],
+         [{tr:'Kurulum',en:'Install'},{tr:'CDN ile tek <script>, derleme adımı yok; ya da npm ile (Node.js 22 ve üstü).',en:'One <script> from a CDN, no build step; or npm (Node.js 22 or newer).'}],
+         [{tr:'Bağımlılık',en:'Dependencies'},{tr:'Yok; jQuery gerekmez.',en:'None; no jQuery.'}]],
+  react: [[{tr:'React',en:'React'},{tr:'18.2 ya da 19',en:'18.2 or 19'}],
+          [{tr:'Next.js',en:'Next.js'},{tr:'App Router; testler Next.js 16 ile çalışır.',en:'App Router; the tests run on Next.js 16.'}],
+          [{tr:'Node.js',en:'Node.js'},{tr:'22 ve üstü',en:'22 or newer'}]],
+  vue: [[{tr:'Vue',en:'Vue'},{tr:'3.4 ve üstü',en:'3.4 or newer'}],
+        [{tr:'Nuxt',en:'Nuxt'},{tr:'Testler Nuxt 4 ile çalışır.',en:'The tests run on Nuxt 4.'}],
+        [{tr:'Node.js',en:'Node.js'},{tr:'22 ve üstü',en:'22 or newer'}]],
+  laravel: [[{tr:'PHP',en:'PHP'},{tr:'8.2 ve üstü',en:'8.2 or newer'}],
+            [{tr:'Laravel',en:'Laravel'},{tr:'12 ya da 13',en:'12 or 13'}],
+            [{tr:'Livewire',en:'Livewire'},{tr:'4; yalnızca Livewire tablosu için. Uç nokta (TableResponse) onsuz çalışır.',en:'4; only for the Livewire table. The endpoint (TableResponse) works without it.'}],
+            [{tr:'PHP eklentileri',en:'PHP extensions'},{tr:'İsteğe bağlı: intl (yerel sayı ve tarih biçimi), zip (Excel dışa ve içe aktarma).',en:'Optional: intl (local number and date formats), zip (Excel export and import).'}]],
+};
+const reqList = (id) => `<ul class="req">${REQ[id].map(([k, v]) => `<li><b>${esc(k[lang])}</b><span>${esc(v[lang])}</span></li>`).join('')}</ul>`;
 const QUICK_SERVER = `new AcunDataTable('#orders', {
   serverSide: true,
   ajax: '/api/orders',            // your Laravel, Node.js or any other end point
@@ -2829,6 +2860,9 @@ const T = {
        q1:"Ekleyin", q1d:"Stil dosyası ve tek bir script. npm kullanıyorsanız ikinci sekme.",
        q2:"Tabloyu dönüştürün", q2d:"Elinizdeki <code>&lt;table&gt;</code> yeter: başlıklar kolon, satırlar veri olur. Arama, sıralama ve sayfalama hemen çalışır.",
        q3:"Sunucuya bağlayın", q3d:"Binlerce, milyonlarca satırda sayfa, sıralama, arama ve sayım backend'de yapılır; tablo yalnızca bir sayfa tutar.",
+       q4:"Görünümü ve dili ayarlayın", q4d:"Dil, boyut, tema ve telefondaki görünüm birer seçenektir; hepsi tek yerde.", q4n:"Ayrıntılar: <a href=\"#/look\">Boyut, tema ve yerleşim</a> · <a href=\"#/texts\">Dil ve metinler</a> · <a href=\"#/mobile\">Mobil görünüm</a>.",
+       ready:"<strong>Hazırsınız.</strong> Tablonuz çalışıyor. Sıradaki adım: <a href=\"#/home/s3\">kendi framework'ünüzün rehberi</a> ya da <a href=\"#/server\">sunucu tarafı</a>.",
+       ready_fw:"<strong>Hazırsınız.</strong> Tablonuz çalışıyor. Sıradaki adım: aşağıdaki örnekler ya da <a href=\"#/server\">sunucu tarafı</a>.", s_req:"Gereksinimler", d_req:"Kurmadan önce projenizde olması gerekenler.",
        q3n:"Backend tarafı: Laravel'de <a href=\"#/laravel\">TableResponse</a>, Node.js'te <a href=\"#/server/node\">@acunsoft/datatable-server</a>; başka bir dil için <a href=\"#/server\">istek ve yanıt biçimi</a>.",
        c_title:"Hangi paketi kurmalıyım?", c_desc:"Projenize göre tek satırlık cevap.",
        c_head:["Projeniz","Kurun","Rehber"],
@@ -2868,6 +2902,9 @@ const T = {
        q1:"Add it", q1d:"A stylesheet and one script. Using npm? The second tab.",
        q2:"Turn your table into a data table", q2d:"Your existing <code>&lt;table&gt;</code> is enough: the headers become columns, the rows the data. Search, sorting and paging work at once.",
        q3:"Connect it to your server", q3d:"With thousands or millions of rows, paging, sorting, search and counting run on the back end; the table holds one page.",
+       q4:"Make it yours", q4d:"Language, size, theme and the phone layout are options; all in one place.", q4n:"More: <a href=\"#/look\">Size, theme and layout</a> · <a href=\"#/texts\">Language and texts</a> · <a href=\"#/mobile\">Mobile layouts</a>.",
+       ready:"<strong>You are set.</strong> Your table works. Next: <a href=\"#/home/s3\">the guide for your framework</a> or <a href=\"#/server\">the server side</a>.",
+       ready_fw:"<strong>You are set.</strong> Your table works. Next: the examples below or <a href=\"#/server\">the server side</a>.", s_req:"Requirements", d_req:"What your project needs before you install.",
        q3n:"The back end: <a href=\"#/laravel\">TableResponse</a> in Laravel, <a href=\"#/server/node\">@acunsoft/datatable-server</a> in Node.js; for any other language, the <a href=\"#/server\">request and response format</a>.",
        c_title:"Which package do I install?", c_desc:"A one-line answer for your project.",
        c_head:["Your project","Install","Guide"],
@@ -2932,7 +2969,9 @@ function page(r) {
     const steps = `<ol class="steps">` +
       `<li><h3>${t.q1}</h3><p>${t.q1d}</p>${tabs(QUICK_ADD)}</li>` +
       `<li><h3>${t.q2}</h3><p>${t.q2d}</p>${code(QUICK_TABLE,'html')}</li>` +
-      `<li><h3>${t.q3}</h3><p>${t.q3d}</p>${code(QUICK_SERVER,'typescript')}<div class="note">${t.q3n}</div></li></ol>`;
+      `<li><h3>${t.q3}</h3><p>${t.q3d}</p>${code(QUICK_SERVER,'typescript')}<div class="note">${t.q3n}</div></li>` +
+      `<li><h3>${t.q4}</h3><p>${t.q4d}</p>${code(QUICK_LOOK,'typescript')}<div class="note">${t.q4n}</div></li></ol>` +
+      `<div class="note ok">${t.ready}</div>`;
     const flow = `<div class="flow"><div class="box"><h3>${t.w1}</h3><p>${t.w1d}</p></div><div class="arrow" aria-hidden="true">⇄</div>` +
       `<div class="box mid"><h3>${t.w2}</h3><p>${t.w2d}</p></div><div class="arrow" aria-hidden="true">⇄</div><div class="box"><h3>${t.w3}</h3><p>${t.w3d}</p></div></div>`;
     return { toc:[['s1',t.q_title],['s2',t.c_title],['s3',t.f_title],['s4',t.w_title],['s5',t.n_title]], html:
@@ -2967,18 +3006,19 @@ function page(r) {
   const topic = (x, n) => sec(x.id, n, esc(x.title[lang]), x.desc[lang],
     x.parts.map(part => `${part.title ? `<h3 class="sub">${esc(part.title[lang])}</h3>` : ''}${part.desc ? `<p>${esc(part.desc[lang])}</p>` : ''}${code(part.code, part.lang)}`).join('') +
     (x.note ? `<div class="note">${x.note[lang]}</div>` : ''));
-  return { toc:[['install',t.s_install],['usage',t.s_usage],['examples',t.s_examples],...topics.map(x => [x.id, x.title[lang]]),['next',t.s_next],['api',t.s_api]], html:
+  return { toc:[['req',t.s_req],['install',t.s_install],['usage',t.s_usage],['examples',t.s_examples],...topics.map(x => [x.id, x.title[lang]]),['next',t.s_next],['api',t.s_api]], html:
     `<h1><span class="hi">${ICON[r]}</span>${f.name}${f.status === 'ready' ? '' : ` <span class="pill">${t.preview}</span>`}</h1><p class="lead">${f.lead[lang]}</p><div class="meta"><span>${esc(f.pkg)}</span></div>` +
     (f.status === 'ready' ? '' : `<div class="note warn" style="margin-top:22px">${t.prevNote}</div>`) +
-    sec('install',1,t.s_install,t.d_install,
+    sec('req',1,t.s_req,t.d_req,reqList(r)) +
+    sec('install',2,t.s_install,t.d_install,
       (f.status === 'ready' ? `<p>${f.unpub ? f.unpub[lang] : t.unpub}</p>${code(f.install,'bash')}` : `<p>${t.planned_install}</p>`) + `<div class="note"><strong>${t.sec_label}</strong> ${f.note[lang]}</div>`) +
-    sec('usage',2,t.s_usage,t.d_usage,f.usage ? tabs(f.usage) : code(f.code,f.lang)) +
-    sec('examples',3,t.s_examples,t.d_examples, f.examples
+    sec('usage',3,t.s_usage,t.d_usage,(f.usage ? tabs(f.usage) : code(f.code,f.lang)) + `<div class="note ok">${t.ready_fw}</div>`) +
+    sec('examples',4,t.s_examples,t.d_examples, f.examples
       ? f.examples.map(x => `<h3 class="sub">${esc(x.title[lang])}</h3><p>${esc(x.desc[lang])}</p>${code(x.code,x.lang)}`).join('')
       : `<h3 class="sub">${t.ex1}</h3><p>${t.ex1d}</p>${code(EX_SORT,'typescript')}<h3 class="sub">${t.ex2}</h3><p>${t.ex2d}</p>${code(EX_STATE,'typescript')}`) +
-    topics.map((x, i) => topic(x, 4 + i)).join('') +
-    sec('next',4 + topics.length,t.s_next,t.d_next,next) +
-    sec('api',5 + topics.length,t.s_api,t.d_api,apiList(f.api ?? (f.status === 'ready' ? undefined : '@acunsoft/datatable-core'))) };
+    topics.map((x, i) => topic(x, 5 + i)).join('') +
+    sec('next',5 + topics.length,t.s_next,t.d_next,next) +
+    sec('api',6 + topics.length,t.s_api,t.d_api,apiList(f.api ?? (f.status === 'ready' ? undefined : '@acunsoft/datatable-core'))) };
 }
 
 /* The published versions, shown in the header; change them with every release. */
