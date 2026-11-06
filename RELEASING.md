@@ -28,7 +28,8 @@ change for users. Commit the generated `.changeset/*.md` with the change.
    dependency versions and the lockfile, and writes each package's
    `CHANGELOG.md`. Review the diff, move the matching notes out of
    "Unreleased" in the root `CHANGELOG.md`, set `VERSIONS` in `site/index.html`
-   (the version the docs header shows), and commit
+   (the version the docs header shows), add the release to the docs'
+   release notes (`PAGES.releases`, newest first), and commit
    (`chore: release 0.x.y`) through a pull request so CI runs.
 2. Start the **Release** workflow by hand (Actions → Release → Run workflow,
    on `main`). A read-only job refuses to run while unversioned changesets

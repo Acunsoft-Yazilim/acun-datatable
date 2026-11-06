@@ -110,3 +110,13 @@ test('each framework page starts with its requirements and says when the first t
   await expect(page.locator('#s1 .steps > li')).toHaveCount(4);
   await expect(page.locator('#s1 .note.ok')).toContainText('Hazırsınız.');
 });
+
+test('release notes: under "Getting started", newest first, reached from the version in the header', async ({ page }) => {
+  await page.goto('/site/index.html#/home');
+  await page.locator('#ver').click();
+  await expect(page).toHaveURL(/#\/releases$/);
+  await expect(page.locator('#content h1')).toHaveText('Sürüm notları');
+  await expect(page.locator('#tnav a.on')).toHaveText('Başlangıç');
+  await expect(page.locator('section h2').first()).toHaveText(/^npm \d+\.\d+\.\d+ · Laravel \d+\.\d+\.\d+$/);
+  await expect(page.locator('section h2').first()).toContainText(await page.locator('#ver').textContent().then(v => v!.slice(1)));
+});
