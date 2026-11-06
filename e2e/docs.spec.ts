@@ -120,3 +120,11 @@ test('release notes: under "Getting started", newest first, reached from the ver
   await expect(page.locator('section h2').first()).toHaveText(/^npm \d+\.\d+\.\d+ · Laravel \d+\.\d+\.\d+$/);
   await expect(page.locator('section h2').first()).toContainText(await page.locator('#ver').textContent().then(v => v!.slice(1)));
 });
+
+test('#/upgrade (removed: no users of earlier versions) opens the release notes', async ({ page }) => {
+  await page.goto('/site/index.html#/upgrade');
+  await expect(page).toHaveURL(/#\/releases$/);
+  await expect(page.locator('#content h1')).toHaveText('Sürüm notları');
+  await expect(page.locator('#side')).not.toContainText('Sürüm geçişi');
+  await expect(page.locator('section')).toHaveCount(1); // the current release only
+});
