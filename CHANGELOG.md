@@ -3,9 +3,9 @@
 All notable changes to this repository. Each npm package also has its own
 `CHANGELOG.md`, written by Changesets.
 
-## Unreleased (`acunsoft/datatable-laravel`)
+## `acunsoft/datatable-laravel` 0.6.1
 
-For the next Composer release; already in the npm packages where they apply.
+The Laravel side of npm 0.6.0; no change is needed in your code.
 
 - **Livewire: `columns()` runs once per render.** The table view asked for
   the columns 17 times in one render (42 in a request with two updates), so
@@ -14,6 +14,9 @@ For the next Composer release; already in the npm packages where they apply.
   updates still build them on every call, so columns that depend on
   component state see it.
 - **Livewire print takes the page's font** instead of `system-ui`.
+- **`WithDataTable` is split into internal traits** (`Livewire/Concerns`);
+  the component's methods are the same, and overriding or aliasing them
+  with `as` works as before.
 - **Texts (German, French, Spanish):** "export too large" in the same
   wording as the JavaScript packages (German in the "Sie" form), typographic
   apostrophes in French, "Fila" for a file line in Spanish.
