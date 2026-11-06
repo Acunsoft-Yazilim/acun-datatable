@@ -90,7 +90,7 @@ test('search: Ctrl+K finds a section whatever the accents, Enter opens it', asyn
 test('every page ends with the previous and next page in menu order, and where to report a mistake', async ({ page }) => {
   await page.goto('/site/index.html#/filters');
   const pager = page.getByRole('navigation', { name: 'Sayfalar' });
-  await expect(pager.getByRole('link')).toHaveText(['← ÖncekiSunucu tarafı (server-side)', 'Sonraki →Araçlar, hücreler ve düzenleme']);
+  await expect(pager.getByRole('link')).toHaveText(['← ÖncekiSunucu tarafı', 'Sonraki →Araçlar, hücreler ve düzenleme']);
   await expect(page.locator('.report a')).toHaveAttribute('href', /github\.com\/Acunsoft-Yazilim\/acun-datatable\/issues\/new\?title=Docs%3A\+Filtreler/);
   await pager.getByRole('link', { name: /Sonraki/ }).click();
   await expect(page).toHaveURL(/#\/tools$/);

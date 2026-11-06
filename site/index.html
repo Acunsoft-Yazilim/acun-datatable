@@ -169,6 +169,10 @@
   .gtable thead th{border-top:0;background:var(--surface-subtle);color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
   .gtable td code{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
   .note{border:1px solid var(--line);border-left:3px solid var(--brand);background:var(--surface-subtle);border-radius:var(--radius);padding:11px 15px;color:var(--muted);font-size:14px;line-height:1.6;margin:12px 0}
+  .note{position:relative;padding-left:42px}
+  .note::before{content:"i";position:absolute;left:15px;top:13px;width:17px;height:17px;border-radius:50%;background:var(--brand);color:#fff;font:700 11px/17px var(--sans);text-align:center}
+  .note.warn::before{content:"!";background:#c48214}
+  .note.ok::before{content:"✓";background:#1f9d55}
   .note.warn{border-left-color:#c48214}
   .note.ok{border-left-color:#1f9d55}
   .rel{margin:0 0 12px;padding-left:20px}
@@ -362,7 +366,7 @@ const API = [
     ["getPageItems(page, pageCount, { siblings?, boundaries? })", {tr:"Numaralı sayfalayıcının sayıları: 1 … 4 5 6 … 20; uzunluk sabit kalır, boşluk en az iki sayfayı gizler.", en:"The numbers of a pager: 1 … 4 5 6 … 20; the length stays fixed, a gap hides at least two pages."}],
     ["persistState(table, { key, storage?, include? })", {tr:"Sayfa, sayfa başı, sıralama, filtre, arama ve gizli kolonları yenilemeler arasında saklar (DataTables stateSave).", en:"Keeps page, page size, sorting, filters, search and hidden columns across reloads (DataTables stateSave)."}],
     ["createPagination(page?, pageSize?)", {tr:"Doğrulanmış, donmuş { page, pageSize } değeri.", en:"Validated, frozen { page, pageSize } value."}],
-    ["createTableState(options?)", {tr:"Değişmez state: page, pageSize, sorting; subscribe ve destroy.", en:"Immutable state: page, pageSize, sorting; subscribe and destroy."}],
+    ["createTableState(options?)", {tr:"Değişmez durum: page, pageSize, sorting; subscribe ve destroy.", en:"Immutable state: page, pageSize, sorting; subscribe and destroy."}],
     ["createRowSelection({ mode })", {tr:"Kararlı ID'lerle tekli/çoklu seçim; değişiklik olayı ve none/some/all durumu.", en:"Single/multiple selection by stable IDs; change events and none/some/all status."}],
     ["createTableQuery(state)", {tr:"Sunucuya gidecek doğrulanmış sorgu; geçersiz operatör ve boş filtreler elenir.", en:"Validated query for a server; invalid operators and empty filters are rejected or dropped."}],
     ["validatePageResult(value, { pageSize })", {tr:"Sunucu yanıtını { rows, totalRows } kontratına göre denetler.", en:"Checks a server response against the { rows, totalRows } contract."}],
@@ -370,7 +374,7 @@ const API = [
   ]],
   ['@acunsoft/datatable-server', [
     ["defineColumns({ id: { sql?, field?, type?, sortable?, filterable?, searchable?, search? } })", {tr:"Uç noktanın kolon izin listesi; yalnızca bu kimlikler sıralanır, filtrelenir, aranır.", en:"The endpoint's column allowlist; only these IDs are sorted, filtered or searched."}],
-    ["readTableQuery(params | formData | body, columns, { maxPageSize? })", {tr:"İsteği okur ve denetler (bizim biçim veya DataTables protokolü, cursor dahil); hata TableQueryError.", en:"Reads and checks a request (this format or DataTables' protocol, cursors included); errors are TableQueryError."}],
+    ["readTableQuery(params | formData | body, columns, { maxPageSize? })", {tr:"İsteği okur ve denetler (bizim biçim veya DataTables protokolü, imleçli sayfalama dahil); hata TableQueryError.", en:"Reads and checks a request (this format or DataTables' protocol, cursors included); errors are TableQueryError."}],
     ["sqlQuery(query, columns, { dialect, table, key?, select?, scope? })", {tr:"PostgreSQL/MySQL/SQLite/SQL Server için bağlı parametreli sayfa ve sayım SQL'i; cursor için cursorOf(row).", en:"Bound-parameter page and count SQL for PostgreSQL/MySQL/SQLite/SQL Server; cursorOf(row) for cursors."}],
     ["prismaQuery(query, columns, { key?, where?, insensitive? })", {tr:"Prisma findMany ve count argümanları.", en:"Prisma findMany and count arguments."}],
     ["tableResponse(query, rows, total?, { cursorOf?, map?, recordsTotal? }) · tableError(error, params)", {tr:"İsteğin biçiminde yanıt (rows/totalRows/nextCursor ya da DataTables) ve 422 / DataTables hatası.", en:"The answer in the request's format (rows/totalRows/nextCursor or DataTables) and 422 / DataTables errors."}],
@@ -426,7 +430,7 @@ const API = [
     ["responsive() · tableSize()", {tr:"cards, scroll, collapse veya modal; sm, md veya lg.", en:"cards, scroll, collapse or modal; sm, md or lg."}],
     ["pageSizeOptions() · defaultPageSize() · stickyHeader() · scrollY() · multiSort()", {tr:"Sayfa başı seçenekleri ve başlangıç değeri; sabit başlık; içte kaydırma; tek kolonlu sıralama.", en:"Rows-per-page choices and starting size; fixed header; scrolling inside; single-column sorting."}],
     ["countLimit() · countTimeout() · maxResultWindow()", {tr:"Tam sayım: 10.000'e kadar her zaman, ötesinde 250 ms bütçeyle (PostgreSQL, MySQL, MariaDB), aşarsa \"10.000+\"; 100.000 satırdan derin sayfa yok.", en:"Exact counts: always up to 10,000, beyond that within 250 ms (PostgreSQL, MySQL, MariaDB), else \"10,000+\"; no pages deeper than 100,000 rows."}],
-    ["use WithDataTable  (Livewire)", {tr:"columns() ve query() tanımla; arama, sıralama, filtre ve sayfa boyutu URL'de; seçim ve selectedQuery() toplu işlemler için.", en:"Declare columns() and query(); search, sorting, filters and page size in the URL; selection and selectedQuery() for bulk actions."}],
+    ["use WithDataTable  (Livewire)", {tr:"columns() ve query() tanımlanır; arama, sıralama, filtre ve sayfa boyutu URL'de; seçim ve selectedQuery() toplu işlemler için.", en:"Declare columns() and query(); search, sorting, filters and page size in the URL; selection and selectedQuery() for bulk actions."}],
     ["setFilter($field, $op, $value) · removeFilter($i) · clearFilters()", {tr:"Livewire eylemleri; geçersiz kurallar eklenmez.", en:"Livewire actions; invalid rules are not added."}],
     ["rowActions() · bulkActions() · Action::make($id)->label()->confirm()->visible()->handle()", {tr:"Satır ve toplu işlemler; satır query() içinde yeniden aranır, görünürlük çalıştırmadan önce tekrar kontrol edilir.", en:"Row and bulk actions; the row is looked up inside query() again and visibility is checked again before running."}],
     ["sortBy($field, $additive) · toggleRow($key) · togglePage() · selectAllMatching()", {tr:"Başlık tıklaması ve seçim eylemleri (Shift+tık çok kolonlu sıralama).", en:"Header-click and selection actions (Shift+click for multi-column sorting)."}],
@@ -1130,7 +1134,7 @@ const GUIDES = {
  },
  "server": {
   "title": {
-   "tr": "Sunucu tarafı (server-side)",
+   "tr": "Sunucu tarafı",
    "en": "Server side"
   },
   "lead": {
@@ -2845,13 +2849,13 @@ const T = {
        g_start:"Başlangıç", g_fw:"Frameworkler", g_guides:"Kılavuzlar", g_resources:"Kaynaklar", g_core:"Çekirdek",
        home:"Giriş", api:"API referansı", toc:"Bu sayfada",
        s_install:"Kurulum", s_usage:"İlk tablo", s_examples:"Örnekler", s_api:"API",
-       d_install:"Paketleri projene ekle.", d_usage:"İlk tablonuz; kopyalayıp kolonlarınızı yazın.", d_examples:"Kopyalanıp uyarlanabilecek örnekler.", d_api:"Kullanılan çekirdek fonksiyonlar.",
+       d_install:"Paketleri projenize ekleyin.", d_usage:"İlk tablonuz; kopyalayıp kolonlarınızı yazın.", d_examples:"Kopyalanıp uyarlanabilecek örnekler.", d_api:"Kullanılan çekirdek fonksiyonlar.",
        preview:"planlanıyor", prev:"← Önceki", next:"Sonraki →", pager:"Sayfalar", report:"Bu sayfada bir hata ya da eksik mi var? GitHub'da bildirin", search:"Ara", search_ph:"Kılavuzda ara…", search_none:"Sonuç bulunamadı.", search_hint:"↑ ↓ seç · Enter aç · Esc kapat", search_start:"Bir sayfa, bölüm ya da seçenek adı yazın.", ver_label:"Sürümler",
-       ex1:"Sıralama ve sayfalama", ex1d:"Çok kolonlu stable sıralama, ardından 1-tabanlı sayfa.",
-       ex2:"Durumu dinlemek", ex2d:"State değişikliklerinde donmuş snapshot alırsın.",
+       ex1:"Sıralama ve sayfalama", ex1d:"Çok kolonlu, kararlı sıralama; ardından 1'den başlayan sayfa numarası.",
+       ex2:"Durumu dinlemek", ex2d:"Durum her değiştiğinde onun dondurulmuş bir kopyasını alırsınız.",
        prevNote:"Bu paket henüz yazılmadı; aşağıdaki kod taslak bir API'dir ve değişebilir. Kurulum komutu yoktur. Örneklerdeki çekirdek fonksiyonlar bugün kullanılabilir.",
        unpub:"npm'de yayında (0.6.0, MIT):", planned_install:"Bu paket henüz yok; kurulum komutu yayınla birlikte eklenecek.",
-       copy:"kopyala", copied:"kopyalandı",
+       copy:"Kopyala", copied:"Kopyalandı",
        legal_title:"MIT lisansı · Sorumluluk reddi", legal:"Yazılım “olduğu gibi” sunulur; açık ya da örtük hiçbir garanti verilmez. Yazarlar ve Acunsoft, yazılımın kullanımından veya kullanılamamasından doğan hiçbir zarar, veri kaybı ya da talepten sorumlu değildir. Projende kullanmadan önce test etmek, güvenliğini ve yetkilendirmesini sağlamak kullanıcının sorumluluğundadır. Bağlayıcı metin <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/LICENSE\">LICENSE</a> dosyasıdır.",
        go:"İncele →",
        fw_desc:{html:"Framework olmadan: tek çağrı, DOM renderer ve <acun-datatable> Web Component.",react:"Hook\'lar ve bileşenler; Next.js App Router ile test edildi.",vue:"Composable\'lar ve bileşenler; Nuxt SSR ile test edildi.",laravel:"Livewire tablosu ve JSON uç nokta; Inertia ile React veya Vue."},
@@ -2893,7 +2897,7 @@ const T = {
        ex2:"Listening to state", ex2d:"Every state change gives you a frozen snapshot.",
        prevNote:"This package is not written yet; the code below is a draft API and may change. There is no install command. The core functions in the examples are available today.",
        unpub:"Published on npm (0.6.0, MIT):", planned_install:"This package does not exist yet; an install command will come with the release.",
-       copy:"copy", copied:"copied",
+       copy:"Copy", copied:"Copied",
        legal_title:"MIT License · Disclaimer", legal:"The software is provided “as is”, without warranty of any kind, express or implied. The authors and Acunsoft are not liable for any damage, data loss or claim arising from the use of, or inability to use, the software. Testing it, securing it and authorizing access in your project are your responsibility. The binding text is the <a href=\"https://github.com/Acunsoft-Yazilim/acun-datatable/blob/main/LICENSE\">LICENSE</a> file.",
        go:"Open →",
        fw_desc:{html:"No framework: one call, the DOM renderer and the <acun-datatable> Web Component.",react:"Hooks and components; tested with the Next.js App Router.",vue:"Composables and components; tested with Nuxt server rendering.",laravel:"A Livewire table and a JSON endpoint; Inertia with React or Vue."},
