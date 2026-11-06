@@ -158,9 +158,10 @@ export async function printRows(doc: Document, options: PrintRowsOptions): Promi
     page.head.append(copy);
   }
   const own = page.createElement('style');
+  const font = doc.defaultView?.getComputedStyle(doc.body).fontFamily || 'system-ui,-apple-system,"Segoe UI",sans-serif'; // the page's font
   own.textContent = [
     'html,body{background:#fff;color:#111}',
-    'body{margin:0;padding:12mm;font:11pt/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}',
+    `body{margin:0;padding:12mm;font:11pt/1.45 ${font}}`,
     'h1{margin:0 0 2mm;font-size:15pt}',
     '.adt-print-subtitle{margin:0 0 5mm;color:#555;font-size:9pt}',
     '.adt-print{width:100%;border-collapse:collapse}',

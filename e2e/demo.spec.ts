@@ -186,6 +186,7 @@ test('one language for the whole page: texts, tables, frameworks and the phone',
 
 test('print: only the table, every matching row as shown, not the page', async ({ page }) => {
   await page.goto('/site/demo/index.html#/server');
+  await page.addStyleTag({ content: 'body { font-family: Georgia, serif; }' }); // the page's font is the print's
   await expect(page.locator('#server .adt-info')).toContainText('5.000');
   await page.locator('#server').getByRole('searchbox').fill('ayse istanbul');
   await expect(page.locator('#server .adt-info')).not.toContainText('5.000');
@@ -200,7 +201,7 @@ test('print: only the table, every matching row as shown, not the page', async (
             (window as unknown as { printed: unknown }).printed = {
               title: doc.querySelector('h1')?.textContent, headers: [...doc.querySelectorAll('th')].map(th => th.textContent),
               rows: doc.querySelectorAll('tbody tr').length, first: doc.querySelector('tbody tr')?.textContent, badge: !!doc.querySelector('tbody .badge'),
-              page: !!doc.querySelector('.tabs, header, .controls'),
+              page: !!doc.querySelector('.tabs, header, .controls'), font: getComputedStyle(doc.body).fontFamily,
             };
           };
         }
@@ -210,7 +211,7 @@ test('print: only the table, every matching row as shown, not the page', async (
   await page.locator('#server').getByText('Araçlar').click();
   await page.locator('#server .adt-menu-item[data-action="print"]').click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { printed?: unknown }).printed)).toBeTruthy();
-  const printed = await page.evaluate(() => (window as unknown as { printed: { title: string; headers: string[]; rows: number; first: string; badge: boolean; page: boolean } }).printed);
+  const printed = await page.evaluate(() => (window as unknown as { printed: { title: string; headers: string[]; rows: number; first: string; badge: boolean; page: boolean; font: string } }).printed);
   expect(printed.title).toBe('Canlı demo · Acun DataTable');
   expect(printed.headers).toEqual(['Müşteri', 'Şehir', 'Tutar', 'Durum', 'Sipariş tarihi']);
   expect(printed.rows).toBe(matches); // every match, not the page of 25
@@ -218,4 +219,28 @@ test('print: only the table, every matching row as shown, not the page', async (
   expect(printed.first).toContain('₺');
   expect(printed.badge).toBe(true);
   expect(printed.page).toBe(false); // not the demo page around it
+  expect(printed.font).toBe('Georgia, serif');
+});
+
+test('the table takes the page font: buttons, inputs, menus, the editor and dialogs', async ({ page }) => {
+  const odd = async () => page.evaluate(() => {
+    const want = getComputedStyle(document.body).fontFamily;
+    return [...document.querySelectorAll<HTMLElement>(':is(.adt, .adt-dialog) :is(button, input:not([type=checkbox], [type=radio]), select, textarea)')]
+      .filter(control => control.getClientRects().length && getComputedStyle(control).fontFamily !== want)
+      .map(control => `${control.tagName.toLowerCase()}.${[...control.classList].join('.')}`);
+  });
+  const theme = () => page.addStyleTag({ content: 'body { font-family: Georgia, serif; }' });
+  await page.goto('/site/demo/index.html#/columns');
+  await theme();
+  await page.locator('#columns summary', { hasText: 'Kolonlar' }).click();
+  await expect(page.locator('#columns').getByRole('button', { name: 'Kod kolonunu aşağı taşı' })).toBeVisible();
+  expect(await odd()).toEqual([]);
+  await page.getByRole('tab', { name: /Düzenleme/ }).click();
+  await page.getByRole('button', { name: /^Stok düzenle:/ }).first().click();
+  expect(await odd()).toEqual([]);
+  await page.keyboard.press('Escape');
+  await page.getByRole('tab', { name: /İçe aktarma/ }).click();
+  await page.getByRole('button', { name: 'İçe aktar', exact: true }).first().click();
+  await expect(page.getByRole('dialog', { name: 'İçe aktar' })).toBeVisible();
+  expect(await odd()).toEqual([]);
 });

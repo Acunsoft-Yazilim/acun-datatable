@@ -1,7 +1,7 @@
 # Releasing
 
-The eight npm packages (`@acunsoft/datatable-core`, `-http`, `-server`,
-`-dom`, `-export`, `-vue`, `-react` and `@acunsoft/datatable`) are released
+The nine npm packages (`@acunsoft/datatable-core`, `-http`, `-server`,
+`-dom`, `-export`, `-vue`, `-react`, `-import` and `@acunsoft/datatable`) are released
 together with one version, using
 [Changesets](https://github.com/changesets/changesets). Nothing is published
 automatically.
@@ -66,7 +66,8 @@ Every later release goes through the Release workflow.
 A package added later is in the same position: its first version is
 published from a machine as above, and its trusted publisher is set up
 afterwards. `@acunsoft/datatable` and `@acunsoft/datatable-server` went this
-way with 0.5.0 (`npm run release` published all eight packages).
+way with 0.5.0 (`npm run release` published all eight packages), and
+`@acunsoft/datatable-import` with 0.6.0.
 
 ## Laravel package (Packagist)
 
@@ -102,7 +103,7 @@ Packagist reads as the version.
       (0.5.0, from a machine) on 2026-11-02.
 - [ ] Trusted publishers for `Acunsoft-Yazilim/acun-datatable`: the six
       packages set up before the move still name `kemaloskan`, and the two
-      new ones have none. Do all eight on the next release day (see "First
+      new ones (and `-import`, first published with 0.6.0) have none. Do all nine on the next release day (see "First
       release" above) and publish through the Release workflow the same day;
       until then, release from a machine.
 - [x] `SPLIT_TOKEN` repository secret: a fine-grained GitHub token owned by

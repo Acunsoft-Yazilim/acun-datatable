@@ -1,7 +1,6 @@
 {
   "name": "@acunsoft/datatable-import",
-  "version": "0.4.0",
-  "private": true,
+  "version": "0.6.0",
   "description": "Excel and CSV import for ACUN DataTable, as an optional module: the import protocol (acun-import/1), its client and a test kit for any back end. The back end reads the file and owns limits, queues and storage.",
   "keywords": [
     "datatable",
@@ -55,7 +54,7 @@
     "build": "tsup && node -e \"require('node:fs').copyFileSync('src/styles.css','dist/styles.css')\""
   },
   "devDependencies": {
-    "@acunsoft/datatable-export": "0.5.0",
+    "@acunsoft/datatable-export": "0.6.0",
     "tsup": "^8.0.0",
     "typescript": "^5.0.0",
     "vitest": "^5.0.5",

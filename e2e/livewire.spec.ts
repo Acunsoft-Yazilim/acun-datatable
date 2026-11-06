@@ -166,3 +166,26 @@ test('the row "⋮" menu opens whole over the table\'s box and follows its row',
   await expect(menu).not.toHaveAttribute('open');
   await expect(menu.locator('.adt-menu-list')).toHaveCSS('position', 'absolute');
 });
+
+test('the table and its print take the page font', async ({ page }) => {
+  await open(page, '/tables/layout');
+  await page.addStyleTag({ content: 'body { font-family: Georgia, serif; }' });
+  await page.locator('details:has(.adt-print-button) > summary').click();
+  await expect(page.locator('.adt-print-button')).toBeVisible();
+  expect(await page.evaluate(() => {
+    const want = getComputedStyle(document.body).fontFamily;
+    return [...document.querySelectorAll<HTMLElement>(':is(.adt, .adt-dialog) :is(button, input:not([type=checkbox], [type=radio]), select, textarea)')]
+      .filter(control => control.getClientRects().length && getComputedStyle(control).fontFamily !== want)
+      .map(control => `${control.tagName.toLowerCase()}.${[...control.classList].join('.')}`);
+  })).toEqual([]);
+  // Catch the frame's print() instead of opening the browser's dialog.
+  await page.evaluate(() => {
+    new MutationObserver(records => {
+      for (const node of records.flatMap(record => [...record.addedNodes])) {
+        if (node instanceof HTMLIFrameElement) node.contentWindow!.print = () => { (window as unknown as { font: string }).font = getComputedStyle(node.contentDocument!.body).fontFamily; };
+      }
+    }).observe(document.body, { childList: true });
+  });
+  await page.locator('.adt-print-button').click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { font?: string }).font)).toBe('Georgia, serif');
+});

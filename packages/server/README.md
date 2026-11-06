@@ -146,10 +146,6 @@ way. Index it (`text_pattern_ops` or a trigram index on PostgreSQL).
 
 ## Import: `@acunsoft/datatable-server/import`
 
-> **Not released yet.** The import comes with the next release; until then
-> the browser package `@acunsoft/datatable-import` (its dialog and
-> `acun-datatable-import.min.js`) is not on npm.
-
 The back end of the import dialog (`@acunsoft/datatable-import`, protocol
 `acun-import/1`) as a web-standard handler — `(Request) => Promise<Response>`.
 Install `@acunsoft/datatable-export` too (it reads xlsx and CSV); the rest of

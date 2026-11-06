@@ -19,8 +19,8 @@ decides how the data is queried. Free and MIT licensed, with no third-party
 runtime dependencies.
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/styles.css">
-<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.5.0/dist/acun-datatable.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.6.0/dist/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@acunsoft/datatable@0.6.0/dist/acun-datatable.min.js"></script>
 
 <table id="orders">…</table>
 <script>new AcunDataTable('#orders', { language: 'tr' });</script>

@@ -1,6 +1,6 @@
 {
   "name": "@acunsoft/datatable-export",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "CSV and Excel (.xlsx) export and import for @acunsoft/datatable-core, without dependencies: formula-safe CSV, real xlsx files, typed and validated import.",
   "keywords": ["datatable", "data-table", "csv", "xlsx", "excel", "export", "import"],
   "homepage": "https://acunsoft-yazilim.github.io/acun-datatable/",
@@ -23,7 +23,7 @@
     "test": "vitest run",
     "build": "tsup src/index.ts src/stream.ts --format esm --dts --clean --no-splitting --external @acunsoft/datatable-core"
   },
-  "dependencies": { "@acunsoft/datatable-core": "0.5.0" },
+  "dependencies": { "@acunsoft/datatable-core": "0.6.0" },
   "devDependencies": { "tsup": "^8.0.0", "typescript": "^5.0.0", "vitest": "^5.0.5" },
   "engines": { "node": ">=22" },
   "publishConfig": { "access": "public" }

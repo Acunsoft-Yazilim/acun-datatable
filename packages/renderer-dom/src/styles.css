@@ -69,6 +69,10 @@
 :where(.adt, .adt-table-wrap, .adt-paging, .adt-length, .adt-search, .adt-selection, .adt-columns, .adt-toolbar, .adt-import, .adt-dialog) * {
   box-sizing: border-box;
 }
+/* Browsers give buttons, inputs and selects a font of their own; these take the page's. */
+:where(.adt, .adt-table-wrap, .adt-paging, .adt-length, .adt-search, .adt-selection, .adt-columns, .adt-toolbar, .adt-import, .adt-dialog) :where(button, input, select, textarea) {
+  font-family: inherit;
+}
 
 /* Screen-reader-only text (labels of the page-size select and the search input) */
 .adt-sr-only {
