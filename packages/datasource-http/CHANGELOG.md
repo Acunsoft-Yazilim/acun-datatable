@@ -1,5 +1,11 @@
 # @acunsoft/datatable-http
 
+## 0.6.0
+
+### Patch Changes
+
+- @acunsoft/datatable-core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes

@@ -3,7 +3,24 @@
 All notable changes to this repository. Each npm package also has its own
 `CHANGELOG.md`, written by Changesets.
 
-## Unreleased
+## Unreleased (`acunsoft/datatable-laravel`)
+
+For the next Composer release; already in the npm packages where they apply.
+
+- **Livewire: `columns()` runs once per render.** The table view asked for
+  the columns 17 times in one render (42 in a request with two updates), so
+  a `columns()` that reads filter options from the database queried that
+  often. They are now built once while the view renders; actions and
+  updates still build them on every call, so columns that depend on
+  component state see it.
+- **Livewire print takes the page's font** instead of `system-ui`.
+- **Texts (German, French, Spanish):** "export too large" in the same
+  wording as the JavaScript packages (German in the "Sie" form), typographic
+  apostrophes in French, "Fila" for a file line in Spanish.
+
+## npm 0.6.0
+
+All nine packages at 0.6.0; `@acunsoft/datatable-import` is new.
 
 - **Import released: `@acunsoft/datatable-import`.** The import dialog
   (file and drag and drop, column mapping with a preview, progress, results,
@@ -15,13 +32,7 @@ All notable changes to this repository. Each npm package also has its own
   inputs and selects a font of their own, so the edit pencil, the column
   move buttons and the dialogs' close buttons showed the browser's font
   instead of the theme's; print used `system-ui`. Every control now takes
-  the page's font, and print (JavaScript and Livewire) uses it too.
-- **Livewire: `columns()` runs once per render.** The table view asked for
-  the columns 17 times in one render (42 in a request with two updates), so
-  a `columns()` that reads filter options from the database queried that
-  often. They are now built once while the view renders; actions and
-  updates still build them on every call, so columns that depend on
-  component state see it.
+  the page's font, and print uses it too.
 - **Editing in place: one editor lifecycle for the DOM renderer, React and
   Vue.** Opening, moving into a re-drawn cell, ending when the row leaves
   the page and the focus return now come from one shared, tested piece
@@ -29,13 +40,10 @@ All notable changes to this repository. Each npm package also has its own
   editor closed by pressing another control now stays in its cell until
   that click is done even when the table redraws meanwhile, as in React
   and Vue. Bundles: React −86 B, Vue −94 B, DOM +223 B gzip.
-- **Texts (German, French, Spanish).** One wording for "export too large"
-  in the JavaScript and Laravel packages, in the form of address the other
-  texts use (Spanish mixed "tú" into "usted"; German Laravel used "bitte …"
-  once among "Sie" texts); French apostrophes are all typographic (’);
-  Spanish calls a file line "Fila", as the import dialog does; two import
-  dialog fixes (French agreement, a clearer Spanish mapping hint). A native
-  speaker's review is still welcome.
+- **Texts (German, French, Spanish).** One wording for "export too large",
+  in the form of address the other texts use (Spanish mixed "tú" into
+  "usted"); two import dialog fixes (French agreement, a clearer Spanish
+  mapping hint). A native speaker's review is still welcome.
 
 ## npm 0.5.0 and `acunsoft/datatable-laravel` 0.6.0
 

@@ -1,5 +1,16 @@
 # @acunsoft/datatable-vue
 
+## 0.6.0
+
+### Patch Changes
+
+- fb16dfd: Editing in place: the DOM renderer, React and Vue share one editor lifecycle (opening, moving into a re-drawn cell, ending when the row leaves the page, focus return). In the DOM renderer an editor closed by pressing another control stays in its cell until that click is done even when the table redraws meanwhile, as in React and Vue.
+- Updated dependencies [fb16dfd]
+- Updated dependencies [6da632b]
+- Updated dependencies [a9a24bb]
+  - @acunsoft/datatable-dom@0.6.0
+  - @acunsoft/datatable-core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes

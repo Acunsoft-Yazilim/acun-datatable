@@ -1,5 +1,14 @@
 # @acunsoft/datatable-dom
 
+## 0.6.0
+
+### Patch Changes
+
+- fb16dfd: Editing in place: the DOM renderer, React and Vue share one editor lifecycle (opening, moving into a re-drawn cell, ending when the row leaves the page, focus return). In the DOM renderer an editor closed by pressing another control stays in its cell until that click is done even when the table redraws meanwhile, as in React and Vue.
+- 6da632b: The table takes the page's font everywhere: buttons, inputs and selects (the edit pencil, the column move buttons, dialog close buttons) no longer fall back to the browser's own control font, and printing uses the page's font instead of `system-ui`.
+- a9a24bb: German and Spanish: the "export too large" message matches the Laravel package's and the rest of the texts (Spanish no longer mixes "tú" into the "usted" texts).
+- @acunsoft/datatable-core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes
