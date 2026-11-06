@@ -64,3 +64,25 @@ test.describe('keyboard and screen reader use of the docs', () => {
     await expect(page.locator('#skip')).toHaveText('Skip to content');
   });
 });
+
+test('search: Ctrl+K finds a section whatever the accents, Enter opens it', async ({ page }) => {
+  await page.goto('/site/index.html#/home');
+  await expect(page.locator('#ver')).toHaveText(/^v\d+\.\d+\.\d+$/);
+  await page.keyboard.press('Control+k');
+  const dialog = page.getByRole('dialog', { name: 'Ara' });
+  await expect(dialog).toBeVisible();
+  await page.keyboard.type('sinirlar sayfa basi');
+  await expect(dialog.locator('#sres a').first()).toHaveAttribute('href', '#/pagesize/limits');
+  await expect(dialog.locator('#sres a').first().locator('mark').first()).toHaveText('Sınırlar');
+  await page.keyboard.press('Enter');
+  await expect(dialog).toBeHidden();
+  await expect(page).toHaveURL(/#\/pagesize\/limits$/);
+  await expect(page.locator('section#limits h2')).toBeInViewport();
+  await page.keyboard.press('/');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.type('zzzz');
+  await expect(dialog).toContainText('Sonuç bulunamadı.');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('#search')).toBeFocused();
+});

@@ -65,6 +65,29 @@
   .ib svg{width:19px;height:19px}
   .cta{height:38px;padding:0 16px;border:0;border-radius:var(--radius);background:var(--brand);color:#fff;font-weight:600;font-size:14px;cursor:pointer;margin-left:6px;white-space:nowrap}
   .cta:hover{filter:brightness(1.07)}
+  .ver{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 9px;white-space:nowrap;margin-left:-10px}
+  .ver:hover{color:var(--ink);border-color:var(--line-strong)}
+  .sbtn{display:inline-flex;align-items:center;gap:8px;height:36px;min-width:230px;padding:0 8px 0 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-subtle);color:var(--muted);font-size:14px;cursor:pointer}
+  .sbtn:hover{border-color:var(--line-strong);color:var(--ink)}
+  .sbtn svg{width:16px;height:16px;flex:none}
+  .sbtn kbd,.sdlg kbd{margin-left:auto;font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);border-radius:4px;padding:1px 6px;background:var(--surface);color:var(--faint)}
+  /* search dialog */
+  .sdlg{width:min(640px,calc(100vw - 32px));max-height:min(560px,calc(100vh - 120px));margin:12vh auto 0;padding:0;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);color:var(--text);box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;flex-direction:column}
+  .sdlg[open]{display:flex}
+  .sdlg::backdrop{background:rgba(10,12,20,.45)}
+  .sdlg .sin{display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line)}
+  .sdlg .sin svg{width:18px;height:18px;color:var(--faint);flex:none}
+  .sdlg input{flex:1;min-width:0;height:52px;border:0;background:none;outline:none;font:inherit;font-size:16px;color:var(--ink)}
+  .sdlg input::-webkit-search-cancel-button{display:none}
+  .sdlg ul{list-style:none;margin:0;padding:6px;overflow:auto}
+  .sdlg li a{display:block;padding:9px 12px;border-radius:var(--radius);cursor:pointer}
+  .sdlg li a .p{display:block;font-size:12px;color:var(--faint)}
+  .sdlg li a .s{display:block;font-weight:600;color:var(--ink);font-size:14.5px}
+  .sdlg li a .x{display:block;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sdlg mark{background:none;color:var(--brand-text);font-weight:700}
+  .sdlg li a:hover,.sdlg li a:focus{background:var(--brand-soft);outline:none}
+  .sdlg .empty{padding:24px;text-align:center;color:var(--muted);font-size:14px}
+  .sdlg .foot{display:flex;gap:14px;padding:8px 14px;border-top:1px solid var(--line);font-size:12px;color:var(--faint)}
   .btn{display:inline-flex;align-items:center;height:38px;padding:0 16px;margin-right:10px;border-radius:var(--radius);background:var(--brand-text);color:#fff;font-weight:600;font-size:14px;text-decoration:none}
   .btn:hover{filter:brightness(1.07)}
   .muted{color:var(--muted);font-size:14px}
@@ -205,6 +228,8 @@
     .tools{margin-left:auto}
     .burger{display:inline-flex}
     .cta{display:none}
+    .sbtn{min-width:0;padding:0 10px;border:0;background:none}
+    .sbtn .lbl,.sbtn kbd{display:none}
     .layout{grid-template-columns:minmax(0,1fr)}
     .side{position:fixed;left:0;top:var(--topbar);bottom:0;height:auto;width:min(300px,86vw);z-index:40;background:var(--surface);transform:translateX(-100%);transition:transform .2s,visibility 0s .2s;visibility:hidden;padding:24px 18px 40px}
     .side.open{transform:none;box-shadow:var(--shadow-sm);visibility:visible;transition:transform .2s}
@@ -225,6 +250,7 @@
   }
   @media (max-width:520px){
     .logo span.t{display:none}
+    .ver{display:none}
     .content h1{font-size:24px}
     .content h1 .hi{width:34px;height:34px}
     .codewrap pre{font-size:12px}
@@ -240,8 +266,11 @@
 <header class="top">
   <button class="ib burger" id="burger" aria-label="Menü" aria-expanded="false" aria-controls="side"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   <a class="logo" href="#/home"><span class="mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></span><span class="t">Acun DataTable</span></a>
+  <a class="ver" id="ver" href="#/upgrade" data-go="upgrade"></a>
+  <button class="sbtn" id="search" type="button" aria-haspopup="dialog"></button>
   <nav class="tnav" id="tnav"></nav>
   <div class="tools">
+    <a class="ib" id="gh" href="https://github.com/Acunsoft-Yazilim/acun-datatable" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg></a>
     <button class="ib" id="lang" aria-label="Dil"></button>
     <button class="ib" id="theme" aria-label="Tema"></button>
     <button class="cta" id="cta"></button>
@@ -254,6 +283,11 @@
   <aside class="toc" id="toc"></aside>
 </div>
 <div class="backdrop" id="backdrop"></div>
+<dialog class="sdlg" id="sdlg">
+  <div class="sin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="sq" type="search" autocomplete="off" spellcheck="false" aria-controls="sres"><kbd>Esc</kbd></div>
+  <ul id="sres"></ul>
+  <div class="foot" id="sfoot"></div>
+</dialog>
 
 <link rel="stylesheet" href="demo/styles.css">
 <script src="demo/acun-datatable.min.js"></script>
@@ -2763,7 +2797,7 @@ const T = {
        home:"Giriş", api:"API referansı", toc:"Bu sayfada",
        s_install:"Kurulum", s_usage:"İlk tablo", s_examples:"Örnekler", s_api:"API",
        d_install:"Paketleri projene ekle.", d_usage:"İlk tablonuz; kopyalayıp kolonlarınızı yazın.", d_examples:"Kopyalanıp uyarlanabilecek örnekler.", d_api:"Kullanılan çekirdek fonksiyonlar.",
-       preview:"planlanıyor", updated:"Son güncelleme · 24 Ekim 2026",
+       preview:"planlanıyor", search:"Ara", search_ph:"Kılavuzda ara…", search_none:"Sonuç bulunamadı.", search_hint:"↑ ↓ seç · Enter aç · Esc kapat", search_start:"Bir sayfa, bölüm ya da seçenek adı yazın.", ver_label:"Sürümler",
        ex1:"Sıralama ve sayfalama", ex1d:"Çok kolonlu stable sıralama, ardından 1-tabanlı sayfa.",
        ex2:"Durumu dinlemek", ex2d:"State değişikliklerinde donmuş snapshot alırsın.",
        prevNote:"Bu paket henüz yazılmadı; aşağıdaki kod taslak bir API'dir ve değişebilir. Kurulum komutu yoktur. Örneklerdeki çekirdek fonksiyonlar bugün kullanılabilir.",
@@ -2802,7 +2836,7 @@ const T = {
        home:"Introduction", api:"API reference", toc:"On this page",
        s_install:"Installation", s_usage:"First table", s_examples:"Examples", s_api:"API",
        d_install:"Add the packages to your project.", d_usage:"Your first table; copy it and write your columns.", d_examples:"Examples to copy and adapt.", d_api:"Core functions used.",
-       preview:"planned", updated:"Last updated · 24 October 2026",
+       preview:"planned", search:"Search", search_ph:"Search the docs…", search_none:"No results.", search_hint:"↑ ↓ choose · Enter open · Esc close", search_start:"Type a page, section or option name.", ver_label:"Versions",
        ex1:"Sorting and pagination", ex1d:"Multi-column stable sorting, then a 1-based page.",
        ex2:"Listening to state", ex2d:"Every state change gives you a frozen snapshot.",
        prevNote:"This package is not written yet; the code below is a draft API and may change. There is no install command. The core functions in the examples are available today.",
@@ -2902,14 +2936,14 @@ function page(r) {
   }
   if (r === 'api') {
     return { toc:[['a1',t.a_s1],['a2',t.a_s2]], html:
-      `<h1><span class="hi">${ICON.api}</span>${t.api_title}</h1><p class="lead">${t.api_lead}</p><div class="meta"><span>@acunsoft/datatable-core</span><span>${t.updated}</span></div>` +
+      `<h1><span class="hi">${ICON.api}</span>${t.api_title}</h1><p class="lead">${t.api_lead}</p><div class="meta"><span>@acunsoft/datatable-core</span></div>` +
       sec('a1',1,t.a_s1,t.a_s1d,apiList()) +
       sec('a2',2,t.a_s2,t.a_s2d,code(EX_TABLE,'typescript')+code(EX_SORT,'typescript')+code(EX_STATE,'typescript')) };
   }
   if (GUIDES[r] || PAGES[r]) {
     const g = GUIDES[r] ?? PAGES[r];
     return { toc: g.sections.map(x => [x.id, x.title[lang]]), html:
-      `<h1><span class="hi">${ICON.guide}</span>${esc(g.title[lang])}</h1><p class="lead">${g.lead[lang]}</p><div class="meta"><span>${GUIDES[r] ? t.g_guides : t.g_resources}</span><span>${t.updated}</span></div>` +
+      `<h1><span class="hi">${ICON.guide}</span>${esc(g.title[lang])}</h1><p class="lead">${g.lead[lang]}</p><div class="meta"><span>${GUIDES[r] ? t.g_guides : t.g_resources}</span></div>` +
       g.sections.map((x, i) => sec(x.id, i + 1, esc(x.title[lang]), x.desc ? esc(x.desc[lang]) : '',
         (x.tabs ? tabs(x.tabs) : '') + (x.code ? code(x.code[1], x.code[0]) : '') + (x.table ? gtable(x.table) : '') +
         (x.note ? `<div class="note">${x.note[lang]}</div>` : ''))).join('') };
@@ -2922,7 +2956,7 @@ function page(r) {
     x.parts.map(part => `${part.title ? `<h3 class="sub">${esc(part.title[lang])}</h3>` : ''}${part.desc ? `<p>${esc(part.desc[lang])}</p>` : ''}${code(part.code, part.lang)}`).join('') +
     (x.note ? `<div class="note">${x.note[lang]}</div>` : ''));
   return { toc:[['install',t.s_install],['usage',t.s_usage],['examples',t.s_examples],...topics.map(x => [x.id, x.title[lang]]),['next',t.s_next],['api',t.s_api]], html:
-    `<h1><span class="hi">${ICON[r]}</span>${f.name}${f.status === 'ready' ? '' : ` <span class="pill">${t.preview}</span>`}</h1><p class="lead">${f.lead[lang]}</p><div class="meta"><span>${esc(f.pkg)}</span><span>${t.updated}</span></div>` +
+    `<h1><span class="hi">${ICON[r]}</span>${f.name}${f.status === 'ready' ? '' : ` <span class="pill">${t.preview}</span>`}</h1><p class="lead">${f.lead[lang]}</p><div class="meta"><span>${esc(f.pkg)}</span></div>` +
     (f.status === 'ready' ? '' : `<div class="note warn" style="margin-top:22px">${t.prevNote}</div>`) +
     sec('install',1,t.s_install,t.d_install,
       (f.status === 'ready' ? `<p>${f.unpub ? f.unpub[lang] : t.unpub}</p>${code(f.install,'bash')}` : `<p>${t.planned_install}</p>`) + `<div class="note"><strong>${t.sec_label}</strong> ${f.note[lang]}</div>`) +
@@ -2935,9 +2969,82 @@ function page(r) {
     sec('api',5 + topics.length,t.s_api,t.d_api,apiList(f.api ?? (f.status === 'ready' ? undefined : '@acunsoft/datatable-core'))) };
 }
 
+/* The published versions, shown in the header; change them with every release. */
+const VERSIONS = { npm: '0.6.0', laravel: '0.6.1' };
+const MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
+/* ======================= search ======================= */
+/* Folded for matching, one character for one (so a match's place in the folded text is its place in the text):
+   case, accents and Turkish dotted/dotless i do not matter. */
+const fold = (s) => Array.from(String(s), ch => {
+  const f = ch.toLocaleLowerCase('tr').normalize('NFD').replace(/\p{M}/gu, '').replace('ı', 'i');
+  return f.length === ch.length ? f : ch.toLowerCase().length === ch.length ? ch.toLowerCase() : ch;
+}).join('');
+const SEARCH = {};
+/** An element's words, with a space between cells, items and blocks; tab names and buttons left out. */
+const textOf = (el) => {
+  if (!el) return '';
+  const parts = [], walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentElement.closest('.tablist, button') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+  while (walk.nextNode()) parts.push(walk.currentNode.nodeValue);
+  return parts.join(' ').replace(/\s+/g, ' ').replace(/ ([.,;:!?)])/g, '$1').trim();
+};
+/** Every page and every section of it, in the current language, built from the pages themselves. */
+function searchIndex() {
+  if (SEARCH[lang]) return SEARCH[lang];
+  const box = document.createElement('div'), out = [];
+  for (const r of ['home', ...FW_ORDER, ...GUIDE_ORDER, ...PAGE_ORDER, 'api']) {
+    box.innerHTML = page(r).html;
+    const title = box.querySelector('h1')?.textContent.trim() || r;
+    out.push({ r, id: '', page: '', title, text: textOf(box.querySelector('.lead')) });
+    for (const s of box.querySelectorAll('section[id]')) {
+      out.push({ r, id: s.id, page: title, title: s.querySelector('h2')?.textContent.trim() ?? '', text: textOf(s.querySelector('.body')) });
+    }
+  }
+  return SEARCH[lang] = out.map(e => ({ ...e, ft: fold(`${e.title} ${e.page}`), fx: fold(e.text) }));
+}
+/** Marks the words in a piece of text (escaped). */
+const marked = (text, words) => {
+  const f = fold(text), hits = [];
+  for (const w of words) { let i = f.indexOf(w); while (i >= 0) { hits.push([i, i + w.length]); i = f.indexOf(w, i + w.length); } }
+  hits.sort((a, b) => a[0] - b[0]);
+  let html = '', at = 0;
+  for (const [a, b] of hits) { if (a < at) continue; html += esc(text.slice(at, a)) + `<mark>${esc(text.slice(a, b))}</mark>`; at = b; }
+  return html + esc(text.slice(at));
+};
+function runSearch() {
+  const t = T[lang], q = $('#sq').value, words = fold(q).split(/\s+/).filter(Boolean);
+  if (!words.length) { $('#sres').innerHTML = `<li class="empty">${t.search_start}</li>`; return; }
+  const found = searchIndex()
+    .map(e => ({ e, score: words.every(w => e.ft.includes(w) || e.fx.includes(w)) ? words.reduce((n, w) => n + (e.ft.includes(w) ? 10 : 0) + (e.fx.includes(w) ? 1 : 0), e.id ? 0 : 2) : 0 }))
+    .filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 20);
+  $('#sres').innerHTML = found.length ? found.map(({ e }) => {
+    const at = e.fx.indexOf(words.find(w => e.fx.includes(w)) ?? '\u0000');
+    let from = Math.max(0, at - 50);
+    if (from) from = e.text.indexOf(' ', from) + 1 || from; // start at a word
+    const snippet = at >= 0 ? (from ? '…' : '') + e.text.slice(from, from + 150) : e.text.slice(0, 150);
+    return `<li><a href="#/${e.r}${e.id ? '/' + e.id : ''}">${e.page ? `<span class="p">${esc(e.page)}</span>` : ''}<span class="s">${marked(e.title, words)}</span>${snippet ? `<span class="x">${marked(snippet, words)}</span>` : ''}</a></li>`;
+  }).join('') : `<li class="empty">${t.search_none}</li>`;
+}
+function openSearch() {
+  const t = T[lang], dlg = $('#sdlg');
+  if (dlg.open) return;
+  dlg.setAttribute('aria-label', t.search);
+  $('#sq').placeholder = t.search_ph;
+  $('#sq').setAttribute('aria-label', t.search_ph);
+  $('#sfoot').textContent = t.search_hint;
+  dlg.showModal();
+  $('#sq').select();
+  runSearch();
+}
+
 /* ======================= render ======================= */
 function renderHeader(r) {
   const t = T[lang];
+  $('#ver').textContent = 'v' + VERSIONS.npm;
+  $('#ver').title = `npm ${VERSIONS.npm} · Laravel ${VERSIONS.laravel}`;
+  $('#ver').setAttribute('aria-label', `${t.ver_label}: npm ${VERSIONS.npm}, Laravel ${VERSIONS.laravel}`);
+  $('#search').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="lbl">${t.search_ph}</span><kbd>${MAC ? '⌘K' : 'Ctrl K'}</kbd>`;
+  $('#search').setAttribute('aria-label', t.search);
   const first = FW_ORDER[0];
   const tn = [['home',t.nav_start],[first,t.nav_fw],[GUIDE_ORDER[0],t.nav_guides],['api',t.nav_api]];
   const active = r === 'home' ? 'home' : r === 'api' ? 'api' : GUIDES[r] || PAGES[r] ? GUIDE_ORDER[0] : first;
@@ -3080,6 +3187,31 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && $('#side').classList.contains('open')) { closeSide(); $('#burger').focus(); }
 });
 $('#skip').onclick = () => { $('#content').focus(); };
+$('#search').onclick = openSearch;
+$('#sq').addEventListener('input', runSearch);
+$('#sdlg').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) { e.currentTarget.close(); return; } // the backdrop
+  const a = e.target.closest('a');
+  if (!a) return;
+  e.currentTarget.close();
+  if (a.getAttribute('href') === location.hash) { e.preventDefault(); render(false); } // same place: scroll to it again
+});
+$('#sdlg').addEventListener('keydown', (e) => {
+  const links = [...$('#sres').querySelectorAll('a')], i = links.indexOf(document.activeElement);
+  if (e.key === 'Escape') { e.preventDefault(); e.currentTarget.close(); return; } // one press, even when a search field would first clear itself
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!links.length) return;
+    const next = e.key === 'ArrowDown' ? (i + 1) % links.length : i <= 0 ? -1 : i - 1;
+    (next < 0 ? $('#sq') : links[next]).focus();
+  } else if (e.key === 'Enter' && document.activeElement === $('#sq') && links[0]) { e.preventDefault(); links[0].click(); }
+  else if (i >= 0 && e.key.length === 1 && !e.metaKey && !e.ctrlKey) $('#sq').focus(); // typing goes on in the field
+});
+$('#sdlg').addEventListener('close', () => $('#search').focus());
+document.addEventListener('keydown', (e) => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
+  if ((e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) { e.preventDefault(); openSearch(); }
+});
 $('#backdrop').onclick = closeSide;
 $('#cta').onclick = () => { location.hash = '#/home/s1'; };
 $('#lang').onclick = () => { lang = lang === 'tr' ? 'en' : 'tr'; try { localStorage.setItem('adt-lang', lang); } catch (e) {} rendered = null; render(false); };

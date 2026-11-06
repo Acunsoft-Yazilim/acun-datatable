@@ -74,6 +74,7 @@ test.describe('accessibility (axe)', () => {
       if (route === 'server') await page.emulateMedia({ colorScheme: 'dark' }); // one page in dark mode too
       await page.goto(`/site/index.html#/${route}`);
       await expect(page.locator('#content h1')).toBeVisible();
+      if (route === 'api') { await page.keyboard.press('Control+k'); await page.keyboard.type('mobil'); await expect(page.locator('#sres a').first()).toBeVisible(); } // the search dialog too
       const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
       expect(result.violations.map(violation => `${violation.id}: ${violation.help} (${violation.nodes.slice(0, 3).map(node => node.target.join(' ')).join(', ')})`)).toEqual([]);
     });
